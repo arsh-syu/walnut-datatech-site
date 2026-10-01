@@ -4,6 +4,11 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import config from './site.config.mjs';
+
+// Root-absolute links (used by 404.html) include the path the site is served from, e.g. /repo-name/.
+const siteUrl = (process.env.SITE_URL || config.siteUrl).replace(/\/+$/, '');
+const basePath = siteUrl ? new URL(siteUrl + '/').pathname : '/';
 
 const dist = join(dirname(fileURLToPath(import.meta.url)), 'dist');
 const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
@@ -35,7 +40,7 @@ for (const [file, html] of cache) {
     const clean = pathPart.split('?')[0];
     let target = file;
     if (clean) {
-      target = clean.startsWith('/') ? join(dist, clean) : resolve(dirname(file), clean);
+      target = clean.startsWith('/') ? join(dist, clean.startsWith(basePath) ? clean.slice(basePath.length) : clean) : resolve(dirname(file), clean);
       if (existsSync(target) && statSync(target).isDirectory()) target = join(target, 'index.html');
       if (!existsSync(target)) {
         fail(file, `broken link → ${ref}`);
