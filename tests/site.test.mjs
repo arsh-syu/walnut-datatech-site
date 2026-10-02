@@ -18,6 +18,8 @@ const PORT = 4391;
 const api = (path, body, headers = { 'Content-Type': 'application/json' }) =>
   fetch(`http://localhost:${PORT}/api/${path}`, body === undefined ? {} : { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 const learner = { name: 'Test Learner', email: 'test@example.com', phone: '9999999999' };
+const enquiry = { topic: 'General enquiry', name: 'Asha Rao', organisation: 'Example University', email: 'asha@example.com', message: 'Hello' };
+const outbox = async () => (await (await fetch(`http://localhost:${PORT}/api/_outbox`)).json());
 
 let server;
 before(async () => {
@@ -84,7 +86,7 @@ test('the audience selector only controls its own three tabs', () => {
 
 test('health endpoint reports status without leaking details', async () => {
   const data = await (await api('health.php')).json();
-  assert.deepEqual(data, { ok: true, curl: true, configured: false, mode: null });
+  assert.deepEqual(data, { ok: true, curl: true, configured: false, email: true, mode: null });
 });
 
 test('create-order rejects an unknown course', async () => {
@@ -121,6 +123,72 @@ test('verify-payment rejects malformed payment details', async () => {
   assert.equal(res.status, 400);
 });
 
+/* ---------- enquiries and email ---------- */
+
+test('the dev server never sends real email unless asked to', async () => {
+  assert.equal((await outbox()).sending, false);
+});
+
+test('an enquiry emails the team and acknowledges the sender', async () => {
+  const before = (await outbox()).emails.length;
+  const res = await api('enquiry.php', { ...enquiry, phone: '', configuration: 'Goal: Launch\nServices: 2', page: '/contact/' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true });
+  const sent = (await outbox()).emails.slice(before);
+  assert.deepEqual(sent.map((e) => [e.template, e.to.address]), [['enquiry_notify', 'support@walnutdatatech.com'], ['enquiry_ack', 'asha@example.com']]);
+  assert.equal(sent[0].subject, 'New enquiry: General enquiry — Example University');
+  assert.equal(sent[1].subject, 'We’ve received your enquiry');
+  for (const email of sent) {
+    assert.ok(!/\{\{|\}\}/.test(email.subject + email.html + email.text), 'no unfilled placeholders');
+    assert.ok(email.html.includes('Example University') && email.text.includes('Example University'));
+    assert.ok(!email.html.includes('>Phone<'), 'empty fields are left out');
+    assert.ok(email.html.includes('Goal: Launch<br>Services: 2'), 'line breaks survive in HTML');
+  }
+});
+
+test('enquiry text cannot inject HTML into the email', async () => {
+  const before = (await outbox()).emails.length;
+  await api('enquiry.php', { ...enquiry, name: 'Eve <script>alert(1)</script>', message: '<img src=x onerror=alert(1)> {{{rows}}}' });
+  const [notify] = (await outbox()).emails.slice(before);
+  assert.ok(!notify.html.includes('<script>alert(1)') && !notify.html.includes('<img src=x'));
+  assert.ok(notify.html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+});
+
+test('enquiry rejects bad input with the field to fix, and sends nothing', async () => {
+  const before = (await outbox()).emails.length;
+  for (const [patch, field] of [[{ name: '' }, 'name'], [{ organisation: '' }, 'organisation'], [{ email: 'nope' }, 'email'], [{ message: 'x'.repeat(4001) }, 'message']]) {
+    const res = await api('enquiry.php', { ...enquiry, ...patch });
+    assert.equal(res.status, 422, field);
+    assert.equal((await res.json()).field, field);
+  }
+  assert.equal((await api('enquiry.php', 'name=x', { 'Content-Type': 'application/x-www-form-urlencoded' })).status, 400);
+  assert.equal((await outbox()).emails.length, before);
+});
+
+test('a bot that ticks the hidden box gets a polite answer and no email', async () => {
+  const before = (await outbox()).emails.length;
+  const res = await api('enquiry.php', { ...enquiry, botcheck: true });
+  assert.equal(res.status, 200);
+  assert.equal((await outbox()).emails.length, before);
+});
+
+test('enquiries are rate-limited per visitor', async () => {
+  let last;
+  for (let i = 0; i < 9; i++) last = await api('enquiry.php', enquiry);
+  assert.equal(last.status, 429);
+});
+
+test('every email template is complete and on-brand', () => {
+  const { row, emails } = JSON.parse(readFileSync(join(dist, 'api/emails.json'), 'utf8'));
+  assert.deepEqual(Object.keys(emails).sort(), ['enquiry_ack', 'enquiry_notify', 'enrol_confirm', 'enrol_notify']);
+  assert.ok(row.includes('{{label}}') && row.includes('{{{value}}}'));
+  for (const [name, email] of Object.entries(emails)) {
+    assert.ok(email.subject && email.html && email.text, name);
+    assert.ok(email.html.includes('{{{rows}}}') && email.text.includes('{{{rows}}}'), `${name} lists the details`);
+    assert.ok(email.html.includes('/assets/img/logo-email.png') && email.html.includes('#0d0c14'), `${name} carries the logo and brand ink`);
+  }
+});
+
 /* ---------- published files ---------- */
 
 test('nothing secret is published', () => {
@@ -130,6 +198,7 @@ test('nothing secret is published', () => {
     assert.ok(!/rzp_(test|live)_[A-Za-z0-9]{6,}/.test(text), `Razorpay key in ${file}`);
     assert.ok(!/key_secret['"]?\s*(=>|:|=)\s*['"][^'"]{8,}/.test(text), `secret in ${file}`);
     assert.ok(!/FTP_(USER|PASS|HOST)\s*=\s*\S/.test(text), `FTP setting in ${file}`);
+    assert.ok(!/\bSK[0-9a-f]{32}\b|\bAC[0-9a-f]{32}\b|twilio_secret['"]?\s*(=>|:|=)\s*['"][^'"]{8,}/.test(text), `Twilio credential in ${file}`);
   }
   assert.ok(!walk(dist).some((f) => /config\.php$|\.env/.test(f)), 'config.php or .env must not be in dist');
 });
@@ -146,4 +215,5 @@ test('server configuration sets security headers and caching', () => {
   }
   const api = readFileSync(join(dist, 'api/.htaccess'), 'utf8');
   assert.match(api, /config\|catalog\|lib/);
+  assert.match(api, /emails\\\.json/, 'email templates are not served');
 });

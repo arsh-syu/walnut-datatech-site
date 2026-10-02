@@ -12,6 +12,7 @@ npm run check    # build, then verify links, outline, SEO metadata, accessibilit
 npm test         # syntax-check every file, then run the test suite (prices, coupons, payment API rules, no secrets published)
 npm run dev      # build and serve at http://localhost:4173 (with a local mirror of the payment API)
 npm run deploy   # build, upload to the web host over FTP, and verify the live site
+node scripts/test-emails.mjs you@example.com   # send every website email, with sample data, to that address
 ```
 
 Requires Node 20+. There is nothing to install — no dependencies.
@@ -23,16 +24,17 @@ Requires Node 20+. There is nothing to install — no dependencies.
 | University services, modules, engagement models, configurator goals | `src/data/services.mjs` |
 | Courses, prices and coupons | `src/data/courses.mjs` |
 | Audiences ("What brings you to Walnut?"), partner applications, navigation | `src/data/site.mjs` |
-| Site URL, form delivery, links, videos, clients, certifications, **legal details**, analytics | `site.config.mjs` |
+| Site URL, links, videos, clients, certifications, **legal details**, analytics | `site.config.mjs` |
+| Email templates (enquiry and enrolment emails) | `src/emails/templates.mjs` |
 | Page templates and shared blocks | `src/templates/` |
 | Security policy (CSP and response headers) | `src/security.mjs` |
 | Styles (tokens → components → sections → journeys) | `src/assets/css/` |
 | Interactions, forms, configurator, checkout, analytics | `src/assets/js/` |
-| Payment API (runs on the web host) | `src/api/` |
+| Payment and enquiry API (runs on the web host) | `src/api/` |
 | Deploy script, local dev server | `scripts/` |
 | Tests | `tests/` |
 | Brand kit for re-theming other tools (tokens, component styles, logos, icons, guidelines) | `brand/` — start with `brand/brand-book.html` |
-| Secrets (FTP login, Razorpay keys) — never committed | `.env` (see `.env.example`) |
+| Secrets (FTP login, Razorpay keys, Twilio API key) — never committed | `.env` (see `.env.example`) |
 
 ## Common edits
 
@@ -58,15 +60,32 @@ To go live: fill `legal.refundPolicy` in `site.config.mjs`, replace the test key
 
 `scripts/dev-server.mjs` mirrors the PHP endpoints in Node for local testing and refuses anything but Razorpay **test** keys. Keep the two in step when changing payment rules.
 
+## Email
+
+The site sends four emails through Twilio, all from the address in `EMAIL_FROM`:
+
+| When | Who receives it |
+|---|---|
+| Someone submits a contact form or a solution configuration | The team (`EMAIL_NOTIFY`), with a button to reply to the sender |
+| The same | The sender, as an acknowledgement with a copy of what they sent |
+| A course payment is verified | The learner, as an enrolment confirmation with the payment reference |
+| The same | The team, with the learner's contact details and both references |
+
+- The browser posts an enquiry to `api/enquiry.php`; the server validates it, rate-limits it and sends the emails. The Twilio key never reaches the browser.
+- An enquiry only shows "Thank you" if the team's copy was accepted by Twilio. Otherwise the visitor is asked to try again.
+- Enrolment emails take the learner's details from the order stored at Razorpay, not from the browser, and are sent once per payment.
+- Wording and design live in `src/emails/templates.mjs`. Preview them by running `npm run dev`, submitting a form, and opening `/api/_outbox` — the dev server captures emails instead of sending them unless started with `--send-emails`.
+- Twilio must have the sending domain verified before it will deliver mail from it.
+
 ## Security
 
-- A Content-Security-Policy on every page allows only this site's own files and the third parties it uses (Razorpay, Google Fonts, the form provider, and video hosts). Adding a new third party means adding it in `src/security.mjs`.
+- A Content-Security-Policy on every page allows only this site's own files and the third parties it uses (Razorpay, Google Fonts and video hosts). Adding a new third party means adding it in `src/security.mjs`.
 - The web server sends `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and HSTS (generated into `dist/.htaccess`).
 - `npm test` fails if a key, secret or FTP setting appears in the published files.
 
 ## Deploying
 
-Production is https://walnutdatatech.com, published with `npm run deploy` (settings in `.env`). The script uploads the site, confirms the server executes PHP, and only then uploads the Razorpay keys.
+Production is https://walnutdatatech.com, published with `npm run deploy` (settings in `.env`). The script uploads the site, confirms the server executes PHP, and only then uploads the Razorpay and Twilio keys.
 
 ### Uploading by hand instead
 
@@ -75,13 +94,18 @@ If you prefer your host's File Manager or an FTP app:
 1. Run `npm run build`.
 2. Upload **everything inside `dist/`** (including the hidden `.htaccess` files) to the website's root folder.
 3. Open `https://your-domain/api/health.php` — it should show `{"ok":true,...}`. If it shows PHP source code instead, stop: PHP is not enabled, and the next step would expose your key.
-4. To switch on payments, create `api/config.php` on the server with your Razorpay keys:
+4. To switch on payments and email, create `api/config.php` on the server with your keys:
 
    ```php
    <?php
    return [
      'key_id' => 'rzp_test_xxxxxxxxxxxx',
      'key_secret' => 'your-key-secret',
+     'twilio_key' => 'SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+     'twilio_secret' => 'your-twilio-api-secret',
+     'email_from' => 'support@walnutdatatech.com',
+     'email_from_name' => 'Walnut Data Tech',
+     'email_notify' => 'support@walnutdatatech.com',
    ];
    ```
 

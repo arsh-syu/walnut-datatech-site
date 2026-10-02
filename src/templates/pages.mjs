@@ -443,8 +443,8 @@ export function privacy({ root }) {
     <p>We do not ask for, and you should not send us, sensitive information such as identity documents or bank details through this website.</p>`],
       ['automatic', 'Information collected automatically', `<p>Like most websites, the servers that host this site record technical information about each request — such as your IP address, browser type, the page requested and the time — in standard server logs kept for security and troubleshooting.${ga ? ' With your consent we also use Google Analytics, described under “Cookies and similar technologies”.' : ' We do not use analytics, advertising or tracking tools on this website.'}</p>`],
       ['use', 'How we use your information', `<ul>
-      <li>to respond to your enquiry and prepare a proposal;</li>
-      <li>to process your enrolment, confirm your payment and give you access to your course;</li>
+      <li>to respond to your enquiry and prepare a proposal, and to email you a copy of what you sent;</li>
+      <li>to process your enrolment, email you a confirmation of your payment and give you access to your course;</li>
       <li>to keep the website secure and working;</li>
       <li>to meet our legal, tax and accounting obligations.</li>
     </ul>
@@ -452,7 +452,7 @@ export function privacy({ root }) {
       ['payments', 'Payments', `<p>Course payments are processed by Razorpay. Your card, UPI or bank details are entered on Razorpay’s secure checkout and are never seen or stored by us. We send Razorpay your name, email address, phone number, the course and the amount so it can process the payment, and Razorpay returns the payment status and reference to us. Razorpay handles your information under its own privacy policy.</p>`],
       ['sharing', 'Who we share information with', `<p>We share information only with service providers that help us run this website, and only as far as they need it:</p>
     <ul>
-      ${config.form.provider ? `<li><strong>${esc(config.form.provider)}</strong> — delivers the enquiries you submit to our inbox.</li>` : ''}
+      <li><strong>${esc(config.email.provider)}</strong> — sends our emails: your enquiry is emailed to our team, and a confirmation is emailed to you.</li>
       <li><strong>Razorpay</strong> — processes course payments.</li>
       <li><strong>Our hosting providers</strong> — serve the website and keep server logs.</li>
       <li><strong>Google Fonts</strong> — serves the typefaces; your browser requests them from Google, which receives your IP address.</li>

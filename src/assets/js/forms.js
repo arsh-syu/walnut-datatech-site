@@ -1,41 +1,28 @@
 // Enquiry forms: validation, delivery and the success state.
 //
-// Delivery is configured in site.config.mjs → form:
-//   endpoint  — POST JSON to a form backend (Web3Forms, Formspree, your own API)
-//   email     — fallback: open the visitor's mail app with the enquiry pre-filled
+// An enquiry is posted to the site's own API (api/enquiry.php), which emails it to the team and
+// sends the visitor an acknowledgement. The browser never talks to the email provider.
 //
 // Other scripts can add fields by listening for `enquiry:collect` on the form and writing to
 // `event.detail.extra`, and react to a successful send via `enquiry:sent`.
 
 import { track } from './analytics.js';
 
-const config = (() => {
+const api = (() => {
   try {
-    return JSON.parse(document.getElementById('site-config').textContent).form || {};
+    return JSON.parse(document.getElementById('site-config').textContent).api || 'api/';
   } catch {
-    return {};
+    return 'api/';
   }
 })();
 
-const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+const UNAVAILABLE = 'Sorry — your enquiry could not be sent. Please try again in a moment.';
 
 const messages = {
   name: 'Please enter your name.',
   organisation: 'Please enter your organisation.',
   email: 'Please enter a valid email address.',
   phone: 'Please enter a valid phone number.',
-};
-
-const labels = {
-  topic: 'Topic',
-  name: 'Name',
-  organisation: 'Organisation',
-  email: 'Email',
-  phone: 'Phone',
-  message: 'Message',
-  interests: 'Interested in',
-  configuration: 'Configuration',
-  page: 'Sent from',
 };
 
 export function setError(input, message) {
@@ -71,38 +58,21 @@ export function validate(form) {
   return !first;
 }
 
+// Resolves once the server has emailed the enquiry; otherwise throws a message fit to show the visitor.
 export async function deliver(payload) {
-  if (config.endpoint) {
-    const subject = `${payload.topic} — ${payload.organisation || payload.name}`;
-    // `subject`/`from_name` are read by Web3Forms, `_subject`/`_template` by FormSubmit; others ignore them.
-    const body = { subject, from_name: 'Walnut Data Tech website', _subject: subject, _template: 'table', ...payload };
-    if (config.accessKey) body.access_key = config.accessKey;
-    const res = await fetch(config.endpoint, {
-      signal: AbortSignal.timeout(20000), // never leave the visitor waiting on a hung request
+  let res;
+  try {
+    res = await fetch(`${api}enquiry.php`, {
+      signal: AbortSignal.timeout(25000), // never leave the visitor waiting on a hung request
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
-    const reply = await res.json().catch(() => ({}));
-    if (!res.ok || String(reply.success) === 'false') throw new Error(reply.message || `Form endpoint responded ${res.status}`);
-    return 'sent';
+  } catch {
+    throw new Error('We couldn’t reach the server. Check your connection and try again.');
   }
-  if (config.email) {
-    const text = Object.entries(payload)
-      .filter(([, v]) => v)
-      .map(([k, v]) => `${labels[k] || k}: ${v}`)
-      .join('\n');
-    const subject = `${payload.topic} — ${payload.organisation || payload.name}`;
-    location.href = `mailto:${config.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
-    return 'mail';
-  }
-  if (isLocal) {
-    // Local preview without a configured inbox: log the payload so the flow can be tested.
-    console.info('[enquiry preview]', payload);
-    await new Promise((r) => setTimeout(r, 600));
-    return 'preview';
-  }
-  throw new Error('unconfigured');
+  const reply = await res.json().catch(() => null);
+  if (!res.ok || !reply?.ok) throw Object.assign(new Error(reply?.error || UNAVAILABLE), { field: reply?.field });
 }
 
 function bind(form) {
@@ -122,32 +92,29 @@ function bind(form) {
     if (!validate(form)) return;
 
     const data = Object.fromEntries(new FormData(form));
-    if (data.botcheck) return; // honeypot
-    delete data.botcheck;
-
-    const detail = { extra: {}, valid: true };
+    const detail = { extra: {} };
     form.dispatchEvent(new CustomEvent('enquiry:collect', { detail }));
-    const payload = { topic: form.dataset.topic, ...data, ...detail.extra, page: location.pathname };
+    // `botcheck` is a hidden box only a bot would tick; the server quietly drops those.
+    const payload = { topic: form.dataset.topic, ...data, ...detail.extra, botcheck: Boolean(data.botcheck), page: location.pathname };
 
     submit.disabled = true;
     submit.classList.add('is-loading');
     try {
-      const how = await deliver(payload);
-      if (how === 'mail') {
-        success.querySelector('h2').textContent = 'Almost there.';
-        success.querySelector('p').textContent = 'Your email app has opened with your enquiry — press send to finish.';
-      }
+      await deliver(payload);
       form.hidden = true;
       success.hidden = false;
       success.focus();
-      form.dispatchEvent(new CustomEvent('enquiry:sent', { detail: { how, payload }, bubbles: true }));
+      form.dispatchEvent(new CustomEvent('enquiry:sent', { detail: { payload }, bubbles: true }));
       track('enquiry_submit', { topic: payload.topic });
     } catch (err) {
-      status.classList.add('is-error');
-      status.textContent =
-        err.message === 'unconfigured'
-          ? 'This form isn’t connected to an inbox yet. Please try again later.'
-          : 'Sorry — your enquiry could not be sent. Please try again in a moment.';
+      const input = err.field && form.elements[err.field];
+      if (input && input.closest?.('.field')) {
+        setError(input, err.message);
+        input.focus();
+      } else {
+        status.classList.add('is-error');
+        status.textContent = err.message || UNAVAILABLE;
+      }
     } finally {
       submit.disabled = false;
       submit.classList.remove('is-loading');

@@ -4,7 +4,7 @@
 //   node scripts/deploy.mjs --yes    — skip the "overwrite existing site?" question
 //
 // Reads .env (see .env.example): FTP_HOST, FTP_USER, FTP_PASS, FTP_DIR, SITE_URL,
-// RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET.
+// RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, TWILIO_API_KEY, TWILIO_API_SECRET, EMAIL_FROM, EMAIL_FROM_NAME, EMAIL_NOTIFY.
 //
 // Order matters for safety: the site and the payment API are uploaded first, the API is checked
 // to be executing as PHP, and only then is the file holding the Razorpay secret uploaded.
@@ -27,6 +27,7 @@ for (const key of ['FTP_HOST', 'FTP_USER', 'FTP_PASS', 'SITE_URL']) {
 }
 const siteUrl = env.SITE_URL.replace(/\/+$/, '');
 const hasKeys = Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
+const hasEmail = Boolean(env.TWILIO_API_KEY && env.TWILIO_API_SECRET && env.EMAIL_FROM && env.EMAIL_NOTIFY);
 
 // Real money must not be taken before the refund terms are published.
 if (hasKeys && env.RAZORPAY_KEY_ID.startsWith('rzp_live_') && !config.legal.refundPolicy) {
@@ -138,24 +139,36 @@ if (!state.data?.ok) {
 }
 console.log(`✓ Payment API is running${state.data.curl ? '' : ' — WARNING: the PHP curl extension is missing, payments will fail'}`);
 
-if (!hasKeys) {
-  console.log('! RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are not set in .env — the site is live but checkout is disabled.');
-} else {
+if (!hasKeys) console.log('! RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are not set in .env — checkout is disabled.');
+if (!hasEmail) console.log('! TWILIO_API_KEY / TWILIO_API_SECRET / EMAIL_FROM / EMAIL_NOTIFY are not all set in .env — enquiry forms and confirmation emails are disabled.');
+
+if (hasKeys || hasEmail) {
   const phpStr = (v) => `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  const settings = {
+    ...(hasKeys ? { key_id: env.RAZORPAY_KEY_ID, key_secret: env.RAZORPAY_KEY_SECRET } : {}),
+    ...(hasEmail ? { twilio_key: env.TWILIO_API_KEY, twilio_secret: env.TWILIO_API_SECRET, email_from: env.EMAIL_FROM, email_from_name: env.EMAIL_FROM_NAME || 'Walnut Data Tech', email_notify: env.EMAIL_NOTIFY } : {}),
+  };
   const configFile = join(tmp, 'config.php');
-  writeFileSync(configFile, `<?php\n// Written by scripts/deploy.mjs. Never commit or share this file.\nreturn [\n  'key_id' => ${phpStr(env.RAZORPAY_KEY_ID)},\n  'key_secret' => ${phpStr(env.RAZORPAY_KEY_SECRET)},\n];\n`, { mode: 0o600 });
+  writeFileSync(
+    configFile,
+    `<?php\n// Written by scripts/deploy.mjs. Never commit or share this file.\nreturn [\n${Object.entries(settings).map(([k, v]) => `  '${k}' => ${phpStr(v)},`).join('\n')}\n];\n`,
+    { mode: 0o600 }
+  );
   upload([[configFile, 'api/config.php']], remoteDir);
 
-  // The secret must never be readable over the web.
+  // The secrets must never be readable over the web.
   const probe = await fetch(`${siteUrl}/api/config.php?t=${Date.now()}`).then((r) => r.text()).catch(() => '');
-  if (probe.includes('key_secret') || probe.includes(env.RAZORPAY_KEY_SECRET)) {
+  const leaked = ['key_secret', 'twilio_secret', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET].filter(Boolean).some((needle) => probe.includes(needle));
+  if (leaked) {
     curl([`url = ${q(ftpUrl(remoteDir))}`, `quote = ${q(`DELE ${remoteDir}api/config.php`)}`, 'list-only'], { quiet: true });
-    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay key secret and contact the host about PHP handling.');
+    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay and Twilio secrets and contact the host about PHP handling.');
   }
 
   state = await health();
-  if (!state.data?.configured) fail('The keys were uploaded but the payment API does not see them.');
-  console.log(`✓ Razorpay connected in ${state.data.mode.toUpperCase()} mode`);
+  if (hasKeys && !state.data?.configured) fail('The keys were uploaded but the payment API does not see them.');
+  if (hasEmail && !state.data?.email) fail('The email settings were uploaded but the API does not see them.');
+  if (hasKeys) console.log(`✓ Razorpay connected in ${state.data.mode.toUpperCase()} mode`);
+  if (hasEmail) console.log(`✓ Email connected — sending from ${env.EMAIL_FROM}, notifications to ${env.EMAIL_NOTIFY}`);
 }
 
 const home200 = await fetch(`${siteUrl}/?t=${Date.now()}`).then((r) => r.status).catch(() => 0);

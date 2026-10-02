@@ -225,8 +225,7 @@ function consentBanner(root) {
 export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
-  const { endpoint, accessKey, email } = config.form;
-  const clientConfig = JSON.stringify({ form: { endpoint, accessKey, email }, analytics: { ga: config.analytics.gaMeasurementId } }).replace(/</g, '\\u003c');
+  const clientConfig = JSON.stringify({ api: `${root}api/`, analytics: { ga: config.analytics.gaMeasurementId } }).replace(/</g, '\\u003c');
   const v = config.assetVersion ? `?v=${config.assetVersion}` : '';
   return `<!doctype html>
 <html lang="en">

@@ -10,19 +10,10 @@ export default {
     legalName: 'Walnut DataTech Private Limited',
   },
 
-  // Where enquiry forms are delivered.
-  //   endpoint   — any JSON form endpoint (Web3Forms, Formspree, your own API…)
-  //   accessKey  — sent as `access_key` when set (Web3Forms)
-  //   email      — fallback: opens the visitor's mail app addressed here when no endpoint is set
-  //   provider   — name of the delivery service, mentioned in the privacy policy
-  form: {
-    // FormSubmit (formsubmit.co): free, no account. The first submission triggers a one-time
-    // activation email to this address. After activating, FormSubmit gives you a random alias
-    // you can use here in place of the address to keep it out of the page source.
-    endpoint: 'https://formsubmit.co/ajax/marketing@selectyouruniversity.com',
-    accessKey: '',
-    email: '',
-    provider: 'FormSubmit',
+  // Email. Enquiries and enrolment confirmations are sent by the site's own API through this
+  // provider; the sending address and API key live in .env, never here.
+  email: {
+    provider: 'Twilio',
   },
 
   links: {

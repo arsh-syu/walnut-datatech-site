@@ -2,9 +2,10 @@
 //
 // The browser never decides the price. It asks the server for an order (api/create-order.php),
 // the server computes the amount from the course catalogue, and after payment the server
-// verifies Razorpay's signature (api/verify-payment.php) before enrolment is confirmed.
+// verifies Razorpay's signature (api/verify-payment.php) before enrolment is confirmed. The server
+// then emails the learner a confirmation and the team a notification.
 
-import { validate, setError, deliver } from './forms.js';
+import { validate, setError } from './forms.js';
 import { track } from './analytics.js';
 
 const course = JSON.parse(document.getElementById('course-data').textContent);
@@ -220,17 +221,6 @@ form.addEventListener('submit', async (e) => {
     el.success.hidden = false;
     el.success.focus();
     track('purchase', { item: course.slug, value: order.amount / 100, currency: order.currency, coupon: applied?.code ?? '' });
-
-    // Tell the team about the enrolment. The payment is already confirmed, so a failure here is not the learner's problem.
-    deliver({
-      topic: 'Course enrolment',
-      course: course.name,
-      amount: inr(order.amount / 100),
-      coupon: applied?.code ?? 'none',
-      ...learner,
-      payment_id: verified.payment_id,
-      order_id: verified.order_id,
-    }).catch(() => {});
   } catch (err) {
     const input = err.field && form.elements[err.field];
     if (payment) {

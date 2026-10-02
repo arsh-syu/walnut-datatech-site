@@ -38,6 +38,7 @@ if ($coupon !== '') {
 }
 
 $config = load_config();
+require_payments($config);
 rate_limit('create-order', 20, 600);
 $order = razorpay('POST', '/orders', [
     'amount' => $amount * 100, // paise
@@ -45,6 +46,7 @@ $order = razorpay('POST', '/orders', [
     'receipt' => substr($slug, 0, 24) . '-' . bin2hex(random_bytes(6)),
     'notes' => [
         'course' => $course['name'],
+        'slug' => $slug,
         'coupon' => $coupon !== '' ? $coupon : 'none',
         'name' => $name,
         'email' => $email,
