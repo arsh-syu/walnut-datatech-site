@@ -2,6 +2,9 @@
 // Shared helpers for the payment API. Works on PHP 7.4+ with the curl extension.
 declare(strict_types=1);
 
+// Errors go to the server log, never to the visitor.
+ini_set('display_errors', '0');
+
 function respond(int $status, array $body): void
 {
     http_response_code($status);
@@ -26,6 +29,10 @@ function read_post(): array
             respond(403, ['error' => 'Cross-site requests are not allowed.']);
         }
     }
+    // Browsers cannot send JSON cross-site without a preflight, so insisting on it blocks forged form posts.
+    if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== 0) {
+        respond(400, ['error' => 'Invalid request.']);
+    }
     $raw = file_get_contents('php://input');
     if ($raw === false || strlen($raw) > 8192) {
         respond(400, ['error' => 'Invalid request.']);
@@ -35,6 +42,40 @@ function read_post(): array
         respond(400, ['error' => 'Invalid request.']);
     }
     return $data;
+}
+
+// Allows $max calls per $window seconds from one visitor, so the endpoint cannot be used to flood
+// the payment account with orders. State lives in the system temp directory.
+function rate_limit(string $bucket, int $max, int $window): void
+{
+    // Behind a proxy every request shares one REMOTE_ADDR, so prefer the forwarded client address.
+    $forwarded = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '')[0]);
+    $client = $forwarded !== '' ? $forwarded : ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    $handle = @fopen(sys_get_temp_dir() . '/walnut-rl-' . hash('sha256', $bucket . '|' . $client), 'c+');
+    if ($handle === false) {
+        return; // never block a payment because the temp directory is unavailable
+    }
+    flock($handle, LOCK_EX);
+    $now = time();
+    $hits = array_values(array_filter(
+        array_map('intval', explode("\n", (string) stream_get_contents($handle))),
+        function ($time) use ($now, $window) {
+            return $time > $now - $window;
+        }
+    ));
+    $blocked = count($hits) >= $max;
+    if (!$blocked) {
+        $hits[] = $now;
+        ftruncate($handle, 0);
+        rewind($handle);
+        fwrite($handle, implode("\n", $hits));
+    }
+    flock($handle, LOCK_UN);
+    fclose($handle);
+    if ($blocked) {
+        header('Retry-After: ' . $window);
+        respond(429, ['error' => 'Too many attempts. Please wait a few minutes and try again.']);
+    }
 }
 
 // config.php is written by the deploy script and never committed.
@@ -67,7 +108,6 @@ function razorpay(string $method, string $path, ?array $payload, array $config):
     }
     $body = curl_exec($ch);
     $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-    curl_close($ch);
 
     $data = is_string($body) ? json_decode($body, true) : null;
     if ($status < 200 || $status >= 300 || !is_array($data)) {

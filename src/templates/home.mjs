@@ -60,13 +60,13 @@ function audienceBody(root, id) {
       </div>`;
   }
   if (id === 'learners') {
-    return `<div class="course-grid">${courses.map((c, i) => courseCard(root, c, i)).join('')}</div>
+    return `<div class="course-grid">${courses.map((c, i) => courseCard(root, c, i, 4)).join('')}</div>
       <div class="actions center">
         ${button({ href: `${root}academy/`, label: 'See all courses', variant: 'ghost', size: 'lg', arrow: true })}
       </div>`;
   }
   return `<div class="app-preview">
-      ${externalApps.map((app) => `<div class="app-preview-item"><span class="app-ico">${icon(app.icon)}</span><div><p class="app-name">${app.name}</p><p class="app-desc">${app.desc}</p></div></div>`).join('')}
+      ${externalApps.map((app) => `<div class="app-preview-item"><span class="app-ico">${icon(app.icon)}</span><div><h4 class="app-name">${app.name}</h4><p class="app-desc">${app.desc}</p></div></div>`).join('')}
     </div>
     <div class="actions center">
       ${button({ href: '#apps', label: 'Open an application', size: 'lg', arrow: true })}
@@ -75,6 +75,16 @@ function audienceBody(root, id) {
 }
 
 export default function home({ root }) {
+  // The film section only exists once the company video URL is set.
+  const film = config.videos.company
+    ? `<section class="section" id="film">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'The film', title: 'See how it all comes together.', text: 'A short walkthrough of what Walnut Data Tech does, and who we do it for.', center: true })}
+    ${videoTile({ title: 'How Walnut Data Tech works', kicker: 'Company film', url: config.videos.company, cls: 'video-tile-xl' })}
+  </div>
+</section>`
+    : '<div class="section-gap"></div>';
+
   const body = `
 <section class="hero">
   <div class="hero-glow" aria-hidden="true"></div>
@@ -85,7 +95,7 @@ export default function home({ root }) {
     <p class="lede hero-fade" style="--d:.75s">Walnut Data Tech runs online programmes for universities, teaches career skills through short courses, and gives education agents the tools to grow.</p>
     <div class="actions center hero-fade" style="--d:.9s">
       ${button({ href: '#start', label: 'Find your path', size: 'lg', arrow: true })}
-      <button class="btn btn-ghost btn-lg" type="button" data-video="${esc(config.videos.company)}" data-video-title="Walnut Data Tech — company film">${icon('play')}<span>Watch the film</span></button>
+      ${config.videos.company ? `<button class="btn btn-ghost btn-lg" type="button" data-video="${esc(config.videos.company)}" data-video-title="Walnut Data Tech — company film">${icon('play')}<span>Watch the film</span></button>` : ''}
     </div>
   </div>
 </section>
@@ -97,7 +107,7 @@ export default function home({ root }) {
       <div class="audience-tabs" role="tablist" aria-label="Choose what describes you">
         ${audiences
           .map(
-            (a, i) => `<button class="audience-tab${i === 0 ? ' is-active' : ''}" type="button" role="tab" id="aud-tab-${a.id}" aria-controls="aud-${a.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-tab="${a.id}">
+            (a, i) => `<button class="audience-tab${i === 0 ? ' is-active' : ''}" type="button" role="tab" id="aud-tab-${a.id}" aria-controls="aud-${a.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-tab="${a.id}" data-track="audience_select" data-track-item="${a.id}">
           <span class="audience-top"><span class="audience-ico">${icon(a.icon)}</span><span class="check-badge" aria-hidden="true">${icon('check')}</span></span>
           <span class="audience-who">${a.who}</span>
           <span class="audience-title">${a.title}</span>
@@ -123,12 +133,7 @@ export default function home({ root }) {
   </div>
 </section>
 
-<section class="section" id="film">
-  <div class="wrap">
-    ${sectionHead({ eyebrow: 'The film', title: 'See how it all comes together.', text: 'A short walkthrough of what Walnut Data Tech does, and who we do it for.', center: true })}
-    ${videoTile({ title: 'How Walnut Data Tech works', kicker: 'Company film', url: config.videos.company, cls: 'video-tile-xl' })}
-  </div>
-</section>
+${film}
 
 <section class="section section-dark" id="apps">
   <div class="wrap">
@@ -148,7 +153,7 @@ ${ctaBand(root, {
 `;
 
   return {
-    title: 'Walnut Data Tech — Technology, courses and partnerships for online education',
+    title: 'Walnut Data Tech — Technology for online education',
     description:
       'Walnut Data Tech powers online education: technology and services for universities, short certification courses for learners, and applications for education agents and partners.',
     body,

@@ -38,6 +38,7 @@ if ($coupon !== '') {
 }
 
 $config = load_config();
+rate_limit('create-order', 20, 600);
 $order = razorpay('POST', '/orders', [
     'amount' => $amount * 100, // paise
     'currency' => $catalog['currency'],

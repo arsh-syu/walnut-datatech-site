@@ -6,6 +6,7 @@ import { areas } from '../data/services.mjs';
 import { courses } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
 import { readFileSync } from 'node:fs';
+import { inlineScript, contentSecurityPolicy } from '../security.mjs';
 
 const markPaths = JSON.parse(readFileSync(new URL('../assets/img/mark-paths.json', import.meta.url), 'utf8'));
 
@@ -46,8 +47,9 @@ export function sectionHead({ eyebrow, title, text, center = false, tag = 'h2' }
   </header>`;
 }
 
-// A film poster that opens the video dialog. With no URL yet it opens a "coming soon" state.
+// A film poster that opens the video dialog. Renders nothing until the video URL is set in site.config.mjs.
 export function videoTile({ title, kicker = 'Film', url = '', cls = '' }) {
+  if (!url) return '';
   return `<button class="video-tile ${cls}" type="button" data-video="${esc(url)}" data-video-title="${esc(title)}" data-reveal>
     <span class="video-tile-bg" aria-hidden="true">${mark()}</span>
     <span class="video-tile-play" aria-hidden="true">${icon('play')}</span>
@@ -83,13 +85,13 @@ export function enquiryForm({ id, topic, orgLabel = 'University or organisation'
     <input class="hp" type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true">
     <div class="form-foot field-wide">
       <button class="btn btn-primary btn-lg" type="submit"><span>${submit}</span>${icon('arrow')}</button>
-      <p class="form-note">We use these details only to respond to your enquiry. See our <a href="${root}privacy/">privacy policy</a>.</p>
+      <p class="form-note">We use these details only to respond to your enquiry. See our <a href="${root}privacy/">privacy policy</a> and <a href="${root}terms/">terms</a>.</p>
     </div>
     <p class="form-status field-wide" role="status" aria-live="polite"></p>
   </form>
   <div class="form-success" hidden tabindex="-1">
     <span class="success-check" aria-hidden="true">${icon('check')}</span>
-    <h3>Thank you. We’ve got it.</h3>
+    <h2>Thank you. We’ve got it.</h2>
     <p>Our team will be in touch shortly.</p>
   </div>
 </div>`;
@@ -119,7 +121,7 @@ export function ctaBand(root, { title = 'Ready to build your online programme?',
 function header(root, path) {
   const login = config.links.studentLogin
     ? `<a class="nav-login" href="${esc(config.links.studentLogin)}" rel="noopener">${icon('user')}<span>Student Login</span></a>`
-    : `<button class="nav-login" type="button" data-modal-open="login-modal">${icon('user')}<span>Student Login</span></button>`;
+    : '';
   return `<header class="site-header" data-header>
   <div class="wrap header-in">
     <a class="brand" href="${root || './'}" aria-label="Walnut Data Tech — home">
@@ -142,21 +144,19 @@ function header(root, path) {
 }
 
 function footer(root) {
-  const social = ['youtube', 'linkedin', 'facebook', 'instagram']
-    .map((s) => {
-      const label = { youtube: 'YouTube', linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram' }[s];
-      return config.links[s]
-        ? `<a class="social" href="${esc(config.links[s])}" rel="noopener" aria-label="${label}">${icon(s)}</a>`
-        : `<span class="social is-pending" title="${label} — link coming soon">${icon(s)}<span class="sr-only">${label} (link coming soon)</span></span>`;
-    })
+  const labels = { youtube: 'YouTube', linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram' };
+  const social = Object.keys(labels)
+    .filter((s) => config.links[s])
+    .map((s) => `<a class="social" href="${esc(config.links[s])}" rel="noopener" aria-label="${labels[s]}">${icon(s)}</a>`)
     .join('');
+  const newTab = '<span class="sr-only"> (opens in a new tab)</span>';
   return `<footer class="site-footer">
   <div class="wrap">
     <div class="footer-top">
       <div class="footer-brand">
         <img src="${root}assets/img/logo-light.svg" alt="${esc(config.company.legalName)}" width="230" height="44" loading="lazy">
         <p>Technology, learning and partnerships for online education.</p>
-        <div class="socials">${social}</div>
+        ${social ? `<div class="socials">${social}</div>` : ''}
       </div>
       <nav class="footer-col footer-col-wide" aria-label="For universities">
         <h2>For universities</h2>
@@ -174,15 +174,15 @@ function footer(root) {
         <h2>For partners</h2>
         <ul>
           <li><a href="${root}partners/">Join Walnut</a></li>
-          ${externalApps.map((app) => `<li><a href="${esc(app.url)}" target="_blank" rel="noopener">${app.name} ${icon('external')}</a></li>`).join('')}
+          ${externalApps.map((app) => `<li><a href="${esc(app.url)}" target="_blank" rel="noopener">${app.name} ${icon('external')}${newTab}</a></li>`).join('')}
         </ul>
       </nav>
       <nav class="footer-col" aria-label="Company">
         <h2>Company</h2>
         <ul>
           <li><a href="${root}about/">About</a></li>
-          <li><a href="${root}about/#clients">Our clients</a></li>
-          <li><a href="${root}about/#certifications">Certifications</a></li>
+          ${config.clients.length ? `<li><a href="${root}about/#clients">Our clients</a></li>` : ''}
+          ${config.certifications.length ? `<li><a href="${root}about/#certifications">Certifications</a></li>` : ''}
           <li><a href="${root}contact/">Contact</a></li>
           <li><a href="${esc(config.links.selectYourUniversity)}" rel="noopener">Select Your University ${icon('external')}</a></li>
         </ul>
@@ -192,7 +192,8 @@ function footer(root) {
       <p>© ${new Date().getFullYear()} ${esc(config.company.legalName)}. All rights reserved.</p>
       <ul>
         <li><a href="${root}privacy/">Privacy policy</a></li>
-        <li><a href="${root}about/#certifications">Certifications</a></li>
+        <li><a href="${root}terms/">Terms &amp; conditions</a></li>
+        ${config.analytics.gaMeasurementId ? '<li><button class="footer-link" type="button" data-consent-open>Cookie settings</button></li>' : ''}
       </ul>
     </div>
   </div>
@@ -203,42 +204,54 @@ function dialogs() {
   return `<dialog class="modal modal-video" id="video-modal" aria-label="Video">
   <button class="modal-close" type="button" data-modal-close aria-label="Close">${icon('close')}</button>
   <div class="video-frame" data-video-frame></div>
-</dialog>
-<dialog class="modal modal-note" id="login-modal" aria-labelledby="login-title">
-  <button class="modal-close" type="button" data-modal-close aria-label="Close">${icon('close')}</button>
-  ${mark('modal-mark')}
-  <h2 id="login-title">Student Login</h2>
-  <p>The student portal sign-in is being connected. Students can reach their university’s support team in the meantime.</p>
-  <button class="btn btn-primary" type="button" data-modal-close><span>Got it</span></button>
 </dialog>`;
 }
 
-export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false }) {
+// Shown only when analytics is configured, and only until the visitor has chosen.
+function consentBanner(root) {
+  if (!config.analytics.gaMeasurementId) return '';
+  return `<section class="consent" data-consent hidden aria-labelledby="consent-title">
+  <div class="consent-text">
+    <h2 id="consent-title">Analytics cookies</h2>
+    <p>We’d like to use Google Analytics to understand how this site is used. It is off unless you accept. <a href="${root}privacy/#cookies">Learn more</a></p>
+  </div>
+  <div class="consent-actions">
+    <button class="btn btn-ghost btn-sm" type="button" data-consent-choice="denied"><span>Decline</span></button>
+    <button class="btn btn-primary btn-sm" type="button" data-consent-choice="granted"><span>Accept</span></button>
+  </div>
+</section>`;
+}
+
+export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
   const { endpoint, accessKey, email } = config.form;
-  const clientConfig = JSON.stringify({ form: { endpoint, accessKey, email } }).replace(/</g, '\\u003c');
+  const clientConfig = JSON.stringify({ form: { endpoint, accessKey, email }, analytics: { ga: config.analytics.gaMeasurementId } }).replace(/</g, '\\u003c');
+  const v = config.assetVersion ? `?v=${config.assetVersion}` : '';
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config)}">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
-${config.noindex ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}
+${config.noindex || noindex ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}
 <meta property="og:type" content="website">
+<meta property="og:locale" content="en_IN">
 <meta property="og:site_name" content="${esc(config.company.name)}">
 <meta property="og:title" content="${esc(fullTitle)}">
 <meta property="og:description" content="${esc(description)}">
 ${url ? `<meta property="og:url" content="${url}">` : ''}
 ${hasOg && config.siteUrl ? `<meta property="og:image" content="${config.siteUrl}/assets/img/og.jpg">\n<meta name="twitter:card" content="summary_large_image">` : '<meta name="twitter:card" content="summary">'}
 <meta name="theme-color" content="#ffffff">
-<script>document.documentElement.classList.add('js')</script>
+<script>${inlineScript}</script>
 <link rel="icon" href="${root}assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lexend:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="${root}assets/css/site.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lexend:wght@500&display=swap">
+<link rel="stylesheet" href="${root}assets/css/site.css${v}">
+<link rel="modulepreload" href="${root}assets/js/main.js${v}">
 ${jsonLd.map((j) => `<script type="application/ld+json">${JSON.stringify(j).replace(/</g, '\\u003c')}</script>`).join('\n')}
 </head>
 <body class="${bodyClass}">
@@ -250,9 +263,10 @@ ${body}
 ${footer(root)}
 ${sticky ? `<a class="sticky-cta" href="${sticky.href}" data-sticky-cta><span>${sticky.label}</span>${icon('arrow')}</a>` : ''}
 ${dialogs()}
+${consentBanner(root)}
 <script type="application/json" id="site-config">${clientConfig}</script>
-<script type="module" src="${root}assets/js/main.js"></script>
-${scripts.map((s) => `<script type="module" src="${root}assets/js/${s}"></script>`).join('\n')}
+<script type="module" src="${root}assets/js/main.js${v}"></script>
+${scripts.map((s) => `<script type="module" src="${root}assets/js/${s}${v}"></script>`).join('\n')}
 </body>
 </html>
 `;

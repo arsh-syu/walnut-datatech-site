@@ -1,6 +1,7 @@
 // Site-wide interactions. Everything here is progressive enhancement: the pages are complete without it.
 
 import { initForms } from './forms.js';
+import { initAnalytics, track } from './analytics.js';
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -29,15 +30,19 @@ function onScroll() {
 addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 
+// While the full-screen menu is open, the page behind it is taken out of the tab order.
+const behindMenu = $$('main, .site-footer, .sticky-cta');
+
 function setMenu(open) {
   menuBtn.setAttribute('aria-expanded', String(open));
   menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
   nav.classList.toggle('is-open', open);
   document.documentElement.classList.toggle('menu-open', open);
+  behindMenu.forEach((el) => (el.inert = open));
 }
 menuBtn.addEventListener('click', () => setMenu(menuBtn.getAttribute('aria-expanded') !== 'true'));
 nav.addEventListener('click', (e) => {
-  if (e.target.closest('a, [data-modal-open]')) setMenu(false);
+  if (e.target.closest('a')) setMenu(false);
 });
 addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && menuBtn.getAttribute('aria-expanded') === 'true') {
@@ -90,29 +95,23 @@ const videoModal = $('#video-modal');
 const videoFrame = $('[data-video-frame]');
 
 function openVideo(url, title) {
-  videoFrame.replaceChildren();
-  if (url) {
-    const iframe = document.createElement('iframe');
-    iframe.src = url + (url.includes('?') ? '&' : '?') + 'autoplay=1';
-    iframe.title = title;
-    iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
-    iframe.allowFullscreen = true;
-    videoFrame.append(iframe);
-  } else {
-    const soon = document.createElement('div');
-    soon.className = 'video-soon';
-    const mark = $('.mark')?.cloneNode(true);
-    if (mark) {
-      mark.setAttribute('class', 'mark');
-      soon.append(mark);
-    }
-    const h = document.createElement('h2');
-    h.textContent = title;
-    const p = document.createElement('p');
-    p.textContent = 'This film is in production and will be available here soon.';
-    soon.append(h, p);
-    videoFrame.append(soon);
+  let src;
+  try {
+    src = new URL(url);
+  } catch {
+    return;
   }
+  if (src.protocol !== 'https:') return;
+  // YouTube's privacy-enhanced player sets no cookies until the visitor presses play
+  if (src.hostname === 'www.youtube.com' || src.hostname === 'youtube.com') src.hostname = 'www.youtube-nocookie.com';
+  src.searchParams.set('autoplay', '1');
+
+  const iframe = document.createElement('iframe');
+  iframe.src = src.href;
+  iframe.title = title;
+  iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+  iframe.allowFullscreen = true;
+  videoFrame.replaceChildren(iframe);
   videoModal.setAttribute('aria-label', title);
   videoModal.showModal();
 }
@@ -121,9 +120,6 @@ videoModal.addEventListener('close', () => videoFrame.replaceChildren());
 document.addEventListener('click', (e) => {
   const video = e.target.closest('[data-video]');
   if (video) return openVideo(video.dataset.video, video.dataset.videoTitle);
-
-  const opener = e.target.closest('[data-modal-open]');
-  if (opener) return document.getElementById(opener.dataset.modalOpen)?.showModal();
 
   const closer = e.target.closest('[data-modal-close]');
   if (closer) return closer.closest('dialog').close();
@@ -180,7 +176,10 @@ function initShowcase(root) {
   }
 
   tabs.forEach((tab, i) => {
-    tab.addEventListener('click', () => select(i, true));
+    tab.addEventListener('click', () => {
+      select(i, true);
+      track('service_select', { item: tab.dataset.slug });
+    });
     tab.addEventListener('keydown', (e) => {
       const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
       if (e.key === 'Home' || e.key === 'End' || step) {
@@ -312,3 +311,4 @@ $$('[data-launcher]').forEach((root) => {
 });
 
 initForms();
+initAnalytics();

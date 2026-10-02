@@ -30,10 +30,11 @@ export function priceFlow(course) {
   </div>`;
 }
 
-export function courseCard(root, course, i = 0) {
+// `level` is the heading level that fits where the card sits in the page outline.
+export function courseCard(root, course, i = 0, level = 3) {
   return `<article class="course-card spot" data-reveal style="--d:${i * 0.1}s">
     <p class="eyebrow">${course.kicker}</p>
-    <h3><a href="${root}academy/${course.slug}/">${course.name}</a></h3>
+    <h${level} class="course-card-title"><a href="${root}academy/${course.slug}/" data-track="course_select" data-track-item="${course.slug}">${course.name}</a></h${level}>
     <p class="course-card-tagline">${course.tagline}</p>
     ${priceFlow(course)}
     <span class="btn btn-primary" aria-hidden="true"><span>View course</span>${icon('arrow')}</span>
@@ -68,7 +69,7 @@ export function appLauncher(name) {
           <p class="launcher-name">${app.name}</p>
           <p class="launcher-url">${new URL(app.url).host}</p>
         </div>
-        <a class="btn btn-light btn-lg" href="${esc(app.url)}" target="_blank" rel="noopener"><span>${app.action}</span>${icon('external')}<span class="sr-only"> (opens in a new tab)</span></a>
+        <a class="btn btn-light btn-lg" href="${esc(app.url)}" target="_blank" rel="noopener" data-track="app_open" data-track-item="${app.id}"><span>${app.action}</span>${icon('external')}<span class="sr-only"> (opens in a new tab)</span></a>
       </div>`
         )
         .join('\n      ')}

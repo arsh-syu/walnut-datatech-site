@@ -12,6 +12,15 @@ const audience = (id) => audiences.find((a) => a.id === id);
 
 export function partners({ root }) {
   const a = audience('partners');
+  // The tutorial section only exists once the onboarding video URL is set.
+  const onboarding = config.videos.partnerOnboarding
+    ? `<section class="section" id="onboarding-video">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Onboarding', title: 'See how partner onboarding works.', center: true })}
+    ${videoTile({ title: 'Partner onboarding — tutorial', kicker: 'Tutorial video', url: config.videos.partnerOnboarding, cls: 'video-tile-xl' })}
+  </div>
+</section>`
+    : '<div class="section-gap"></div>';
   const body = `
 <section class="page-hero">
   <div class="wrap">
@@ -20,7 +29,7 @@ export function partners({ root }) {
     <p class="lede hero-fade" style="--d:.4s">Become a Walnut agent. Get onboarded, find the right online programme for every student you advise, and work the leads we send your way.</p>
     <div class="actions hero-fade" style="--d:.55s">
       ${button({ href: '#apps', label: 'Open an application', size: 'lg', arrow: true })}
-      <a class="btn btn-ghost btn-lg" href="#onboarding-video">${icon('play')}<span>Watch the onboarding tutorial</span></a>
+      ${config.videos.partnerOnboarding ? `<a class="btn btn-ghost btn-lg" href="#onboarding-video">${icon('play')}<span>Watch the onboarding tutorial</span></a>` : ''}
     </div>
     <div class="hero-fade" style="--d:.7s">${journeySteps(a.steps)}</div>
   </div>
@@ -33,12 +42,7 @@ export function partners({ root }) {
   </div>
 </section>
 
-<section class="section" id="onboarding-video">
-  <div class="wrap">
-    ${sectionHead({ eyebrow: 'Onboarding', title: 'See how partner onboarding works.', center: true })}
-    ${videoTile({ title: 'Partner onboarding — tutorial', kicker: 'Tutorial video', url: config.videos.partnerOnboarding, cls: 'video-tile-xl' })}
-  </div>
-</section>
+${onboarding}
 
 ${ctaBand(root, {
   title: 'Questions before you start?',
@@ -200,14 +204,15 @@ export function coursePage({ root }, course) {
         }
         <div class="form-foot field-wide">
           <button class="btn btn-accent btn-lg" type="submit" data-pay>${icon('lock')}<span data-pay-label>Pay ${inr(course.price)}</span></button>
-          <p class="form-note">Payments are processed securely by Razorpay. See our <a href="${root}privacy/">privacy policy</a>.</p>
+          <p class="form-note">Payments are processed securely by Razorpay. By paying you agree to our <a href="${root}terms/">terms</a> and <a href="${root}privacy/">privacy policy</a>.</p>
         </div>
         <p class="form-status field-wide" role="status" aria-live="polite"></p>
+        <noscript><p class="form-status field-wide is-error">Online enrolment needs JavaScript. Please enable it, or <a href="${root}contact/">contact us</a> to enrol.</p></noscript>
       </form>
       <div class="form-success" hidden tabindex="-1">
         <span class="success-check" aria-hidden="true">${icon('check')}</span>
-        <h3>You’re enrolled.</h3>
-        <p>Payment received for ${course.name}. We’ll send your course access details to <strong data-success-email></strong>.</p>
+        <h2>You’re enrolled.</h2>
+        <p>Payment received for ${course.name}. ${config.legal.courseAccess ? `Your course access is delivered ${esc(config.legal.courseAccess)}, to` : 'We’ll send your course access details to'} <strong data-success-email></strong>.</p>
         <p class="pay-ref">Payment reference: <span data-success-ref></span></p>
       </div>
     </div>
@@ -232,6 +237,16 @@ export function coursePage({ root }, course) {
         provider: { '@type': 'Organization', name: config.company.name, ...(config.siteUrl ? { sameAs: config.siteUrl } : {}) },
         offers: { '@type': 'Offer', category: 'Paid', price: course.price, priceCurrency: currency },
       },
+      ...(config.siteUrl
+        ? [{
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Courses', item: `${config.siteUrl}/academy/` },
+              { '@type': 'ListItem', position: 2, name: course.name, item: `${config.siteUrl}/academy/${course.slug}/` },
+            ],
+          }]
+        : []),
     ],
   };
 }
@@ -242,13 +257,24 @@ export function about({ root }) {
   const moduleCount = areas.reduce((t, a) => t + a.items.length, 0);
   const links = { universities: 'solutions/', learners: 'academy/', partners: 'partners/' };
 
+  // Client and certification sections exist only when there is something real to show.
   const clients = config.clients.length
-    ? config.clients.map((c) => `<li class="client"><img src="${root}assets/img/${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></li>`).join('')
-    : Array.from({ length: 5 }, () => `<li class="client is-empty" aria-hidden="true"></li>`).join('');
+    ? `<section class="section section-mist" id="clients">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Our clients', title: 'The institutions we work with.' })}
+    <ul class="clients" data-reveal>${config.clients.map((c) => `<li class="client"><img src="${root}assets/img/${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></li>`).join('')}</ul>
+  </div>
+</section>`
+    : '';
 
-  const certs = config.certifications.length
-    ? `<ul class="certs">${config.certifications.map((c) => `<li><h3>${esc(c.name)}</h3><p>${esc(c.detail || '')}</p></li>`).join('')}</ul>`
-    : `<p class="placeholder-note">Our certifications will be listed here.</p>`;
+  const certifications = config.certifications.length
+    ? `<section class="section" id="certifications">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Certifications', title: 'Certifications and compliance.' })}
+    <ul class="certs">${config.certifications.map((c) => `<li><h3>${esc(c.name)}</h3><p>${esc(c.detail || '')}</p></li>`).join('')}</ul>
+  </div>
+</section>`
+    : '';
 
   const body = `
 <section class="page-hero">
@@ -317,20 +343,9 @@ export function about({ root }) {
   </div>
 </section>
 
-<section class="section section-mist" id="clients">
-  <div class="wrap">
-    ${sectionHead({ eyebrow: 'Our clients', title: 'The institutions we work with.' })}
-    <ul class="clients" data-reveal>${clients}</ul>
-    ${config.clients.length ? '' : '<p class="placeholder-note">Client names and logos will appear here.</p>'}
-  </div>
-</section>
+${clients}
 
-<section class="section" id="certifications">
-  <div class="wrap">
-    ${sectionHead({ eyebrow: 'Certifications', title: 'Certifications and compliance.' })}
-    ${certs}
-  </div>
-</section>
+${certifications}
 
 <section class="section section-tight">
   <div class="wrap about-legal" data-reveal>
@@ -386,64 +401,157 @@ export function contact({ root }) {
   };
 }
 
-/* ---------- /privacy/ ---------- */
+/* ---------- legal pages ---------- */
 
-export function privacy({ root }) {
-  const updated = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const body = `
+const legal = config.legal;
+const contactLine = (root) =>
+  legal.contactEmail
+    ? `email <a href="mailto:${esc(legal.contactEmail)}">${esc(legal.contactEmail)}</a> or use our <a href="${root}contact/">contact page</a>`
+    : `use our <a href="${root}contact/">contact page</a>`;
+
+function legalPage({ title, intro, sections }) {
+  return `
 <section class="page-hero">
   <div class="wrap">
     <p class="eyebrow">Legal</p>
-    <h1 class="display display-sm">Privacy policy</h1>
-    <p class="lede">Last updated ${updated}</p>
+    <h1 class="display display-sm">${title}</h1>
+    <p class="lede">Last updated ${esc(legal.lastUpdated)}</p>
   </div>
 </section>
 <section class="section section-tight">
   <div class="wrap prose">
-    <h2>Who we are</h2>
-    <p>This website is operated by ${esc(config.company.legalName)} (“${config.company.name}”, “we”).</p>
-    <h2>Information we collect</h2>
-    <p>We collect the details you choose to send us through the forms on this site: your name, organisation, email address, phone number, your message and — if you use the solution builder — the services and modules you selected. When you enrol in a course we also receive the course you chose and your payment reference.</p>
-    <h2>How we use it</h2>
-    <p>We use this information only to respond to your enquiry, prepare a proposal, confirm your enrolment and stay in touch about it. We do not sell your information.</p>
-    <h2>Payments</h2>
-    <p>Course payments are processed by Razorpay. Your card, UPI or bank details are entered on Razorpay’s secure checkout and are never seen or stored by us. Razorpay shares the payment status and reference with us so we can confirm your enrolment.</p>
-    <h2>Storage in your browser</h2>
-    <p>The solution builder saves your in-progress selections in your browser so they survive a page refresh, and the homepage remembers which path you chose. This stays on your device.</p>
-    <h2>Third-party services</h2>
-    <p>${config.form.provider ? `Enquiries you submit are delivered to our inbox by ${esc(config.form.provider)}, a form-delivery service. ` : ''}Fonts on this site are served by Google Fonts. Videos, when you choose to play them, are loaded from the video platform that hosts them. Our partner applications open on their own websites, which have their own policies. These providers may receive technical information such as your IP address.</p>
-    <h2>Your choices</h2>
-    <p>You can ask us to access, correct or delete the information you have sent us at any time.</p>
-    <h2>Contact</h2>
-    <p>Questions about this policy? <a href="${root}contact/">Get in touch with us</a>.</p>
+    ${intro}
+    ${sections.filter(Boolean).map(([id, heading, html]) => `<h2 id="${id}">${heading}</h2>\n    ${html}`).join('\n    ')}
   </div>
 </section>
 `;
+}
+
+// Describes what the site actually does. Every statement here is backed by the implementation:
+// update it when a form, a third party or a storage key is added or removed.
+export function privacy({ root }) {
+  const ga = Boolean(config.analytics.gaMeasurementId);
+  const body = legalPage({
+    title: 'Privacy policy',
+    intro: `<p>This policy explains what information ${esc(config.company.legalName)} (“${config.company.name}”, “we”, “us”) collects through this website, why, and what you can do about it.</p>`,
+    sections: [
+      ['who', 'Who we are', `<p>This website is operated by ${esc(config.company.legalName)}${legal.registeredAddress ? `, ${esc(legal.registeredAddress)}` : ''}. For anything in this policy, ${contactLine(root)}.</p>`],
+      ['collect', 'Information you give us', `<ul>
+      <li><strong>Enquiries.</strong> When you use a contact form or the solution builder: your name, organisation, email address, phone number (optional), your message, and the services and modules you selected.</li>
+      <li><strong>Course enrolment.</strong> When you enrol in a course: your name, email address, phone number, the course and coupon you chose, and the payment reference issued by our payment provider.</li>
+    </ul>
+    <p>We do not ask for, and you should not send us, sensitive information such as identity documents or bank details through this website.</p>`],
+      ['automatic', 'Information collected automatically', `<p>Like most websites, the servers that host this site record technical information about each request — such as your IP address, browser type, the page requested and the time — in standard server logs kept for security and troubleshooting.${ga ? ' With your consent we also use Google Analytics, described under “Cookies and similar technologies”.' : ' We do not use analytics, advertising or tracking tools on this website.'}</p>`],
+      ['use', 'How we use your information', `<ul>
+      <li>to respond to your enquiry and prepare a proposal;</li>
+      <li>to process your enrolment, confirm your payment and give you access to your course;</li>
+      <li>to keep the website secure and working;</li>
+      <li>to meet our legal, tax and accounting obligations.</li>
+    </ul>
+    <p>We do not sell your personal information, and we do not use it for automated decision-making.</p>`],
+      ['payments', 'Payments', `<p>Course payments are processed by Razorpay. Your card, UPI or bank details are entered on Razorpay’s secure checkout and are never seen or stored by us. We send Razorpay your name, email address, phone number, the course and the amount so it can process the payment, and Razorpay returns the payment status and reference to us. Razorpay handles your information under its own privacy policy.</p>`],
+      ['sharing', 'Who we share information with', `<p>We share information only with service providers that help us run this website, and only as far as they need it:</p>
+    <ul>
+      ${config.form.provider ? `<li><strong>${esc(config.form.provider)}</strong> — delivers the enquiries you submit to our inbox.</li>` : ''}
+      <li><strong>Razorpay</strong> — processes course payments.</li>
+      <li><strong>Our hosting providers</strong> — serve the website and keep server logs.</li>
+      <li><strong>Google Fonts</strong> — serves the typefaces; your browser requests them from Google, which receives your IP address.</li>
+      <li><strong>Video platforms</strong> — if you choose to play a video, it is loaded from the platform that hosts it.</li>
+      ${ga ? '<li><strong>Google Analytics</strong> — only if you accept analytics cookies.</li>' : ''}
+    </ul>
+    <p>Our partner applications (Agent Onboard, Course Finder and Online Leads) open on their own websites and handle information under their own terms. We may also disclose information where the law requires it.</p>`],
+      ['cookies', 'Cookies and similar technologies', `<p>This website itself does not set any cookies${ga ? ' unless you accept analytics' : ''}. It stores a small amount of information in your browser so the site works as you expect:</p>
+    <ul>
+      <li><strong>Your chosen path</strong> — the homepage remembers whether you chose universities, courses or partners.</li>
+      <li><strong>Solution builder progress</strong> — your in-progress selections are kept until you close the tab, so they survive a page refresh.</li>
+      ${ga ? '<li><strong>Your analytics choice</strong> — whether you accepted or declined analytics.</li>' : ''}
+    </ul>
+    <p>This information stays on your device and is not sent to us. When you pay, Razorpay’s checkout may set its own cookies to process the payment securely.${ga ? ' If you accept, Google Analytics sets cookies to measure how the site is used; you can change your choice at any time through “Cookie settings” at the bottom of any page.' : ''}</p>`],
+      ['retention', 'How long we keep it', `<p>${legal.retention ? `We keep enquiry and enrolment records ${esc(legal.retention)}.` : 'We keep enquiry and enrolment records only for as long as we need them for the purposes above, and for as long as the law requires us to keep financial records.'}</p>`],
+      ['rights', 'Your choices and rights', `<p>You can ask us to tell you what information we hold about you, to correct it, or to delete it, and you can withdraw a consent you have given. To do so, ${contactLine(root)}. We will respond as required by applicable data-protection law.${legal.grievanceOfficer ? ` Complaints can be addressed to our grievance officer, ${esc(legal.grievanceOfficer)}.` : ''}</p>`],
+      ['security', 'Security', `<p>The website is served over an encrypted connection and payment details are handled entirely by Razorpay. No method of transmission or storage is completely secure, so we cannot guarantee absolute security.</p>`],
+      ['changes', 'Changes to this policy', `<p>We may update this policy when the website or the law changes. The date at the top shows when it was last revised.</p>`],
+    ],
+  });
   return {
     title: 'Privacy policy',
-    description: `How ${config.company.name} handles the information you share through this website, including enquiries and course payments.`,
+    description: `How ${config.company.name} collects, uses and protects the information you share through this website, including enquiries and course payments.`,
     body,
     bodyClass: 'page-legal',
   };
 }
 
-/* ---------- 404 ---------- */
+// Terms cover what the website actually offers. Commercial terms that only the business can decide
+// (refunds, course access, governing law) come from site.config.mjs → legal and are never invented here.
+export function terms({ root }) {
+  const body = legalPage({
+    title: 'Terms &amp; conditions',
+    intro: `<p>These terms apply to your use of this website, which is operated by ${esc(config.company.legalName)} (“${config.company.name}”, “we”, “us”). By using the website you agree to them.</p>`,
+    sections: [
+      ['use', 'Using this website', `<p>You may use this website for lawful purposes only. You must not attempt to disrupt it, gain unauthorised access to it, interfere with its payment process, or use it to send unlawful, misleading or harmful material. Information you submit must be accurate and must be your own, or sent with the permission of the person it belongs to.</p>`],
+      ['services', 'Services for universities and institutions', `<p>The descriptions of our services on this website are for general information. Submitting an enquiry or a configuration through the solution builder is a request for a proposal — it is not an order and does not create a contract. Services are provided only under a separate written agreement between us and the institution, which sets out the scope, fees and terms.</p>`],
+      ['courses', 'Courses and enrolment', `<ul>
+      <li>Course descriptions, including what a course covers and whether it carries a certificate, are shown on each course page.</li>
+      <li>Fees are shown in Indian rupees on the course page and again at checkout before you pay. The amount you are charged is the amount shown at checkout.</li>
+      <li>A coupon applies only to the course it is offered for, cannot be exchanged for cash, and may be changed or withdrawn at any time before you pay.</li>
+      <li>Your enrolment is confirmed once your payment has been received and verified. ${legal.courseAccess ? `Course access is delivered ${esc(legal.courseAccess)}.` : 'We will then contact you at the email address you provided with your course access details.'}</li>
+      <li>Course access is for the enrolled person only and may not be shared or resold.</li>
+    </ul>`],
+      ['payments', 'Payments', `<p>Payments are processed by Razorpay. Your payment details are entered on Razorpay’s checkout and are subject to Razorpay’s terms; we do not see or store them. If a payment is deducted but your enrolment is not confirmed on screen, contact us with your payment reference and we will resolve it.</p>`],
+      ['refunds', 'Refunds and cancellations', legal.refundPolicy ? `<p>${esc(legal.refundPolicy)}</p>` : `<p>To cancel an enrolment or ask for a refund, ${contactLine(root)} with your payment reference. Requests are handled in line with our refund policy and applicable consumer law.</p>`],
+      ['partners', 'Partner applications and external links', `<p>Agent Onboard, Course Finder and Online Leads are separate applications that open on their own websites and have their own terms. This website may also link to other third-party sites. We are not responsible for the content or practices of websites we do not operate.</p>`],
+      ['ip', 'Intellectual property', `<p>The content of this website — including text, design, graphics, logos and course materials — belongs to ${esc(config.company.legalName)} or its licensors. You may view it for your own use. You may not copy, republish or use it commercially without our written permission.</p>`],
+      ['liability', 'Availability and liability', `<p>We work to keep this website accurate and available, but we provide it “as is” and cannot promise that it will always be available or free of errors. To the extent the law allows, we are not liable for indirect or consequential loss arising from your use of the website. Nothing in these terms limits any right you have under law that cannot be excluded.</p>`],
+      ['suspension', 'Suspension', `<p>We may restrict or end access to the website or to a course for anyone who breaks these terms.</p>`],
+      legal.governingLaw ? ['law', 'Governing law', `<p>These terms are governed by the laws of ${esc(legal.governingLaw)}${legal.jurisdiction ? `, and the courts of ${esc(legal.jurisdiction)} have jurisdiction over any dispute` : ''}.</p>`] : null,
+      ['changes', 'Changes to these terms', `<p>We may update these terms from time to time. The date at the top shows when they were last revised. The terms that apply to a purchase are those in force when you pay.</p>`],
+      ['contact', 'Contact', `<p>Questions about these terms? Please ${contactLine(root)}.${legal.registeredAddress ? ` ${esc(config.company.legalName)}, ${esc(legal.registeredAddress)}.` : ''}</p>`],
+    ],
+  });
+  return {
+    title: 'Terms & conditions',
+    description: `The terms that apply to using the ${config.company.name} website, enquiring about our services and enrolling in our courses.`,
+    body,
+    bodyClass: 'page-legal',
+  };
+}
 
-export function notFound({ root }) {
-  const body = `
+/* ---------- system pages ---------- */
+
+function systemPage(root, { code, heading, text }) {
+  return `
 <section class="page-hero notfound">
   <div class="wrap center">
     ${mark('hero-mark')}
-    <p class="eyebrow">404</p>
-    <h1 class="display display-md">This page isn’t here.</h1>
-    <p class="lede">The link may be old, or the page may have moved.</p>
+    <p class="eyebrow">${code}</p>
+    <h1 class="display display-md">${heading}</h1>
+    <p class="lede">${text}</p>
     <div class="actions center">
       ${button({ href: root || './', label: 'Back to home', size: 'lg' })}
-      ${button({ href: `${root}solutions/`, label: 'For universities', variant: 'ghost', size: 'lg' })}
-      ${button({ href: `${root}academy/`, label: 'Courses', variant: 'ghost', size: 'lg' })}
+      ${button({ href: `${root}contact/`, label: 'Contact us', variant: 'ghost', size: 'lg' })}
     </div>
   </div>
 </section>
 `;
-  return { title: 'Page not found', description: 'This page could not be found.', body, bodyClass: 'page-404' };
+}
+
+export function notFound({ root }) {
+  return {
+    title: 'Page not found',
+    description: 'This page could not be found.',
+    body: systemPage(root, { code: '404', heading: 'This page isn’t here.', text: 'The link may be old, or the page may have moved.' }),
+    bodyClass: 'page-system',
+    noindex: true,
+  };
+}
+
+// Served by the web server when something fails on its side (5xx).
+export function serverError({ root }) {
+  return {
+    title: 'Something went wrong',
+    description: 'The page could not be loaded.',
+    body: systemPage(root, { code: 'Error', heading: 'Something went wrong.', text: 'The problem is on our side. Please try again in a moment.' }),
+    bodyClass: 'page-system',
+    noindex: true,
+  };
 }

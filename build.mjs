@@ -2,21 +2,25 @@
 //   node build.mjs            — build once
 //   SITE_URL=https://… node build.mjs   — override siteUrl from site.config.mjs (used by CI)
 
-import { rmSync, mkdirSync, writeFileSync, readFileSync, cpSync, existsSync } from 'node:fs';
+import { rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync, cpSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import config from './site.config.mjs';
+import { securityHeaders } from './src/security.mjs';
 
 if (process.env.SITE_URL) config.siteUrl = process.env.SITE_URL;
 config.siteUrl = config.siteUrl.replace(/\/+$/, '');
 // NOINDEX=1 marks a build as a non-production mirror (e.g. the GitHub Pages preview) so search engines skip it.
 config.noindex = process.env.NOINDEX === '1';
+// GA_MEASUREMENT_ID overrides the analytics ID for one build (used to test the consent banner).
+if (process.env.GA_MEASUREMENT_ID) config.analytics.gaMeasurementId = process.env.GA_MEASUREMENT_ID;
 
 const { layout } = await import('./src/templates/layout.mjs');
 const { default: home } = await import('./src/templates/home.mjs');
 const { solutionsIndex, servicePage } = await import('./src/templates/solutions.mjs');
 const { default: configure } = await import('./src/templates/configure.mjs');
-const { partners, academy, coursePage, about, contact, privacy, notFound } = await import('./src/templates/pages.mjs');
+const { partners, academy, coursePage, about, contact, privacy, terms, notFound, serverError } = await import('./src/templates/pages.mjs');
 const { areas } = await import('./src/data/services.mjs');
 const { courses, currency } = await import('./src/data/courses.mjs');
 
@@ -36,9 +40,18 @@ const css = cssFiles
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/\n\s*\n/g, '\n')
   .replace(/^\s+/gm, '');
-writeFileSync(join(dist, 'assets/css/site.css'), css);
 
-cpSync(join(src, 'assets/js'), join(dist, 'assets/js'), { recursive: true });
+// One version string for every stylesheet and script, derived from their contents. It is appended
+// to asset URLs (and to the scripts' own imports) so they can be cached for a year yet update at once.
+const jsFiles = readdirSync(join(src, 'assets/js')).filter((f) => f.endsWith('.js')).sort();
+const jsSources = Object.fromEntries(jsFiles.map((f) => [f, readFileSync(join(src, 'assets/js', f), 'utf8')]));
+config.assetVersion = createHash('sha256').update(css).update(Object.values(jsSources).join('')).digest('hex').slice(0, 10);
+
+writeFileSync(join(dist, 'assets/css/site.css'), css);
+mkdirSync(join(dist, 'assets/js'), { recursive: true });
+for (const [file, source] of Object.entries(jsSources)) {
+  writeFileSync(join(dist, 'assets/js', file), source.replace(/(from\s+'\.\/[\w-]+\.js)'/g, `$1?v=${config.assetVersion}'`));
+}
 cpSync(join(src, 'assets/img'), join(dist, 'assets/img'), { recursive: true, filter: (p) => !p.endsWith('.json') });
 const hasOg = existsSync(join(src, 'assets/img/og.jpg'));
 
@@ -67,6 +80,7 @@ const pages = [
   ['about/', about],
   ['contact/', contact],
   ['privacy/', privacy],
+  ['terms/', terms],
 ];
 
 for (const [path, render] of pages) {
@@ -77,9 +91,10 @@ for (const [path, render] of pages) {
   writeFileSync(join(dir, 'index.html'), layout({ ...page, path, root, hasOg }));
 }
 
-// The 404 page can be served from any depth, so it needs root-absolute asset URLs.
+// System pages can be served from any depth, so they need root-absolute asset URLs.
 const basePath = config.siteUrl ? new URL(config.siteUrl + '/').pathname : '/';
 writeFileSync(join(dist, '404.html'), layout({ ...notFound({ root: basePath }), path: '404.html', root: basePath, hasOg }));
+writeFileSync(join(dist, '500.html'), layout({ ...serverError({ root: basePath }), path: '500.html', root: basePath, hasOg }));
 
 /* ---------- crawl files ---------- */
 
@@ -89,7 +104,37 @@ if (config.siteUrl && !config.noindex) {
 }
 writeFileSync(join(dist, 'robots.txt'), config.noindex ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nAllow: /\n${config.siteUrl ? `Sitemap: ${config.siteUrl}/sitemap.xml\n` : ''}`);
 writeFileSync(join(dist, '.nojekyll'), '');
-// Apache / LiteSpeed hosts: custom 404 page and no directory listings. (Ignored by GitHub Pages.)
-writeFileSync(join(dist, '.htaccess'), `ErrorDocument 404 ${basePath}404.html\nOptions -Indexes\n`);
 
-console.log(`Built ${pages.length + 1} pages → dist/ (${(css.length / 1024).toFixed(1)} kB CSS)${config.siteUrl ? ` for ${config.siteUrl}` : ''}`);
+// Apache / LiteSpeed configuration (ignored by GitHub Pages): error pages, one canonical host,
+// security headers, compression and caching. Versioned assets are cached for a year; pages always revalidate.
+writeFileSync(
+  join(dist, '.htaccess'),
+  `ErrorDocument 404 ${basePath}404.html
+ErrorDocument 500 ${basePath}500.html
+ErrorDocument 503 ${basePath}500.html
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]
+  RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+${Object.entries(securityHeaders).map(([k, v]) => `  Header always set ${k} "${v}"`).join('\n')}
+  Header always set Strict-Transport-Security "max-age=15552000" env=HTTPS
+  <FilesMatch "\\.(css|js|svg|jpg|jpeg|png|webp|woff2)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "\\.(html|xml|txt)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml application/xml text/plain
+</IfModule>
+`
+);
+
+console.log(`Built ${pages.length + 2} pages → dist/ (${(css.length / 1024).toFixed(1)} kB CSS)${config.siteUrl ? ` for ${config.siteUrl}` : ''}`);

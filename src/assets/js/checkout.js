@@ -5,6 +5,7 @@
 // verifies Razorpay's signature (api/verify-payment.php) before enrolment is confirmed.
 
 import { validate, setError, deliver } from './forms.js';
+import { track } from './analytics.js';
 
 const course = JSON.parse(document.getElementById('course-data').textContent);
 const root = document.querySelector('[data-checkout]');
@@ -71,6 +72,7 @@ function applyCoupon() {
     return true;
   }
   const coupon = findCoupon(code);
+  if (coupon && applied === coupon) return true;
   if (!coupon) {
     clearCoupon({ keepText: true });
     setCouponStatus('That code isn’t valid for this course.', 'error');
@@ -83,6 +85,7 @@ function applyCoupon() {
   el.couponOffer.hidden = true;
   setCouponStatus(`Coupon applied — you save ${inr(course.price - coupon.finalPrice)}.`, 'ok');
   renderOrder();
+  track('coupon_applied', { item: course.slug, coupon: coupon.code });
   return true;
 }
 
@@ -119,12 +122,13 @@ async function api(endpoint, payload) {
   let res;
   try {
     res = await fetch(course.api + endpoint, {
+      signal: AbortSignal.timeout(25000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(payload),
     });
   } catch {
-    throw new Error('We couldn’t reach the server. Check your connection and try again.');
+    throw Object.assign(new Error('We couldn’t reach the server. Check your connection and try again.'), { network: true });
   }
   const data = await res.json().catch(() => null);
   if (!data) throw new Error(UNAVAILABLE); // e.g. a static mirror of the site without the payment API
@@ -166,6 +170,23 @@ function pay(order, learner) {
   });
 }
 
+// The payment has already happened at this point, so a dropped connection is retried before giving up.
+async function verify(payment) {
+  const details = {
+    razorpay_order_id: payment.razorpay_order_id,
+    razorpay_payment_id: payment.razorpay_payment_id,
+    razorpay_signature: payment.razorpay_signature,
+  };
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await api('verify-payment.php', details);
+    } catch (err) {
+      if (!err.network || attempt === 3) throw err;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+    }
+  }
+}
+
 function setBusy(busy) {
   el.pay.disabled = busy;
   el.pay.classList.toggle('is-loading', busy);
@@ -185,21 +206,20 @@ form.addEventListener('submit', async (e) => {
   };
 
   setBusy(true);
+  let payment = null;
   try {
     const order = await api('create-order.php', { course: course.slug, coupon: applied?.code ?? '', ...learner });
+    track('checkout_start', { item: course.slug, value: order.amount / 100, currency: order.currency });
     await loadRazorpay();
-    const payment = await pay(order, learner);
-    const verified = await api('verify-payment.php', {
-      razorpay_order_id: payment.razorpay_order_id,
-      razorpay_payment_id: payment.razorpay_payment_id,
-      razorpay_signature: payment.razorpay_signature,
-    });
+    payment = await pay(order, learner);
+    const verified = await verify(payment);
 
     form.hidden = true;
     el.success.querySelector('[data-success-email]').textContent = learner.email;
     el.success.querySelector('[data-success-ref]').textContent = verified.payment_id;
     el.success.hidden = false;
     el.success.focus();
+    track('purchase', { item: course.slug, value: order.amount / 100, currency: order.currency, coupon: applied?.code ?? '' });
 
     // Tell the team about the enrolment. The payment is already confirmed, so a failure here is not the learner's problem.
     deliver({
@@ -213,7 +233,12 @@ form.addEventListener('submit', async (e) => {
     }).catch(() => {});
   } catch (err) {
     const input = err.field && form.elements[err.field];
-    if (input && err.field === 'coupon') {
+    if (payment) {
+      // Money may have moved but we could not confirm it. Never tell the learner to simply pay again.
+      el.status.classList.add('is-error');
+      el.status.textContent = `Your payment went through, but we couldn’t confirm your enrolment. Please don’t pay again — contact us with your payment reference: ${payment.razorpay_payment_id}`;
+      el.pay.hidden = true;
+    } else if (input && err.field === 'coupon') {
       clearCoupon({ keepText: true });
       setCouponStatus(err.message, 'error');
       input.focus();
@@ -228,3 +253,5 @@ form.addEventListener('submit', async (e) => {
     setBusy(false);
   }
 });
+
+track('course_view', { item: course.slug });

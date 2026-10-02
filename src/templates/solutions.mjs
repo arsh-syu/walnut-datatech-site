@@ -111,7 +111,7 @@ ${stageSections}
 
 <section class="section section-mist" id="compliance">
   <div class="wrap">
-    ${sectionHead({ eyebrow: 'Regulation-ready', title: 'Built around UGC and DEB requirements.', text: 'Compliance is designed into the services, not bolted on afterwards.' })}
+    ${sectionHead({ eyebrow: 'Regulation-ready', title: 'Built around UGC and DEB requirements.', text: 'Where regulation applies, the services are delivered in line with it.' })}
     <div class="facts">
       ${compliancePoints.map((p, i) => `<div class="fact" data-reveal style="--d:${i * 0.08}s"><h3>${p.label}</h3><p>${p.text}</p></div>`).join('\n      ')}
     </div>
@@ -140,6 +140,15 @@ export function servicePage({ root }, a) {
   const prev = areas[(idx - 1 + areas.length) % areas.length];
   const next = areas[(idx + 1) % areas.length];
   const videoUrl = config.videos.services[a.slug] || '';
+  // The tutorial section only exists once this service's video URL is set.
+  const tutorial = videoUrl
+    ? `<section class="section" id="tutorial">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Tutorial', title: `See ${a.short} in action.`, center: true })}
+    ${videoTile({ title: `${a.name} — tutorial`, kicker: 'Tutorial video', url: videoUrl, cls: 'video-tile-xl' })}
+  </div>
+</section>`
+    : '<div class="section-gap"></div>';
 
   const body = `
 <section class="svc-hero">
@@ -153,7 +162,7 @@ export function servicePage({ root }, a) {
       <p class="lede hero-fade" style="--d:.55s">${a.summary}</p>
       <div class="actions hero-fade" style="--d:.7s">
         ${button({ href: `${root}configure/?add=${a.slug}`, label: 'Add to my solution', size: 'lg', arrow: true })}
-        <a class="btn btn-ghost btn-lg" href="#tutorial">${icon('play')}<span>Watch the tutorial</span></a>
+        ${videoUrl ? `<a class="btn btn-ghost btn-lg" href="#tutorial">${icon('play')}<span>Watch the tutorial</span></a>` : ''}
       </div>
     </div>
     <div class="svc-hero-visual hero-fade" style="--d:.3s">${vignette(a.slug, a.name)}</div>
@@ -166,7 +175,7 @@ export function servicePage({ root }, a) {
     <ul>
       <li><a href="#capabilities">What’s included</a></li>
       <li><a href="#engagement">Pricing</a></li>
-      <li><a href="#tutorial">Tutorial</a></li>
+      ${videoUrl ? '<li><a href="#tutorial">Tutorial</a></li>' : ''}
     </ul>
     ${button({ href: `${root}configure/?add=${a.slug}`, label: 'Add to my solution', variant: 'accent', size: 'sm' })}
   </div>
@@ -208,12 +217,7 @@ export function servicePage({ root }, a) {
   </div>
 </section>
 
-<section class="section" id="tutorial">
-  <div class="wrap">
-    ${sectionHead({ eyebrow: 'Tutorial', title: `See ${a.short} in action.`, center: true })}
-    ${videoTile({ title: `${a.name} — tutorial`, kicker: 'Tutorial video', url: videoUrl, cls: 'video-tile-xl' })}
-  </div>
-</section>
+${tutorial}
 
 <nav class="svc-next" aria-label="More solutions">
   <div class="wrap svc-next-grid">
@@ -253,7 +257,7 @@ ${ctaBand(root, { title: `Add ${a.short} to your solution.`, text: 'Pick the mod
 
   return {
     title: a.name,
-    description: `${a.tagline} ${a.summary}`,
+    description: a.summary,
     body,
     bodyClass: 'page-service',
     sticky: { href: `${root}configure/?add=${a.slug}`, label: 'Add to my solution' },

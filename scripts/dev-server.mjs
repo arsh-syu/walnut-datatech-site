@@ -10,8 +10,10 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { loadEnv, projectRoot } from './env.mjs';
 import { courses, currency } from '../src/data/courses.mjs';
+import { securityHeaders } from '../src/security.mjs';
 
-const env = loadEnv();
+// WALNUT_ENV_FILE lets the test suite start the server without any keys.
+const env = loadEnv(process.env.WALNUT_ENV_FILE);
 const port = Number(process.argv[2]) || 4173;
 const dist = join(projectRoot, 'dist');
 const keyId = env.RAZORPAY_KEY_ID || '';
@@ -25,12 +27,27 @@ const types = {
   '.xml': 'application/xml', '.txt': 'text/plain; charset=utf-8',
 };
 
-const json = (res, status, body) => {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+const json = (res, status, body, extra = {}) => {
+  res.writeHead(status, { ...securityHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...extra });
   res.end(JSON.stringify(body));
 };
 
+// Mirrors rate_limit() in src/api/lib.php (kept in memory here).
+const hits = new Map();
+function rateLimited(req, res, bucket, max, windowSeconds) {
+  const key = `${bucket}|${req.socket.remoteAddress}`;
+  const now = Date.now();
+  const recent = (hits.get(key) || []).filter((t) => t > now - windowSeconds * 1000);
+  if (recent.length >= max) {
+    json(res, 429, { error: 'Too many attempts. Please wait a few minutes and try again.' }, { 'Retry-After': String(windowSeconds) });
+    return true;
+  }
+  hits.set(key, [...recent, now]);
+  return false;
+}
+
 async function readBody(req) {
+  if (!(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) return null;
   let raw = '';
   for await (const chunk of req) raw += chunk;
   try {
@@ -54,7 +71,7 @@ async function razorpay(method, path, payload) {
 
 const api = {
   'GET /api/health.php': async (req, res) =>
-    json(res, 200, { ok: true, runtime: `node ${process.version} (dev mirror)`, configured, mode: configured ? 'test' : null }),
+    json(res, 200, { ok: true, curl: true, configured, mode: configured ? 'test' : null }),
 
   'POST /api/create-order.php': async (req, res) => {
     const input = await readBody(req);
@@ -78,6 +95,7 @@ const api = {
       amount = coupon.finalPrice;
     }
     if (!configured) return json(res, 503, { error: 'Online payment is not set up yet. Please try again later.' });
+    if (rateLimited(req, res, 'create-order', 20, 600)) return;
 
     const order = await razorpay('POST', '/orders', {
       amount: amount * 100,
@@ -95,6 +113,7 @@ const api = {
       return json(res, 400, { ok: false, error: 'Invalid payment details.' });
     }
     if (!configured) return json(res, 503, { error: 'Online payment is not set up yet. Please try again later.' });
+    if (rateLimited(req, res, 'verify-payment', 30, 600)) return;
     const expected = createHmac('sha256', keySecret).update(`${orderId}|${paymentId}`).digest('hex');
     if (!timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) {
       return json(res, 400, { ok: false, error: 'We could not verify this payment. If money was deducted, please contact us with your payment reference.' });
@@ -115,10 +134,10 @@ async function serveStatic(req, res, pathname) {
       file = join(file, 'index.html');
     }
     const body = await readFile(file);
-    res.writeHead(200, { 'Content-Type': types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+    res.writeHead(200, { ...securityHeaders, 'Content-Type': types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(body);
   } catch {
-    res.writeHead(404, { 'Content-Type': types['.html'] });
+    res.writeHead(404, { ...securityHeaders, 'Content-Type': types['.html'] });
     res.end(await readFile(join(dist, '404.html')).catch(() => 'Not found'));
   }
 }

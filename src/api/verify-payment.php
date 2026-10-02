@@ -16,6 +16,7 @@ if (!preg_match('/^order_[A-Za-z0-9]{6,40}$/', $orderId)
 }
 
 $config = load_config();
+rate_limit('verify-payment', 30, 600);
 $expected = hash_hmac('sha256', $orderId . '|' . $paymentId, $config['key_secret']);
 if (!hash_equals($expected, $signature)) {
     respond(400, ['ok' => false, 'error' => 'We could not verify this payment. If money was deducted, please contact us with your payment reference.']);

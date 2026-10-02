@@ -74,7 +74,7 @@
 .cfg-group legend small { font: 400 .875rem var(--font-body); letter-spacing: 0; color: var(--muted); }
 .cfg-tools { display: flex; gap: var(--s-4); margin-bottom: var(--s-5); }
 .text-btn {
-  padding: 0; border: 0; background: none; cursor: pointer;
+  padding: 8px 4px; margin: -8px -4px; border: 0; background: none; cursor: pointer;
   font-size: .875rem; font-weight: 600; color: var(--violet-700);
   text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; transition: text-decoration-color .2s;
 }
@@ -109,8 +109,9 @@
 .mod-box path { stroke-dasharray: 24; stroke-dashoffset: 24; stroke-width: 3; transition: stroke-dashoffset .3s var(--ease); }
 .mod input:checked + .mod-box { background: var(--violet-600); border-color: var(--violet-600); transform: scale(1.06); }
 .mod input:checked + .mod-box path { stroke-dashoffset: 0; }
-.mod-text { display: grid; gap: 2px; transition: opacity .25s; }
-.mod input:not(:checked) ~ .mod-text { opacity: .55; }
+.mod-text { display: grid; gap: 2px; }
+.mod-title { transition: color .25s; }
+.mod input:not(:checked) ~ .mod-text .mod-title { color: var(--muted); }
 .mod-title { font-weight: 500; }
 .mod-desc { font-size: .875rem; color: var(--muted); }
 

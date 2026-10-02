@@ -32,15 +32,27 @@ const check = `<span class="check-badge" aria-hidden="true">${icons.check}</span
 
 const fresh = () => ({ step: 0, maxStep: 0, goal: null, areas: [], items: {}, model: null, areaModel: {} });
 
+// Saved state comes back from the browser, so it is rebuilt field by field rather than trusted.
 function load() {
+  const state = fresh();
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
-    if (saved && Array.isArray(saved.areas)) {
-      saved.areas = saved.areas.filter((s) => areaBy[s]);
-      return { ...fresh(), ...saved };
+    if (!saved || typeof saved !== 'object') return state;
+    const models = data.models.map((m) => m.id);
+    state.areas = (Array.isArray(saved.areas) ? saved.areas : []).filter((s) => areaBy[s]);
+    for (const slug of state.areas) {
+      const ids = areaBy[slug].items.map((it) => it.id);
+      const picked = Array.isArray(saved.items?.[slug]) ? saved.items[slug] : ids;
+      state.items[slug] = ids.filter((id) => picked.includes(id));
+      if (models.includes(saved.areaModel?.[slug])) state.areaModel[slug] = saved.areaModel[slug];
     }
+    if (data.goals.some((g) => g.id === saved.goal)) state.goal = saved.goal;
+    if ([...models, ADVISE].includes(saved.model)) state.model = saved.model;
+    const clampStep = (n) => (Number.isInteger(n) && n >= 0 && n <= 4 ? n : 0);
+    state.step = clampStep(saved.step);
+    state.maxStep = Math.max(state.step, clampStep(saved.maxStep));
   } catch {}
-  return fresh();
+  return state;
 }
 function save() {
   try {

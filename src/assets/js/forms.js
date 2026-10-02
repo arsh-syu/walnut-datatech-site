@@ -7,6 +7,8 @@
 // Other scripts can add fields by listening for `enquiry:collect` on the form and writing to
 // `event.detail.extra`, and react to a successful send via `enquiry:sent`.
 
+import { track } from './analytics.js';
+
 const config = (() => {
   try {
     return JSON.parse(document.getElementById('site-config').textContent).form || {};
@@ -76,6 +78,7 @@ export async function deliver(payload) {
     const body = { subject, from_name: 'Walnut Data Tech website', _subject: subject, _template: 'table', ...payload };
     if (config.accessKey) body.access_key = config.accessKey;
     const res = await fetch(config.endpoint, {
+      signal: AbortSignal.timeout(20000), // never leave the visitor waiting on a hung request
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
@@ -131,13 +134,14 @@ function bind(form) {
     try {
       const how = await deliver(payload);
       if (how === 'mail') {
-        success.querySelector('h3').textContent = 'Almost there.';
+        success.querySelector('h2').textContent = 'Almost there.';
         success.querySelector('p').textContent = 'Your email app has opened with your enquiry — press send to finish.';
       }
       form.hidden = true;
       success.hidden = false;
       success.focus();
       form.dispatchEvent(new CustomEvent('enquiry:sent', { detail: { how, payload }, bubbles: true }));
+      track('enquiry_submit', { topic: payload.topic });
     } catch (err) {
       status.classList.add('is-error');
       status.textContent =

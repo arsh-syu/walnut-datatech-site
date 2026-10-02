@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { loadEnv, projectRoot } from './env.mjs';
+import config from '../site.config.mjs';
 
 const env = loadEnv();
 const fail = (msg) => {
@@ -26,6 +27,11 @@ for (const key of ['FTP_HOST', 'FTP_USER', 'FTP_PASS', 'SITE_URL']) {
 }
 const siteUrl = env.SITE_URL.replace(/\/+$/, '');
 const hasKeys = Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
+
+// Real money must not be taken before the refund terms are published.
+if (hasKeys && env.RAZORPAY_KEY_ID.startsWith('rzp_live_') && !config.legal.refundPolicy) {
+  fail('Live Razorpay keys are set, but legal.refundPolicy in site.config.mjs is empty.\n  Publish your refund and cancellation terms there first (they appear on the Terms page), then deploy again.');
+}
 const dist = join(projectRoot, 'dist');
 const tmp = mkdtempSync(join(tmpdir(), 'walnut-deploy-'));
 process.on('exit', () => rmSync(tmp, { recursive: true, force: true }));
@@ -130,7 +136,7 @@ if (!state.data?.ok) {
   console.log(`  FTP login folder contains: ${home.join(', ') || '(empty)'}`);
   fail('Razorpay keys were not uploaded.');
 }
-console.log(`✓ Payment API is running (PHP ${state.data.php}${state.data.curl ? '' : ' — WARNING: curl extension missing'})`);
+console.log(`✓ Payment API is running${state.data.curl ? '' : ' — WARNING: the PHP curl extension is missing, payments will fail'}`);
 
 if (!hasKeys) {
   console.log('! RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are not set in .env — the site is live but checkout is disabled.');
