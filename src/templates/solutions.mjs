@@ -1,5 +1,6 @@
 import config from '../../site.config.mjs';
-import { areas, stages, models } from '../data/services.mjs';
+import { areas, stages, models, journey } from '../data/services.mjs';
+import { compliancePoints } from '../data/site.mjs';
 import { icon } from './icons.mjs';
 import { vignette } from './vignettes.mjs';
 import { button, splitWords, sectionHead, videoTile, ctaBand } from './layout.mjs';
@@ -51,7 +52,7 @@ export function solutionsIndex({ root }) {
   const body = `
 <section class="page-hero">
   <div class="wrap">
-    <p class="eyebrow hero-fade">Solutions</p>
+    <p class="eyebrow hero-fade">For universities and institutions</p>
     <h1 class="display display-md">${splitWords('One partner for the whole programme lifecycle.')}</h1>
     <p class="lede hero-fade" style="--d:.5s">${areas.length} service areas and ${moduleCount} modules, organised around how an online programme actually runs. Take one — or take them all.</p>
     <nav class="stage-nav hero-fade" style="--d:.65s" aria-label="Lifecycle stages">
@@ -60,14 +61,74 @@ export function solutionsIndex({ root }) {
   </div>
 </section>
 ${stageSections}
+
+<section class="section section-dark" id="platform">
+  <div class="wrap journey-grid">
+    <div class="journey-intro" data-reveal>
+      <p class="eyebrow">One connected platform</p>
+      <h2 class="title">Every step of the student journey. One platform.</h2>
+      <p class="lede">Admissions, student records, learning, examinations and support are set up as one integrated system — and managed for you, day to day.</p>
+      <a class="link-arrow" href="${root}solutions/infrastructure/"><span>Explore the infrastructure</span>${icon('arrow')}</a>
+    </div>
+    <ol class="journey" data-journey>
+      ${journey
+        .map(
+          (j, i) => `<li class="journey-step${i === 0 ? ' is-active' : ''}">
+        <a href="${root}solutions/${j.area}/">
+          <span class="journey-verb">${j.verb}</span>
+          <span class="journey-body"><span class="journey-system">${j.system}</span><span class="journey-desc">${j.desc}</span></span>
+          ${icon('arrow')}
+        </a>
+      </li>`
+        )
+        .join('\n      ')}
+    </ol>
+  </div>
+</section>
+
+<section class="section" id="engagement">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Engagement', title: 'Two ways to work with us.', text: 'Choose one model for everything — or decide service by service.', center: true })}
+    <div class="models">
+      ${models
+        .map(
+          (m, i) => `<article class="model-card spot" data-reveal style="--d:${i * 0.1}s">
+        <p class="model-n">Model ${i + 1}</p>
+        <h3>${m.name}</h3>
+        <p class="model-line">${m.line}</p>
+        <p>${m.desc}</p>
+        <p class="model-unit">${icon('check')}${m.unit}</p>
+        <p class="model-unit">${icon('check')}Pay only for the modules you select</p>
+      </article>`
+        )
+        .join('\n      ')}
+    </div>
+    <div class="actions center" data-reveal>
+      ${button({ href: `${root}configure/`, label: 'Configure your engagement', variant: 'accent', size: 'lg', arrow: true })}
+    </div>
+  </div>
+</section>
+
+<section class="section section-mist" id="compliance">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Regulation-ready', title: 'Built around UGC and DEB requirements.', text: 'Compliance is designed into the services, not bolted on afterwards.' })}
+    <div class="facts">
+      ${compliancePoints.map((p, i) => `<div class="fact" data-reveal style="--d:${i * 0.08}s"><h3>${p.label}</h3><p>${p.text}</p></div>`).join('\n      ')}
+    </div>
+    <a class="link-arrow" href="${root}solutions/compliance/" data-reveal><span>Reporting &amp; regulatory support</span>${icon('arrow')}</a>
+  </div>
+</section>
+
+<div class="section-gap"></div>
 ${ctaBand(root, { title: 'Not sure where to start?', text: 'Tell us your goal and we’ll suggest the right services — you stay in control of every choice.' })}
 `;
 
   return {
-    title: 'Solutions',
+    title: 'Solutions for universities',
     description: `Explore Walnut Data Tech's ${areas.length} service areas for university online programmes — from infrastructure and content to admissions, examinations, compliance, student support and placements.`,
     body,
     bodyClass: 'page-solutions',
+    sticky: { href: `${root}configure/`, label: 'Build your solution' },
   };
 }
 
@@ -195,6 +256,7 @@ ${ctaBand(root, { title: `Add ${a.short} to your solution.`, text: 'Pick the mod
     description: `${a.tagline} ${a.summary}`,
     body,
     bodyClass: 'page-service',
+    sticky: { href: `${root}configure/?add=${a.slug}`, label: 'Add to my solution' },
     jsonLd,
   };
 }

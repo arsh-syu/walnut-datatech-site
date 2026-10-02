@@ -1,5 +1,5 @@
-# Builds the site and publishes it to GitHub Pages on every push to main.
-name: Deploy site
+# Builds the site and publishes a preview mirror to GitHub Pages on every push to main.
+name: Deploy preview
 
 on:
   push:
@@ -25,10 +25,13 @@ jobs:
           node-version: 20
       - id: pages
         uses: actions/configure-pages@v5
-      # site.config.mjs → siteUrl wins when set (e.g. a custom domain); otherwise use the Pages URL.
+      # Production is walnutdatatech.com (deployed with `npm run deploy`). This Pages copy is a preview
+      # mirror: built for its own URL, hidden from search engines, and without the payment API.
       - name: Build and check
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+          NOINDEX: '1'
         run: |
-          if grep -q "siteUrl: ''" site.config.mjs; then export SITE_URL="${{ steps.pages.outputs.base_url }}"; fi
           node build.mjs
           node check.mjs
       - uses: actions/upload-pages-artifact@v3

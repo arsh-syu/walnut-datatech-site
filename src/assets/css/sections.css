@@ -68,7 +68,7 @@
 .showcase-panel:not(.is-active) .vg-card { animation: none; opacity: 0; }
 .showcase-caption { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-5); padding: clamp(18px, 2.4vw, 28px) clamp(20px, 2.6vw, 32px); }
 .showcase-kicker { font-size: .8125rem; font-weight: 600; color: var(--violet-700); }
-.showcase-caption h3 { font: 500 clamp(1.25rem, 2.2vw, 1.75rem)/1.15 var(--font-display); letter-spacing: -.03em; margin-block: 4px 6px; }
+.showcase-caption h4 { font: 500 clamp(1.25rem, 2.2vw, 1.75rem)/1.15 var(--font-display); letter-spacing: -.03em; margin-block: 4px 6px; }
 .showcase-caption p:last-child { color: var(--muted); }
 .showcase-caption .link-arrow { flex: none; padding-bottom: 2px; }
 .showcase-foot { margin-top: var(--s-5); text-align: center; font-size: .9375rem; color: var(--muted); }

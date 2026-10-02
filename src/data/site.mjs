@@ -1,44 +1,66 @@
-// Content for the pages around the service catalogue.
+// Content for the pages around the service catalogue: who Walnut serves, and the partner applications.
 
 export const nav = [
-  { label: 'Solutions', href: 'solutions/' },
+  { label: 'Universities', href: 'solutions/' },
+  { label: 'Courses', href: 'academy/' },
   { label: 'Partners', href: 'partners/' },
-  { label: 'Academy', href: 'academy/' },
   { label: 'About', href: 'about/' },
   { label: 'Contact', href: 'contact/' },
 ];
 
-export const partnerModules = [
+// The three kinds of people Walnut serves. Each has its own journey — they are never merged into one flow.
+export const audiences = [
   {
-    id: 'course-finder',
-    name: 'Course Finder',
-    desc: 'Search and compare online programmes to find the right fit for every student you advise.',
+    id: 'universities',
+    icon: 'building',
+    who: 'I’m from a university or institution',
+    title: 'Work with Walnut',
+    line: 'Technology and services to launch, run and grow your online programmes.',
+    steps: ['Explore solutions', 'Select services', 'Review your solution', 'Request a consultation'],
   },
   {
-    id: 'onboarding',
-    name: 'Agent Onboarding',
-    desc: 'Register as a partner and get set up to represent online programmes.',
+    id: 'learners',
+    icon: 'cap',
+    who: 'I want to learn and upgrade my career',
+    title: 'Upgrade your skills',
+    line: 'Short online courses for counsellors, students and professionals.',
+    steps: ['Explore courses', 'View course details', 'Apply your coupon', 'Enrol and pay'],
   },
   {
-    id: 'leads',
-    name: 'Student Leads',
-    desc: 'Access leads from students who are looking for online programmes.',
+    id: 'partners',
+    icon: 'handshake',
+    who: 'I want to become a Walnut agent or partner',
+    title: 'Join Walnut',
+    line: 'Onboard as an agent and use Walnut’s applications to grow.',
+    steps: ['Explore the partnership', 'Select an application', 'Open it and get started'],
   },
 ];
 
-export const courses = [
+// Walnut's connected applications. Exactly one can be selected at a time; the action opens `url`.
+export const externalApps = [
   {
-    id: 'counsellor-training',
-    name: 'Online Counsellor Training Course',
-    kicker: 'For education counsellors',
-    desc: 'Learn to counsel prospective students for online programmes — and guide them through to admission.',
+    id: 'agent-onboard',
+    icon: 'handshake',
+    name: 'Agent Onboard',
+    desc: 'Register as a Walnut agent and complete your onboarding.',
+    action: 'Open Agent Onboarding',
+    url: 'https://syuapptracker.softsolanalytics.com',
   },
   {
-    id: 'agentic-ai',
-    name: 'Agentic AI',
-    kicker: 'For technology professionals',
-    desc: 'Build with AI agents and retrieval-augmented generation (RAG).',
-    topics: ['Agentic AI', 'AI agents', 'RAG'],
+    id: 'course-finder',
+    icon: 'cap',
+    name: 'Course Finder',
+    desc: 'Search and compare online programmes for the students you advise.',
+    action: 'Open Course Finder',
+    url: 'https://syu-course-finder.vercel.app',
+  },
+  {
+    id: 'online-leads',
+    icon: 'marketing',
+    name: 'Online Leads',
+    desc: 'Access leads from students who are looking for online programmes.',
+    action: 'Open Online Leads',
+    url: 'https://syu-leads.vercel.app',
   },
 ];
 

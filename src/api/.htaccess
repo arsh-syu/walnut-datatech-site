@@ -1,0 +1,7 @@
+# These files are included by the endpoints and must never be requested directly.
+<IfModule mod_authz_core.c>
+  <FilesMatch "^(config|catalog|lib)\.php$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+Options -Indexes

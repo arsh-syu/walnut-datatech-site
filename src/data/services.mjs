@@ -69,8 +69,10 @@ export const areas = [
     short: 'Marketing',
     tagline: 'Put your programmes in front of the right students.',
     summary:
-      'Awareness for your online programmes across social, influencer and broadcast channels.',
+      'Awareness and student enquiries for your online programmes — across digital, social, influencer and broadcast channels.',
     items: [
+      m('digital', 'Digital marketing', 'Digital marketing campaigns for your online programmes.'),
+      m('lead-generation', 'Student lead generation', 'Generating enquiries from prospective students for your programmes.'),
       m('social-marketing', 'Social media marketing', 'Campaigns that promote your online programmes across social platforms.'),
       m('social-management', 'Social media management', 'Day-to-day management of your programmes’ social media presence.'),
       m('influencer', 'Influencer marketing', 'Campaigns with micro, mini and mega influencers.'),
@@ -156,6 +158,20 @@ export const areas = [
       m('reports', 'Institutional reports', 'Reports on admissions, fees collection, student backlogs, examination data and academic records, as required by the University and regulatory authorities including UGC/DEB.'),
       m('abc', 'Academic Bank of Credit (ABC)', 'Support for registration and data sharing with the Academic Bank of Credit.'),
       m('regulatory', 'Regulatory compliance reporting', 'Institutional reporting in compliance with UGC/DEB and other applicable regulatory requirements.'),
+      m('integration', 'UGC/DEB technology integration', 'Technology integration and support for UGC/DEB-related systems.'),
+    ],
+  },
+  {
+    slug: 'automation',
+    stage: 'run',
+    name: 'Automation & AI',
+    short: 'Automation & AI',
+    tagline: 'Let routine work run itself.',
+    summary:
+      'Automation and agentic AI that take repetitive work off your teams, so people can focus on students.',
+    items: [
+      m('process', 'Process automation', 'Automation of routine programme operations.'),
+      m('agentic', 'Agentic AI automation', 'AI agents that carry out multi-step tasks for your teams.'),
     ],
   },
   {

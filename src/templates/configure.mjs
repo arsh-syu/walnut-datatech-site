@@ -61,6 +61,5 @@ export default function configure({ root }) {
     body,
     bodyClass: 'page-configure',
     scripts: ['configure.js'],
-    stickyCta: false,
   };
 }

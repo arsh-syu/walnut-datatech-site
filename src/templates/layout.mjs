@@ -1,8 +1,9 @@
 // Page shell (head, header, footer, dialogs) and the UI primitives shared by every page.
 
 import config from '../../site.config.mjs';
-import { nav } from '../data/site.mjs';
+import { nav, externalApps } from '../data/site.mjs';
 import { areas } from '../data/services.mjs';
+import { courses } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
 import { readFileSync } from 'node:fs';
 
@@ -94,7 +95,11 @@ export function enquiryForm({ id, topic, orgLabel = 'University or organisation'
 </div>`;
 }
 
-export function ctaBand(root, { title = 'Ready to build your online programme?', text = 'Choose the services you need and see your solution take shape — in a few minutes.' } = {}) {
+export function ctaBand(root, { title = 'Ready to build your online programme?', text = 'Choose the services you need and see your solution take shape — in a few minutes.', actions } = {}) {
+  actions ??= [
+    { href: `${root}configure/`, label: 'Build your solution' },
+    { href: `${root}contact/`, label: 'Talk to an expert' },
+  ];
   return `<section class="cta-band">
     <div class="wrap">
       <div class="cta-card spot" data-reveal>
@@ -102,8 +107,7 @@ export function ctaBand(root, { title = 'Ready to build your online programme?',
         <h2 class="title">${title}</h2>
         <p class="lede">${text}</p>
         <div class="actions center">
-          ${button({ href: `${root}configure/`, label: 'Build your solution', variant: 'light', size: 'lg', arrow: true })}
-          ${button({ href: `${root}contact/`, label: 'Talk to an expert', variant: 'ghost-light', size: 'lg' })}
+          ${actions.map((a, i) => button({ ...a, variant: i === 0 ? 'light' : 'ghost-light', size: 'lg', arrow: i === 0 })).join('\n          ')}
         </div>
       </div>
     </div>
@@ -127,7 +131,7 @@ function header(root, path) {
       </ul>
       <div class="nav-actions">
         ${login}
-        ${button({ href: `${root}configure/`, label: 'Build your solution', variant: 'primary', size: 'sm' })}
+        ${button({ href: `${root}#start`, label: 'Get started', variant: 'primary', size: 'sm' })}
       </div>
     </nav>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu" data-menu-btn>
@@ -151,12 +155,27 @@ function footer(root) {
     <div class="footer-top">
       <div class="footer-brand">
         <img src="${root}assets/img/logo-light.svg" alt="${esc(config.company.legalName)}" width="230" height="44" loading="lazy">
-        <p>Technology and services that power university online programmes.</p>
+        <p>Technology, learning and partnerships for online education.</p>
         <div class="socials">${social}</div>
       </div>
-      <nav class="footer-col footer-col-wide" aria-label="Solutions">
-        <h2>Solutions</h2>
-        <ul>${areas.map((a) => `<li><a href="${root}solutions/${a.slug}/">${a.name}</a></li>`).join('')}</ul>
+      <nav class="footer-col footer-col-wide" aria-label="For universities">
+        <h2>For universities</h2>
+        <ul>${areas.map((a) => `<li><a href="${root}solutions/${a.slug}/">${a.name}</a></li>`).join('')}
+          <li><a href="${root}configure/">Build your solution</a></li></ul>
+      </nav>
+      <nav class="footer-col" aria-label="Courses">
+        <h2>Courses</h2>
+        <ul>
+          ${courses.map((c) => `<li><a href="${root}academy/${c.slug}/">${c.name}</a></li>`).join('')}
+          <li><a href="${root}academy/">All courses</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="For partners">
+        <h2>For partners</h2>
+        <ul>
+          <li><a href="${root}partners/">Join Walnut</a></li>
+          ${externalApps.map((app) => `<li><a href="${esc(app.url)}" target="_blank" rel="noopener">${app.name} ${icon('external')}</a></li>`).join('')}
+        </ul>
       </nav>
       <nav class="footer-col" aria-label="Company">
         <h2>Company</h2>
@@ -165,14 +184,6 @@ function footer(root) {
           <li><a href="${root}about/#clients">Our clients</a></li>
           <li><a href="${root}about/#certifications">Certifications</a></li>
           <li><a href="${root}contact/">Contact</a></li>
-        </ul>
-      </nav>
-      <nav class="footer-col" aria-label="More from Walnut">
-        <h2>More</h2>
-        <ul>
-          <li><a href="${root}partners/">Partners</a></li>
-          <li><a href="${root}academy/">Academy</a></li>
-          <li><a href="${root}configure/">Build your solution</a></li>
           <li><a href="${esc(config.links.selectYourUniversity)}" rel="noopener">Select Your University ${icon('external')}</a></li>
         </ul>
       </nav>
@@ -202,7 +213,7 @@ function dialogs() {
 </dialog>`;
 }
 
-export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], stickyCta = true, hasOg = false }) {
+export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
   const { endpoint, accessKey, email } = config.form;
@@ -214,7 +225,7 @@ export function layout({ title, description, path, root, body, bodyClass = '', j
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
-${url ? `<link rel="canonical" href="${url}">` : ''}
+${config.noindex ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${esc(config.company.name)}">
 <meta property="og:title" content="${esc(fullTitle)}">
@@ -237,7 +248,7 @@ ${header(root, path)}
 ${body}
 </main>
 ${footer(root)}
-${stickyCta ? `<a class="sticky-cta" href="${root}configure/" data-sticky-cta><span>Build your solution</span>${icon('arrow')}</a>` : ''}
+${sticky ? `<a class="sticky-cta" href="${sticky.href}" data-sticky-cta><span>${sticky.label}</span>${icon('arrow')}</a>` : ''}
 ${dialogs()}
 <script type="application/json" id="site-config">${clientConfig}</script>
 <script type="module" src="${root}assets/js/main.js"></script>

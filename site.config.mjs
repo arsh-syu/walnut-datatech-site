@@ -3,7 +3,7 @@
 
 export default {
   // Public URL of the deployed site, no trailing slash. Used for canonical URLs, Open Graph and the sitemap.
-  siteUrl: '',
+  siteUrl: 'https://walnutdatatech.com',
 
   company: {
     name: 'Walnut Data Tech',

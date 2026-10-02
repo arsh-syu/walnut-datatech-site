@@ -1,15 +1,16 @@
 # Walnut Data Tech — website
 
-Corporate website for Walnut Data Tech: technology and services for university online programmes.
+Website for Walnut Data Tech: technology and services for universities, short courses for learners, and applications for education agents.
 
-A zero-dependency static site. One data file describes every service; a small Node script turns it into HTML.
+A zero-dependency static site plus a small PHP payment API. Data files describe every service, course and application; a Node script turns them into HTML.
 
 ## Commands
 
 ```bash
-npm run build   # render the site into dist/
-npm run check   # build, then verify links, anchors, headings and metadata
-npm run dev     # build and serve at http://localhost:4173
+npm run build    # render the site into dist/
+npm run check    # build, then verify links, anchors, headings and metadata
+npm run dev      # build and serve at http://localhost:4173 (with a local mirror of the payment API)
+npm run deploy   # build, upload to the web host over FTP, and verify the live site
 ```
 
 Requires Node 18+. There is nothing to install.
@@ -18,23 +19,39 @@ Requires Node 18+. There is nothing to install.
 
 | What | Where |
 |---|---|
-| Services, modules, engagement models, configurator goals | `src/data/services.mjs` |
-| Partner tools, short courses, navigation | `src/data/site.mjs` |
+| University services, modules, engagement models, configurator goals | `src/data/services.mjs` |
+| Courses, prices and coupons | `src/data/courses.mjs` |
+| Audiences ("What brings you to Walnut?"), partner applications, navigation | `src/data/site.mjs` |
 | Site URL, form delivery, social links, video URLs, clients, certifications | `site.config.mjs` |
-| Page templates | `src/templates/` |
-| Styles (tokens → components → sections) | `src/assets/css/` |
-| Interactions, forms, configurator | `src/assets/js/` |
+| Page templates and shared blocks | `src/templates/` |
+| Styles (tokens → components → sections → journeys) | `src/assets/css/` |
+| Interactions, forms, configurator, checkout | `src/assets/js/` |
+| Payment API (runs on the web host) | `src/api/` |
+| Deploy script, local dev server | `scripts/` |
+| Secrets (FTP login, Razorpay keys) — never committed | `.env` (see `.env.example`) |
 
 ## Common edits
 
-- **Add or reword a service module** — edit the `items` list of that service in `src/data/services.mjs`. The Solutions pages, the configurator and the footer all update from it.
-- **Add pricing** — set `revSharePct` and/or `oneTimePrice` on a module: `m('cloud', 'Cloud data centre', '…', { revSharePct: 2, oneTimePrice: 150000 })`. Once every selected module has a value, the configurator shows a running total instead of "In your proposal".
-- **Add a video** — paste the embed URL (e.g. `https://www.youtube.com/embed/VIDEO_ID`) into `videos` in `site.config.mjs`. Until then the play button opens a "coming soon" state.
-- **Connect the enquiry forms** — set `form.endpoint` in `site.config.mjs` to any JSON form endpoint (Web3Forms, Formspree, FormSubmit, your own API). All four forms, including the configurator, post there.
-- **Add clients, certifications, social links, the Student Login URL** — fill the matching fields in `site.config.mjs`.
+- **Change a course price or coupon** — edit `price` or `coupons` in `src/data/courses.mjs`, then deploy. The course pages, the checkout and the server-side price list all come from that one file. A coupon only applies to the course it is listed under.
+- **Add a course** — add an entry to `courses` in the same file; its page, card and checkout are generated.
+- **Add or change a partner application** — edit `externalApps` in `src/data/site.mjs`.
+- **Add or reword a university service module** — edit that service's `items` in `src/data/services.mjs`.
+- **Add a video, client logos, certifications, social links, the Student Login URL** — fill the matching fields in `site.config.mjs`.
+
+## Payments
+
+Checkout uses Razorpay. The browser never decides the price:
+
+1. `api/create-order.php` computes the amount from the course catalogue (and coupon, if valid for that course) and creates a Razorpay order.
+2. Razorpay Checkout collects the payment.
+3. `api/verify-payment.php` checks Razorpay's signature before the enrolment is confirmed.
+
+The Razorpay **key secret lives only on the server** in `api/config.php`, which the deploy script writes from `.env`. It is not in this repository and never reaches the browser. To go live, replace the test keys in `.env` with live keys and deploy again.
+
+`scripts/dev-server.mjs` mirrors the PHP endpoints in Node for local testing and refuses anything but Razorpay **test** keys. Keep the two in step when changing payment rules.
 
 ## Deploying
 
-The output is plain static files in `dist/`, so any static host works: build command `node build.mjs`, output directory `dist`.
+Production is https://walnutdatatech.com, published with `npm run deploy` (settings in `.env`). The script uploads the site, confirms the server executes PHP, and only then uploads the Razorpay keys.
 
-`.github/workflows/deploy.yml` publishes to GitHub Pages on every push to `main`. For a custom domain, set `siteUrl` in `site.config.mjs` so canonical URLs, Open Graph tags and the sitemap point at it.
+Pushing to `main` also publishes a preview mirror to GitHub Pages. The mirror is hidden from search engines and has no payment API, so checkout shows "payment isn't available" there.

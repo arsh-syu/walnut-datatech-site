@@ -21,6 +21,7 @@ const messages = {
   name: 'Please enter your name.',
   organisation: 'Please enter your organisation.',
   email: 'Please enter a valid email address.',
+  phone: 'Please enter a valid phone number.',
 };
 
 const labels = {
@@ -35,7 +36,7 @@ const labels = {
   page: 'Sent from',
 };
 
-function setError(input, message) {
+export function setError(input, message) {
   const field = input.closest('.field');
   let note = field.querySelector('.field-error');
   if (!message) {
@@ -57,7 +58,7 @@ function setError(input, message) {
   input.setAttribute('aria-describedby', note.id);
 }
 
-function validate(form) {
+export function validate(form) {
   let first = null;
   for (const input of form.querySelectorAll('input[required], textarea[required]')) {
     const ok = input.value.trim() !== '' && input.validity.valid;
@@ -68,7 +69,7 @@ function validate(form) {
   return !first;
 }
 
-async function deliver(payload) {
+export async function deliver(payload) {
   if (config.endpoint) {
     const subject = `${payload.topic} — ${payload.organisation || payload.name}`;
     // `subject`/`from_name` are read by Web3Forms, `_subject`/`_template` by FormSubmit; others ignore them.

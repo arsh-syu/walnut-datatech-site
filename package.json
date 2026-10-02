@@ -2,13 +2,13 @@
   "name": "walnut-datatech-site",
   "version": "1.0.0",
   "private": true,
-  "description": "Walnut Data Tech — corporate website (zero-dependency static build)",
+  "description": "Walnut Data Tech — website (static build + PHP payment API)",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
     "check": "node build.mjs && node check.mjs",
-    "serve": "python3 -m http.server 4173 --directory dist",
-    "dev": "node build.mjs && python3 -m http.server 4173 --directory dist"
+    "dev": "node build.mjs && node scripts/dev-server.mjs",
+    "deploy": "node scripts/deploy.mjs"
   },
   "engines": {
     "node": ">=18"

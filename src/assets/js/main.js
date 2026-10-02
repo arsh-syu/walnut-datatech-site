@@ -13,11 +13,17 @@ const menuBtn = $('[data-menu-btn]');
 const nav = $('#site-nav');
 const stickyCta = $('[data-sticky-cta]');
 
+// When the sticky button points at a section on this page, it steps aside once that section is on screen.
+const stickyHash = stickyCta?.getAttribute('href').startsWith('#') ? stickyCta.getAttribute('href') : null;
+const stickyTarget = stickyHash ? $(stickyHash) : null;
+
 function onScroll() {
   header.classList.toggle('is-scrolled', scrollY > 8);
   if (stickyCta) {
     const nearEnd = document.documentElement.scrollHeight - scrollY - innerHeight < 420;
-    stickyCta.classList.toggle('is-visible', scrollY > innerHeight * 0.7 && !nearEnd);
+    const box = stickyTarget?.getBoundingClientRect();
+    const targetOnScreen = Boolean(box && box.top < innerHeight - 80 && box.bottom > 0);
+    stickyCta.classList.toggle('is-visible', scrollY > innerHeight * 0.7 && !nearEnd && !targetOnScreen);
   }
 }
 addEventListener('scroll', onScroll, { passive: true });
@@ -59,7 +65,7 @@ $$('[data-reveal]').forEach((el) => revealer.observe(el));
 
 document.addEventListener('pointerdown', (e) => {
   if (reduceMotion) return;
-  const target = e.target.closest('.btn, .pick, .opt, .rail-item, .stage-nav a');
+  const target = e.target.closest('.btn, .opt, .rail-item, .stage-nav a, .audience-tab, .app');
   if (!target || target.disabled) return;
   const rect = target.getBoundingClientRect();
   const size = Math.max(rect.width, rect.height) * 2.2;
@@ -237,28 +243,72 @@ $$('[data-subnav]').forEach((subnav) => {
   });
 });
 
-/* ---------- selectable tiles feeding an enquiry form (partners, academy) ---------- */
+/* ---------- "What brings you to Walnut?" — audience tabs ---------- */
 
-$$('[data-interest-scope]').forEach((scope) => {
-  const picks = $$('[data-interest]', scope);
-  const echo = $('[data-interest-echo]', scope);
-  const form = $('[data-enquiry]', scope);
-  const selected = () => picks.filter((p) => p.getAttribute('aria-pressed') === 'true').map((p) => p.dataset.interest);
+$$('[data-tabs]').forEach((root) => {
+  const tabs = $$('[role="tab"]', root);
+  const panels = tabs.map((t) => document.getElementById(t.getAttribute('aria-controls')));
+  const storageKey = root.dataset.remember;
 
-  picks.forEach((pick) =>
-    pick.addEventListener('click', () => {
-      pick.setAttribute('aria-pressed', String(pick.getAttribute('aria-pressed') !== 'true'));
-      const names = selected();
-      if (echo) {
-        echo.hidden = names.length === 0;
-        echo.textContent = names.length ? `Selected: ${names.join(' · ')}` : '';
-      }
-    })
-  );
-  form?.addEventListener('enquiry:collect', (e) => {
-    const names = selected();
-    if (names.length) e.detail.extra.interests = names.join(', ');
+  function select(index, { focus = false, remember = true } = {}) {
+    tabs.forEach((tab, i) => {
+      const on = i === index;
+      tab.classList.toggle('is-active', on);
+      tab.setAttribute('aria-selected', String(on));
+      tab.tabIndex = on ? 0 : -1;
+      panels[i].classList.toggle('is-active', on);
+    });
+    if (focus) tabs[index].focus();
+    if (remember && storageKey) {
+      try {
+        localStorage.setItem(storageKey, tabs[index].dataset.tab);
+      } catch {}
+    }
+  }
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => select(i));
+    tab.addEventListener('keydown', (e) => {
+      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (!step && e.key !== 'Home' && e.key !== 'End') return;
+      e.preventDefault();
+      const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (i + step + tabs.length) % tabs.length;
+      select(next, { focus: true });
+    });
   });
+
+  // A link such as /#for-learners opens that path; otherwise restore the visitor's last choice.
+  const fromHash = () => tabs.findIndex((t) => location.hash === `#for-${t.dataset.tab}`);
+  let initial = fromHash();
+  if (initial < 0 && storageKey) {
+    try {
+      initial = tabs.findIndex((t) => t.dataset.tab === localStorage.getItem(storageKey));
+    } catch {}
+  }
+  if (initial > 0) select(initial, { remember: false });
+  addEventListener('hashchange', () => {
+    const i = fromHash();
+    if (i < 0) return;
+    select(i);
+    root.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  });
+  if (fromHash() >= 0) root.scrollIntoView({ block: 'start' });
+});
+
+/* ---------- application launcher: one choice → its action button ---------- */
+
+$$('[data-launcher]').forEach((root) => {
+  const panels = $$('.launcher-panel', root);
+  const show = (id) => {
+    root.classList.add('has-selection');
+    panels.forEach((p) => p.classList.toggle('is-active', p.dataset.app === id));
+  };
+  root.addEventListener('change', (e) => {
+    if (e.target.type === 'radio') show(e.target.value);
+  });
+  // the browser may restore a previous choice when navigating back
+  const restored = $('input[type="radio"]:checked', root);
+  if (restored) show(restored.value);
 });
 
 initForms();

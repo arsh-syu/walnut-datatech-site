@@ -126,7 +126,7 @@ a:hover > .link-arrow .ico, .link-arrow:hover .ico { transform: translateX(4px);
 /* ---------- footer ---------- */
 
 .site-footer { background: var(--night); color: #fff; padding-block: clamp(56px, 8vw, 96px) var(--s-6); }
-.footer-top { display: grid; grid-template-columns: 1.5fr 1.3fr 1fr 1fr; gap: clamp(28px, 5vw, 64px); }
+.footer-top { display: grid; grid-template-columns: 1.3fr 1.4fr 1fr 1fr 1fr; gap: clamp(28px, 5vw, 64px); }
 .footer-brand { display: grid; gap: var(--s-5); align-content: start; }
 .footer-brand img { height: 44px; width: auto; }
 .footer-brand p { color: var(--on-dark-muted); max-width: 26em; font-size: .9375rem; }
