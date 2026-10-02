@@ -31,8 +31,9 @@ export function priceFlow(course) {
 }
 
 // `level` is the heading level that fits where the card sits in the page outline.
-export function courseCard(root, course, i = 0, level = 3) {
-  return `<article class="course-card spot" data-reveal style="--d:${i * 0.1}s">
+// `reveal: false` is for cards inside a container that already animates in (e.g. the audience panels).
+export function courseCard(root, course, i = 0, level = 3, reveal = true) {
+  return `<article class="course-card spot"${reveal ? ` data-reveal style="--d:${i * 0.1}s"` : ''}>
     <p class="eyebrow">${course.kicker}</p>
     <h${level} class="course-card-title"><a href="${root}academy/${course.slug}/" data-track="course_select" data-track-item="${course.slug}">${course.name}</a></h${level}>
     <p class="course-card-tagline">${course.tagline}</p>

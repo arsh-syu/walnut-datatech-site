@@ -14,7 +14,7 @@
 .hero-in { display: grid; justify-items: center; gap: var(--s-5); text-align: center; }
 .hero-in .display { max-width: 12.5em; }
 .hero-in .lede { max-width: 36em; }
-.hero-mark { width: clamp(52px, 6vw, 72px); animation: mark-turn 1.5s var(--ease) both; transition: rotate .8s var(--spring); }
+.hero-mark { width: clamp(52px, 6vw, 72px); animation: mark-turn 1.5s var(--ease) backwards; transition: rotate .8s var(--spring); }
 .hero-mark .arm { animation: arm-in 1.1s var(--spring) both; }
 .hero-mark .arm-t { animation-delay: .08s; }
 .hero-mark .arm-l { animation-delay: .16s; }
@@ -65,7 +65,8 @@
 }
 .showcase-panel.is-active { opacity: 1; visibility: visible; transition-delay: 0s; }
 .showcase-panel .vg { flex: 1; min-height: clamp(280px, 34vw, 430px); aspect-ratio: auto; border-radius: 0; }
-.showcase-panel:not(.is-active) .vg-card { animation: none; opacity: 0; }
+/* hidden panels keep their state but stop ticking; main.js replays the entrance when a panel is shown */
+.showcase-panel:not(.is-active) .vg, .showcase-panel:not(.is-active) .vg * { animation-play-state: paused; }
 .showcase-caption { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-5); padding: clamp(18px, 2.4vw, 28px) clamp(20px, 2.6vw, 32px); }
 .showcase-kicker { font-size: .8125rem; font-weight: 600; color: var(--violet-700); }
 .showcase-caption h4 { font: 500 clamp(1.25rem, 2.2vw, 1.75rem)/1.15 var(--font-display); letter-spacing: -.03em; margin-block: 4px 6px; }
@@ -164,6 +165,7 @@
 
 .stage-nav { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .stage-nav a {
+  position: relative; isolation: isolate; overflow: hidden;
   display: inline-flex; gap: 8px; padding: 9px 16px; border-radius: 999px;
   border: 1.5px solid var(--line); font-size: .9375rem; font-weight: 500;
   transition: border-color .25s, background-color .25s, transform .25s var(--ease);

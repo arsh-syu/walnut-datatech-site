@@ -32,12 +32,21 @@
 .audience-who { font-size: .9375rem; color: var(--muted); }
 .audience-title { font: 500 clamp(1.3rem, 2.4vw, 1.9rem)/1.1 var(--font-display); letter-spacing: -.035em; }
 
-.audience-panel { margin-top: var(--s-4); padding: clamp(16px, 3vw, 40px); border-radius: calc(var(--r-xl) + 8px); background: var(--mist); }
+/* One persistent stage holds the three panels: its background stays put and its height glides
+   between choices, while the outgoing panel fades out and the incoming one rises in. */
+.audience-stage { margin-top: var(--s-4); padding: clamp(16px, 3vw, 40px); border-radius: calc(var(--r-xl) + 8px); background: var(--mist); }
+.audience-stage.is-resizing { overflow: hidden; transition: height .5s var(--ease); }
 .audience-panel:focus { outline: none; }
+.audience-panel + .audience-panel { margin-top: var(--s-7); } /* only visible without JS, when all three are shown */
+.js .audience-panel + .audience-panel { margin-top: 0; }
 .js .audience-panel:not(.is-active) { display: none; }
-.js .audience-panel.is-active > * { animation: rise .6s var(--ease) both; }
-.js .audience-panel.is-active > *:nth-child(2) { animation-delay: .07s; }
-.js .audience-panel.is-active > *:nth-child(n + 3) { animation-delay: .14s; }
+.audience-panel { transition: opacity .18s ease, transform .18s ease; }
+.audience-panel.is-leaving { opacity: 0; transform: translateY(-10px); }
+.audience-panel.is-entering > * { animation: rise .55s var(--ease) backwards; }
+.audience-panel.is-entering > *:nth-child(2) { animation-delay: .06s; }
+.audience-panel.is-entering > *:nth-child(n + 3) { animation-delay: .12s; }
+/* returning visitors: hold the selector back until the script has switched to their saved choice */
+.tabs-pending [data-tabs] { visibility: hidden; }
 .audience-intro { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--s-4) var(--s-6); margin-bottom: clamp(18px, 3vw, 32px); }
 .audience-intro h3 { font: 500 clamp(1.5rem, 2.8vw, 2.2rem)/1.1 var(--font-display); letter-spacing: -.035em; }
 .audience-intro p { margin-top: 6px; max-width: 34em; color: var(--muted); }

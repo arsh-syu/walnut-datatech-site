@@ -3,10 +3,13 @@
 
 import { createHash } from 'node:crypto';
 
-// The only inline script on the site. It marks the document as JS-capable before first paint and,
-// if the main script ever fails to load, removes that mark again so no content stays hidden.
+// The only inline script on the site. Before first paint it:
+//   - marks the document as JS-capable (scroll-reveal and tabs depend on it);
+//   - if the visitor chose an audience before, holds the audience selector back until the main
+//     script has switched to it, so the wrong panel never flashes;
+// and if the main script ever fails to load, it removes both marks so no content stays hidden.
 export const inlineScript =
-  "document.documentElement.classList.add('js');addEventListener('error',function(e){var t=e.target;if(t&&t.tagName==='SCRIPT'&&/assets\\/js\\/main\\.js/.test(t.src))document.documentElement.classList.remove('js')},true)";
+  "(function(){var d=document.documentElement;d.classList.add('js');try{if(localStorage.getItem('walnut-audience'))d.classList.add('tabs-pending')}catch(e){}addEventListener('error',function(e){var t=e.target;if(t&&t.tagName==='SCRIPT'&&/assets\\/js\\/main\\.js/.test(t.src))d.classList.remove('js','tabs-pending')},true)})()";
 
 const sha256 = (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`;
 

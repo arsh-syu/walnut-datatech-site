@@ -157,6 +157,10 @@ function initShowcase(root) {
       panels[i].classList.toggle('is-active', on);
       panels[i].inert = !on;
     });
+    // replay the one-shot animations (cards rising, bars growing) of the panel that is now showing
+    for (const animation of panels[index].getAnimations({ subtree: true })) {
+      if (animation.effect?.getComputedTiming().iterations !== Infinity) animation.currentTime = 0;
+    }
     // keep the active tab in view when the rail scrolls horizontally (mobile)
     if (rail.scrollWidth > rail.clientWidth) {
       const tab = tabs[index];
@@ -245,18 +249,68 @@ $$('[data-subnav]').forEach((subnav) => {
 /* ---------- "What brings you to Walnut?" — audience tabs ---------- */
 
 $$('[data-tabs]').forEach((root) => {
-  const tabs = $$('[role="tab"]', root);
+  // Only this selector's own tabs. The university panel contains the service showcase, which has
+  // tabs of its own; picking those up here made a click on a service deselect every audience.
+  const tabs = $$(':scope > [role="tablist"] > [role="tab"]', root);
   const panels = tabs.map((t) => document.getElementById(t.getAttribute('aria-controls')));
+  const stage = $('[data-tabs-stage]', root);
   const storageKey = root.dataset.remember;
+  const FADE_OUT = 180; // matches .audience-panel's transition
+  const SETTLE = 800; // height glide + staggered entrance
+  let timer = null;
 
-  function select(index, { focus = false, remember = true } = {}) {
+  function showPanel(index, animate) {
+    clearTimeout(timer);
+    const shown = panels.find((p) => p.classList.contains('is-active'));
+    const next = panels[index];
+    const swap = () => panels.forEach((p, i) => {
+      p.classList.remove('is-leaving', 'is-entering');
+      p.classList.toggle('is-active', i === index);
+    });
+
+    if (!animate || reduceMotion || !stage || shown === next) {
+      swap();
+      if (stage) {
+        stage.style.height = '';
+        stage.classList.remove('is-resizing');
+      }
+      return;
+    }
+
+    // 1. pin the stage at its current height and fade the visible panel out
+    const startHeight = stage.offsetHeight;
+    stage.style.height = `${startHeight}px`;
+    stage.classList.add('is-resizing');
+    panels.forEach((p) => p.classList.remove('is-entering'));
+    shown.classList.add('is-leaving');
+
+    timer = setTimeout(() => {
+      // 2. swap panels, then glide the stage from the old height to the new one while the content rises in
+      swap();
+      next.classList.add('is-entering');
+      stage.style.height = 'auto';
+      const endHeight = stage.offsetHeight;
+      stage.style.height = `${startHeight}px`;
+      void stage.offsetHeight;
+      stage.style.height = `${endHeight}px`;
+
+      timer = setTimeout(() => {
+        // 3. hand the height back to the layout
+        stage.style.height = '';
+        stage.classList.remove('is-resizing');
+        next.classList.remove('is-entering');
+      }, SETTLE);
+    }, FADE_OUT);
+  }
+
+  function select(index, { focus = false, remember = true, animate = true } = {}) {
     tabs.forEach((tab, i) => {
       const on = i === index;
       tab.classList.toggle('is-active', on);
       tab.setAttribute('aria-selected', String(on));
       tab.tabIndex = on ? 0 : -1;
-      panels[i].classList.toggle('is-active', on);
     });
+    showPanel(index, animate);
     if (focus) tabs[index].focus();
     if (remember && storageKey) {
       try {
@@ -265,8 +319,18 @@ $$('[data-tabs]').forEach((root) => {
     }
   }
 
+  // On small screens the panel can sit below the fold: bring the choice and its result into view.
+  function revealStage() {
+    if (stage && stage.getBoundingClientRect().top > innerHeight - 120) {
+      tabs[0].parentElement.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    }
+  }
+
   tabs.forEach((tab, i) => {
-    tab.addEventListener('click', () => select(i));
+    tab.addEventListener('click', () => {
+      select(i);
+      revealStage();
+    });
     tab.addEventListener('keydown', (e) => {
       const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
       if (!step && e.key !== 'Home' && e.key !== 'End') return;
@@ -277,6 +341,7 @@ $$('[data-tabs]').forEach((root) => {
   });
 
   // A link such as /#for-learners opens that path; otherwise restore the visitor's last choice.
+  // Either way the first state is set without animation, before the selector becomes visible.
   const fromHash = () => tabs.findIndex((t) => location.hash === `#for-${t.dataset.tab}`);
   let initial = fromHash();
   if (initial < 0 && storageKey) {
@@ -284,7 +349,9 @@ $$('[data-tabs]').forEach((root) => {
       initial = tabs.findIndex((t) => t.dataset.tab === localStorage.getItem(storageKey));
     } catch {}
   }
-  if (initial > 0) select(initial, { remember: false });
+  if (initial > 0) select(initial, { remember: false, animate: false });
+  document.documentElement.classList.remove('tabs-pending');
+
   addEventListener('hashchange', () => {
     const i = fromHash();
     if (i < 0) return;

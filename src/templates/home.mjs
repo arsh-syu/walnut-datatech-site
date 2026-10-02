@@ -60,7 +60,7 @@ function audienceBody(root, id) {
       </div>`;
   }
   if (id === 'learners') {
-    return `<div class="course-grid">${courses.map((c, i) => courseCard(root, c, i, 4)).join('')}</div>
+    return `<div class="course-grid">${courses.map((c, i) => courseCard(root, c, i, 4, false)).join('')}</div>
       <div class="actions center">
         ${button({ href: `${root}academy/`, label: 'See all courses', variant: 'ghost', size: 'lg', arrow: true })}
       </div>`;
@@ -107,7 +107,7 @@ export default function home({ root }) {
       <div class="audience-tabs" role="tablist" aria-label="Choose what describes you">
         ${audiences
           .map(
-            (a, i) => `<button class="audience-tab${i === 0 ? ' is-active' : ''}" type="button" role="tab" id="aud-tab-${a.id}" aria-controls="aud-${a.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-tab="${a.id}" data-track="audience_select" data-track-item="${a.id}">
+            (a, i) => `<button class="audience-tab${i === 0 ? ' is-active' : ''}" type="button" role="tab" id="aud-tab-${a.id}" aria-controls="aud-${a.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-tab="${a.id}" data-track="audience_select" data-track-item="${a.id}" data-reveal style="--d:${i * 0.08}s">
           <span class="audience-top"><span class="audience-ico">${icon(a.icon)}</span><span class="check-badge" aria-hidden="true">${icon('check')}</span></span>
           <span class="audience-who">${a.who}</span>
           <span class="audience-title">${a.title}</span>
@@ -115,6 +115,7 @@ export default function home({ root }) {
           )
           .join('\n        ')}
       </div>
+      <div data-reveal style="--d:.2s"><div class="audience-stage" data-tabs-stage>
       ${audiences
         .map(
           (a, i) => `<div class="audience-panel${i === 0 ? ' is-active' : ''}" role="tabpanel" id="aud-${a.id}" aria-labelledby="aud-tab-${a.id}" tabindex="-1">
@@ -129,6 +130,7 @@ export default function home({ root }) {
       </div>`
         )
         .join('\n      ')}
+      </div></div>
     </div>
   </div>
 </section>

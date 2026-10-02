@@ -70,6 +70,16 @@ test('partner applications point at the right addresses, and there are three aud
   assert.equal((partners.match(/type="radio" name="partner-app"/g) || []).length, 3, 'launcher is a single-choice radio group');
 });
 
+test('the audience selector only controls its own three tabs', () => {
+  // The university panel nests the service showcase, which has tabs of its own. If the selector
+  // ever picks those up again, clicking a service deselects every audience and blanks the section.
+  const home = readFileSync(join(dist, 'index.html'), 'utf8');
+  assert.equal((home.match(/class="audience-tab[ "]/g) || []).length, 3);
+  assert.ok((home.match(/class="rail-item[ "]/g) || []).length > 3, 'showcase tabs are nested inside the selector');
+  const script = readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8');
+  assert.ok(script.includes(`$$(':scope > [role="tablist"] > [role="tab"]', root)`), 'tabs must be scoped to the direct tablist');
+});
+
 /* ---------- payment API ---------- */
 
 test('health endpoint reports status without leaking details', async () => {
