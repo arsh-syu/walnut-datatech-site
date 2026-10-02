@@ -67,4 +67,23 @@ To go live: fill `legal.refundPolicy` in `site.config.mjs`, replace the test key
 
 Production is https://walnutdatatech.com, published with `npm run deploy` (settings in `.env`). The script uploads the site, confirms the server executes PHP, and only then uploads the Razorpay keys.
 
+### Uploading by hand instead
+
+If you prefer your host's File Manager or an FTP app:
+
+1. Run `npm run build`.
+2. Upload **everything inside `dist/`** (including the hidden `.htaccess` files) to the website's root folder.
+3. Open `https://your-domain/api/health.php` — it should show `{"ok":true,...}`. If it shows PHP source code instead, stop: PHP is not enabled, and the next step would expose your key.
+4. To switch on payments, create `api/config.php` on the server with your Razorpay keys:
+
+   ```php
+   <?php
+   return [
+     'key_id' => 'rzp_test_xxxxxxxxxxxx',
+     'key_secret' => 'your-key-secret',
+   ];
+   ```
+
+   Never put this file in the repository, in `dist/`, or in a zip you share.
+
 Pushing to `main` runs the tests and publishes a preview mirror to GitHub Pages. The mirror is hidden from search engines and has no payment API, so checkout shows "payment isn't available" there.
