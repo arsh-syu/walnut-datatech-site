@@ -8,7 +8,7 @@
     "build": "node build.mjs",
     "check": "node build.mjs && node check.mjs",
     "lint": "for f in build.mjs check.mjs site.config.mjs scripts/*.mjs src/*.mjs src/data/*.mjs src/templates/*.mjs src/assets/js/*.js tests/*.mjs; do node --check \"$f\" || exit 1; done",
-    "test": "npm run lint && node --test tests/",
+    "test": "npm run lint && node --test tests/*.test.mjs",
     "dev": "node build.mjs && node scripts/dev-server.mjs",
     "deploy": "node scripts/deploy.mjs"
   },
