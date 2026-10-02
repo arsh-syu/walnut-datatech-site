@@ -31,6 +31,7 @@ Requires Node 20+. There is nothing to install — no dependencies.
 | Payment API (runs on the web host) | `src/api/` |
 | Deploy script, local dev server | `scripts/` |
 | Tests | `tests/` |
+| Brand kit for re-theming other tools (tokens, component styles, logos, icons, guidelines) | `brand/` — start with `brand/brand-book.html` |
 | Secrets (FTP login, Razorpay keys) — never committed | `.env` (see `.env.example`) |
 
 ## Common edits

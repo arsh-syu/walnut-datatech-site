@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walnut Data Tech — brand book</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lexend:wght@500&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  body { margin: 0; background: var(--paper); }
+  .page { max-width: 1120px; margin: 0 auto; padding: 56px clamp(20px, 5vw, 40px) 96px; }
+  .page > header { display: grid; gap: var(--s-5); padding-bottom: var(--s-8); }
+  .page > header img { height: 44px; width: auto; }
+  section { padding-block: var(--s-8); border-top: 1px solid var(--line); }
+  section > h2 { margin: 0 0 var(--s-6); font: 500 clamp(1.75rem, 3.7vw, 2.5rem)/1.08 var(--font-display); letter-spacing: -.035em; }
+  h3.sub { margin: var(--s-6) 0 var(--s-3); font: 600 .8125rem var(--font-body); color: var(--muted); }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-3); }
+  .swatch { border: 1.5px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: #fff; }
+  .swatch-chip { display: flex; align-items: flex-end; height: 88px; padding: 12px 14px; font: 600 .8125rem var(--font-mono); }
+  .swatch-text { padding: 12px 14px 14px; }
+  .swatch-text b { display: block; font: 600 .9375rem var(--font-mono); }
+  .swatch-text span { display: block; margin-top: 4px; font-size: .8125rem; line-height: 1.45; color: var(--muted); }
+  .type-row { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: var(--s-5); align-items: baseline; padding-block: var(--s-4); border-top: 1px solid var(--line); }
+  .type-row small { font: 500 .8125rem/1.5 var(--font-mono); color: var(--muted); }
+  .type-row p { margin: 0; overflow-wrap: anywhere; }
+  .scale { display: grid; gap: 10px; }
+  .scale div { display: flex; align-items: center; gap: var(--s-4); font: 500 .8125rem var(--font-mono); color: var(--muted); }
+  .scale i { display: block; height: 14px; border-radius: 4px; background: var(--violet); }
+  .tiles { display: flex; flex-wrap: wrap; gap: var(--s-4); }
+  .tile { display: grid; place-items: center; width: 132px; height: 96px; background: var(--mist); font: 500 .8125rem var(--font-mono); color: var(--ink-2); text-align: center; }
+  .tile.elev { background: #fff; }
+  .demo { padding: 24px; border: 1.5px solid var(--line); border-radius: var(--r-xl); overflow: hidden; }
+  .demo + h3.sub { margin-top: var(--s-7); }
+  .demo .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .demo .row + .row { margin-top: 16px; }
+  .demo .grid { display: grid; gap: 12px; }
+  .demo .night { margin: 16px -24px -24px; padding: 24px; background: var(--night); }
+  .logos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--s-3); }
+  .logo { display: grid; place-items: center; gap: 12px; padding: 32px 24px 16px; border-radius: var(--r-lg); background: var(--mist); font: 500 .8125rem var(--font-mono); color: var(--muted); }
+  .logo.on-night { background: var(--night); color: var(--on-dark-muted); }
+  .logo img { height: 56px; width: auto; max-width: 100%; }
+  .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: var(--s-2); }
+  .icons div { display: grid; justify-items: center; gap: 8px; padding: 16px 8px 12px; border-radius: var(--r); background: var(--mist); font: 500 .75rem var(--font-mono); color: var(--muted); }
+  .icons img { width: 24px; height: 24px; }
+  @media (max-width: 640px) { .type-row { grid-template-columns: 1fr; gap: 4px; } }
+</style>
+</head>
+<body>
+<div class="wn page">
+  <header>
+    <img src="logos/logo.svg" alt="Walnut DataTech Private Limited">
+    <h1 class="wn-display wn-display-md">Brand book</h1>
+    <p class="wn-lede">The colours, type, spacing, shapes and components of the Walnut Data Tech website — with the exact values to give any other tool the same look. The full written guidelines are in BRAND.md.</p>
+  </header>
+
+  <section>
+    <h2>Colour</h2>
+    <h3 class="sub">Surfaces</h3>
+    <div class="swatches"><div class="swatch"><div class="swatch-chip" style="background:#ffffff;color:#0d0c14">#ffffff</div><div class="swatch-text"><b>paper</b><span>Page background and raised cards. The default ground.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#f6f5fb;color:#0d0c14">#f6f5fb</div><div class="swatch-text"><b>mist</b><span>Soft section backgrounds and quiet cards on paper.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#faf9ff;color:#0d0c14">#faf9ff</div><div class="swatch-text"><b>selected</b><span>Background of a selected card, always with a violet-600 border.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#efebff;color:#0d0c14">#efebff</div><div class="swatch-text"><b>violet-soft</b><span>Tinted surface: icon tiles, chips, coupon codes. Carries violet-700 text.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#0c0a17;color:#fff">#0c0a17</div><div class="swatch-text"><b>night</b><span>Dark sections, footer and closing call-to-action. Carries white and on-dark-muted text.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#171429;color:#fff">#171429</div><div class="swatch-text"><b>night-2</b><span>Raised surface on night.</span></div></div></div>
+    <h3 class="sub">Text</h3>
+    <div class="swatches"><div class="swatch"><div class="swatch-chip" style="background:#0d0c14;color:#fff">#0d0c14</div><div class="swatch-text"><b>ink</b><span>Headings and body text on paper, mist and violet-soft. Also the fill of the primary button.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#2b2937;color:#fff">#2b2937</div><div class="swatch-text"><b>ink-2</b><span>Secondary text such as navigation links, on paper and mist.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#63607a;color:#fff">#63607a</div><div class="swatch-text"><b>muted</b><span>Supporting text and descriptions on paper and mist.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#b9b5cc;color:#0d0c14">#b9b5cc</div><div class="swatch-text"><b>on-dark-muted</b><span>Supporting text on night.</span></div></div></div>
+    <h3 class="sub">Brand violet</h3>
+    <div class="swatches"><div class="swatch"><div class="swatch-chip" style="background:#7d62ff;color:#fff">#7d62ff</div><div class="swatch-text"><b>violet</b><span>The brand colour, taken from the logo. Use it for marks, progress, illustration and glows — not for small text on white (4.1:1).</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#6a4df5;color:#fff">#6a4df5</div><div class="swatch-text"><b>violet-600</b><span>Accent fills that carry white text: accent buttons, selected ticks and icon tiles.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#5b3fe6;color:#fff">#5b3fe6</div><div class="swatch-text"><b>violet-700</b><span>Accent text on light surfaces: links, eyebrows, small labels on paper, mist and violet-soft.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#b3a3ff;color:#0d0c14">#b3a3ff</div><div class="swatch-text"><b>violet-on-dark</b><span>Accent text on night: eyebrows and links in dark sections.</span></div></div></div>
+    <h3 class="sub">Lines and status</h3>
+    <div class="swatches"><div class="swatch"><div class="swatch-chip" style="background:#e8e6f0;color:#0d0c14">#e8e6f0</div><div class="swatch-text"><b>line</b><span>Hairline borders and dividers. Decorative — never the only sign of a control.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#cfccdd;color:#0d0c14">#cfccdd</div><div class="swatch-text"><b>line-strong</b><span>Borders of inputs and outline buttons.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#17b26a;color:#0d0c14">#17b26a</div><div class="swatch-text"><b>ok</b><span>Success marks: tick circles and status dots. Always paired with a word or a tick.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#0b7a43;color:#fff">#0b7a43</div><div class="swatch-text"><b>ok-text</b><span>Success text on paper and ok-soft.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#e6f8ee;color:#0d0c14">#e6f8ee</div><div class="swatch-text"><b>ok-soft</b><span>Tinted background behind success text.</span></div></div><div class="swatch"><div class="swatch-chip" style="background:#b42318;color:#fff">#b42318</div><div class="swatch-text"><b>danger</b><span>Error text and the border of an invalid field, on paper. Always paired with a message.</span></div></div></div>
+  </section>
+
+  <section>
+    <h2>Typography</h2>
+    <p class="wn-lede" style="margin-bottom:var(--s-5)">Lexend 500 for every heading, Inter 400/500/600 for everything else. Both are free on Google Fonts.</p>
+    <div class="type-row"><small>display<br>84px / 1.02 · 500 · -0.045em</small><p style="font:500 64px/1.02 var(--font-display);letter-spacing:-0.045em">The technology ecosystem behind online education.</p></div>
+    <div class="type-row"><small>display-md<br>68px / 1.04 · 500 · -0.045em</small><p style="font:500 64px/1.04 var(--font-display);letter-spacing:-0.045em">Upgrade your skills.</p></div>
+    <div class="type-row"><small>display-sm<br>52px / 1.06 · 500 · -0.04em</small><p style="font:500 52px/1.06 var(--font-display);letter-spacing:-0.04em">Online Examination Management</p></div>
+    <div class="type-row"><small>title<br>48px / 1.08 · 500 · -0.035em</small><p style="font:500 48px/1.08 var(--font-display);letter-spacing:-0.035em">What brings you to Walnut?</p></div>
+    <div class="type-row"><small>card-title<br>30px / 1.12 · 500 · -0.035em</small><p style="font:500 30px/1.12 var(--font-display);letter-spacing:-0.035em">Infrastructure Set-up</p></div>
+    <div class="type-row"><small>subhead<br>20px / 1.2 · 500 · -0.02em</small><p style="font:500 20px/1.2 var(--font-display);letter-spacing:-0.02em">Proctored examinations</p></div>
+    <div class="type-row"><small>label-title<br>18px / 1.2 · 500 · -0.02em</small><p style="font:500 18px/1.2 var(--font-display);letter-spacing:-0.02em">Revenue sharing</p></div>
+    <div class="type-row"><small>lede<br>21px / 1.5 · 400</small><p style="font:400 21px/1.5 var(--font-body);letter-spacing:0;color:var(--muted)">Short online courses for counsellors, students and professionals.</p></div>
+    <div class="type-row"><small>body<br>17px / 1.55 · 400</small><p style="font:400 17px/1.55 var(--font-body);letter-spacing:0">We set up, host and manage the full technology stack for your online programmes.</p></div>
+    <div class="type-row"><small>body-sm<br>15px / 1.55 · 400</small><p style="font:400 15px/1.55 var(--font-body);letter-spacing:0">A fixed price, agreed up front.</p></div>
+    <div class="type-row"><small>button<br>15px / 1.1 · 600</small><p style="font:600 15px/1.1 var(--font-body);letter-spacing:0">Build your solution</p></div>
+    <div class="type-row"><small>eyebrow<br>14px / 1.55 · 600 · 0.005em</small><p style="font:600 14px/1.55 var(--font-body);letter-spacing:0.005em;color:var(--violet-700)">For universities and institutions</p></div>
+    <div class="type-row"><small>caption<br>13px / 1.5 · 500</small><p style="font:500 13px/1.5 var(--font-body);letter-spacing:0">9 of 9 modules</p></div>
+    <div class="type-row"><small>overline<br>12px / 1.4 · 600 · 0.06em</small><p style="font:600 12px/1.4 var(--font-body);letter-spacing:0.06em;text-transform:uppercase">01 SET UP</p></div>
+    <div class="type-row"><small>code<br>15px / 1.4 · 600 · 0.04em</small><p style="font:600 15px/1.4 var(--font-mono);letter-spacing:0.04em">SYUSANDEEP</p></div>
+  </section>
+
+  <section>
+    <h2>Spacing</h2>
+    <div class="scale"><div><span style="width:44px">s-1</span><i style="width:4px"></i><span>4px</span></div><div><span style="width:44px">s-2</span><i style="width:8px"></i><span>8px</span></div><div><span style="width:44px">s-3</span><i style="width:12px"></i><span>12px</span></div><div><span style="width:44px">s-4</span><i style="width:16px"></i><span>16px</span></div><div><span style="width:44px">s-5</span><i style="width:24px"></i><span>24px</span></div><div><span style="width:44px">s-6</span><i style="width:32px"></i><span>32px</span></div><div><span style="width:44px">s-7</span><i style="width:48px"></i><span>48px</span></div><div><span style="width:44px">s-8</span><i style="width:64px"></i><span>64px</span></div><div><span style="width:44px">s-9</span><i style="width:96px"></i><span>96px</span></div><div><span style="width:44px">s-10</span><i style="width:128px"></i><span>128px</span></div></div>
+  </section>
+
+  <section>
+    <h2>Shape and elevation</h2>
+    <h3 class="sub">Corner radius</h3>
+    <div class="tiles"><div class="tile" style="border-radius:10px">r-sm<br>10px</div><div class="tile" style="border-radius:14px">r-field<br>14px</div><div class="tile" style="border-radius:16px">r<br>16px</div><div class="tile" style="border-radius:22px">r-lg<br>22px</div><div class="tile" style="border-radius:30px">r-xl<br>30px</div><div class="tile" style="border-radius:48px">r-pill<br>999px</div></div>
+    <h3 class="sub">Shadows and rings</h3>
+    <div class="tiles" style="gap:var(--s-6);padding:8px 8px 40px"><div class="tile elev" style="border-radius:var(--r-lg);box-shadow:0 1px 2px rgba(13, 12, 20, .06), 0 4px 14px -6px rgba(48, 30, 140, .18)">shadow-sm</div><div class="tile elev" style="border-radius:var(--r-lg);box-shadow:0 2px 4px rgba(13, 12, 20, .04), 0 18px 40px -18px rgba(48, 30, 140, .3)">shadow-md</div><div class="tile elev" style="border-radius:var(--r-lg);box-shadow:0 2px 6px rgba(13, 12, 20, .04), 0 40px 80px -36px rgba(48, 30, 140, .38)">shadow-lg</div><div class="tile elev" style="border-radius:var(--r-lg);box-shadow:0 0 0 4px rgba(125, 98, 255, .16);border:1.5px solid var(--violet-600)">ring-selected</div><div class="tile elev" style="border-radius:var(--r-lg);box-shadow:0 0 0 4px rgba(125, 98, 255, .2);border:1.5px solid var(--violet-600)">ring-focus</div><div class="tile elev" style="border-radius:var(--r-lg);box-shadow:0 10px 24px -10px rgba(106, 77, 245, .7)">glow-accent</div></div>
+  </section>
+
+  <section>
+    <h2>Components</h2>
+    <h3 class="sub">Button</h3>
+    <div class="demo">
+<div>
+<div class="row">
+  <button class="btn btn-primary btn-lg"><span>Build your solution</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+  <button class="btn btn-accent btn-lg"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg><span>Pay ₹499</span></button>
+  <button class="btn btn-ghost btn-lg"><span>Talk to an expert</span></button>
+</div>
+<div class="row">
+  <button class="btn btn-primary"><span>Send enquiry</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+  <button class="btn btn-ghost"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Add to my solution</span></button>
+  <button class="btn btn-primary btn-sm"><span>Get started</span></button>
+  <button class="btn btn-ghost btn-sm"><span>Back</span></button>
+  <button class="btn btn-primary" disabled><span>Disabled</span></button>
+  <button class="btn btn-accent is-loading"><span>Pay ₹499</span></button>
+</div>
+<div class="night row wn-on-night">
+  <button class="btn btn-light btn-lg"><span>Open Agent Onboarding</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M11 7H6a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-5"/></svg></button>
+  <button class="btn btn-ghost-light btn-lg"><span>Talk to us</span></button>
+  <a class="link-arrow" href="#"><span>Explore the infrastructure</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+</div>
+</div>
+</div>
+    <h3 class="sub">LinkArrow</h3>
+    <div class="demo">
+<div>
+<div class="row">
+  <a class="link-arrow" href="#"><span>Explore</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+  <a class="link-arrow" href="#"><span>See all courses</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+  <a class="link-arrow" href="#"><span>Reporting &amp; regulatory support</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+</div>
+</div>
+</div>
+    <h3 class="sub">TextField</h3>
+    <div class="demo">
+<div>
+<div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;max-width:640px">
+  <div class="field"><label for="f1">Full name</label><input id="f1" type="text" value="Asha Rao"></div>
+  <div class="field"><label for="f2">Phone <span class="optional">optional</span></label><input id="f2" type="tel"></div>
+  <div class="field has-error"><label for="f3">Work email</label><input id="f3" type="email" value="asha@" aria-invalid="true"><p class="field-error">Please enter a valid email address.</p></div>
+  <div class="field"><label for="f4">University or organisation</label><input id="f4" type="text"></div>
+  <div class="field" style="grid-column:1/-1"><label for="f5">Anything we should know? <span class="optional">optional</span></label><textarea id="f5" rows="2"></textarea></div>
+</div>
+</div>
+</div>
+    <h3 class="sub">SelectCard</h3>
+    <div class="demo">
+<div>
+<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+  <label class="opt"><input type="radio" name="m" checked><span class="opt-top"><span class="opt-ico"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6M9 11h.01M15 11h.01"/></svg></span><span class="check-badge" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><span class="opt-name">Work with Walnut</span><span class="opt-desc">Technology and services for your online programmes.</span></label>
+  <label class="opt"><input type="radio" name="m"><span class="opt-top"><span class="opt-ico"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5zM6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5M22 9v5"/></svg></span><span class="check-badge" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><span class="opt-name">Upgrade your skills</span><span class="opt-desc">Short online courses for professionals.</span></label>
+  <label class="opt"><input type="radio" name="m"><span class="opt-top"><span class="opt-ico"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 19a5.5 5.5 0 0 1 11 0M13.5 15.2A5.5 5.5 0 0 1 21.5 19"/></svg></span><span class="check-badge" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><span class="opt-name">Join Walnut</span><span class="opt-desc">Onboard as an agent and grow.</span></label>
+</div>
+<div class="night wn-on-night">
+  <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <label class="opt"><input type="radio" name="n"><span class="opt-top"><span class="opt-ico"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 19a5.5 5.5 0 0 1 11 0M13.5 15.2A5.5 5.5 0 0 1 21.5 19"/></svg></span><span class="check-badge" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><span class="opt-name">Agent Onboard</span><span class="opt-desc">Register and complete your onboarding.</span></label>
+    <label class="opt"><input type="radio" name="n" checked><span class="opt-top"><span class="opt-ico"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5zM6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5M22 9v5"/></svg></span><span class="check-badge" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><span class="opt-name">Course Finder</span><span class="opt-desc">Search and compare online programmes.</span></label>
+    <label class="opt"><input type="radio" name="n"><span class="opt-top"><span class="opt-ico"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></span><span class="check-badge" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><span class="opt-name">Online Leads</span><span class="opt-desc">Access leads from prospective students.</span></label>
+  </div>
+</div>
+</div>
+</div>
+    <h3 class="sub">Chip</h3>
+    <div class="demo">
+<div>
+<div class="row"><span class="chip">Revenue sharing</span><span class="chip">One-time payment</span><span class="chip chip-ok">Verified</span></div>
+<div class="row"><span class="tag"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8M12 16.5V20"/></svg>Online</span><span class="tag"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Short course</span><span class="tag"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="5.5"/><path d="M8.5 13.5L7 21l5-2.5 5 2.5-1.5-7.5"/></svg>Certificate on completion</span></div>
+<div class="row"><ol class="steps"><li><span class="steps-n">1</span>Explore courses</li><li><span class="steps-n">2</span>View course details</li><li><span class="steps-n">3</span>Apply your coupon</li><li><span class="steps-n">4</span>Enrol and pay</li></ol></div>
+</div>
+</div>
+    <h3 class="sub">PriceFlow</h3>
+    <div class="demo">
+<div>
+<div class="price-flow">
+  <div class="price-step"><span class="price-label">Original price</span><span class="price-value">₹999</span></div>
+  <span class="price-arrow"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  <div class="price-step price-step-coupon"><span class="price-label">Apply coupon</span><span class="price-code"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12.6V4a1 1 0 0 1 1-1h8.6a1 1 0 0 1 .7.3l7.4 7.4a1 1 0 0 1 0 1.4l-8.6 8.6a1 1 0 0 1-1.4 0l-7.4-7.4a1 1 0 0 1-.3-.7zM7.5 7.5h.01"/></svg>SYUSANDEEP</span></div>
+  <span class="price-arrow"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  <div class="price-step price-step-final"><span class="price-label">You pay</span><span class="price-value">₹499</span></div>
+</div>
+<div class="price-flow" style="margin-top:20px">
+  <div class="price-step price-step-final"><span class="price-label">Price</span><span class="price-value">₹1,999</span></div>
+  <span style="font-size:.875rem;color:var(--muted)">No discount currently</span>
+</div>
+</div>
+</div>
+    <h3 class="sub">Card</h3>
+    <div class="demo">
+<div>
+<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+  <div class="card card-lift"><span class="icon-tile"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 14l2 2 4-4"/></svg></span><h3>Online Examination Management</h3><p>Online examinations, from enrolment to results.</p><a class="link-arrow" href="#"><span>Explore</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+  <div class="card card-raised"><span class="icon-tile icon-tile-soft"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5zM6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5M22 9v5"/></svg></span><h3>Agentic AI Short Course</h3><p>Build with AI agents and retrieval-augmented generation.</p><a class="link-arrow" href="#"><span>View course</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+  <div class="card card-night"><h3>Not sure where you fit?</h3><p>Tell us what you’re trying to do.</p><div><button class="btn btn-light btn-sm"><span>Talk to us</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div></div>
+</div>
+</div>
+</div>
+    <h3 class="sub">SectionHeading</h3>
+    <div class="demo">
+<div>
+<div class="wn-section-head">
+  <p class="wn-eyebrow">For universities and institutions</p>
+  <h2 class="wn-title">One partner for the whole programme lifecycle.</h2>
+  <p class="wn-lede">Ten service areas, organised around how an online programme actually runs. Take one — or take them all.</p>
+</div>
+<div class="night wn-on-night" style="color:#fff;margin-top:28px">
+  <div class="wn-section-head">
+    <p class="wn-eyebrow">Walnut applications</p>
+    <h2 class="wn-title">Already working with us? Open your application.</h2>
+    <p class="wn-lede">Pick the tool you need and jump straight in.</p>
+  </div>
+</div>
+</div>
+</div>
+    <h3 class="sub">IconTile</h3>
+    <div class="demo">
+<div>
+<div class="row">
+  <span class="icon-tile icon-tile-soft"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 10a4 4 0 0 1 0 8H7z"/></svg></span>
+  <span class="icon-tile icon-tile-soft"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10.5 9.5l4.5 2.5-4.5 2.5z"/></svg></span>
+  <span class="icon-tile icon-tile-soft"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></span>
+  <span class="icon-tile icon-tile-soft"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14a2 2 0 0 1 2-2h1v6H6a2 2 0 0 1-2-2v-2zM20 14a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2v-2zM18 18v1a3 3 0 0 1-3 3h-2"/></svg></span>
+  <span class="icon-tile icon-tile-soft"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 20v-1.5A3.5 3.5 0 0 0 11.5 15h-5A3.5 3.5 0 0 0 3 18.5V20M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM16 11l2 2 4-4"/></svg></span>
+  <span class="icon-tile icon-tile-soft"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 14l2 2 4-4"/></svg></span>
+</div>
+<div class="row">
+  <span class="icon-tile"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12zM9 11h6M9 14h4"/></svg></span>
+  <span class="icon-tile"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 17v-3M12 17v-5M15 17v-2"/></svg></span>
+  <span class="icon-tile"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg></span>
+  <span class="icon-tile"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h16a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a1 1 0 0 1 1-1zM9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg></span>
+  <span class="icon-tile"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6M9 11h.01M15 11h.01"/></svg></span>
+  <span class="icon-tile"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5zM6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5M22 9v5"/></svg></span>
+</div>
+</div>
+</div>
+  </section>
+
+  <section>
+    <h2>Logo</h2>
+    <div class="logos">
+      <div class="logo"><img src="logos/logo.svg" alt="">logo.svg</div>
+      <div class="logo on-night"><img src="logos/logo-on-dark.svg" alt="">logo-on-dark.svg</div>
+      <div class="logo"><img src="logos/mark.svg" alt="">mark.svg</div>
+      <div class="logo"><img src="logos/app-icon.svg" alt="">app-icon.svg</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Icons</h2>
+    <div class="icons"><div><img src="icons/admissions.svg" alt="">admissions</div><div><img src="icons/arrow.svg" alt="">arrow</div><div><img src="icons/automation.svg" alt="">automation</div><div><img src="icons/building.svg" alt="">building</div><div><img src="icons/cap.svg" alt="">cap</div><div><img src="icons/careers.svg" alt="">careers</div><div><img src="icons/certificate.svg" alt="">certificate</div><div><img src="icons/check.svg" alt="">check</div><div><img src="icons/chevron.svg" alt="">chevron</div><div><img src="icons/clock.svg" alt="">clock</div><div><img src="icons/close.svg" alt="">close</div><div><img src="icons/compliance.svg" alt="">compliance</div><div><img src="icons/content.svg" alt="">content</div><div><img src="icons/counselling.svg" alt="">counselling</div><div><img src="icons/examinations.svg" alt="">examinations</div><div><img src="icons/external.svg" alt="">external</div><div><img src="icons/handshake.svg" alt="">handshake</div><div><img src="icons/infrastructure.svg" alt="">infrastructure</div><div><img src="icons/lock.svg" alt="">lock</div><div><img src="icons/marketing.svg" alt="">marketing</div><div><img src="icons/play.svg" alt="">play</div><div><img src="icons/plus.svg" alt="">plus</div><div><img src="icons/screen.svg" alt="">screen</div><div><img src="icons/student-support.svg" alt="">student-support</div><div><img src="icons/tag.svg" alt="">tag</div><div><img src="icons/user.svg" alt="">user</div></div>
+  </section>
+</div>
+</body>
+</html>

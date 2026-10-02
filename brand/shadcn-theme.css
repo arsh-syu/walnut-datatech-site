@@ -1,0 +1,46 @@
+/* Walnut Data Tech theme for shadcn/ui (and any tool built on it, such as Lovable or v0).
+   Paste over the :root block in your global stylesheet. Values are H S% L%. */
+:root {
+  --background: 0 0% 100%;         /* paper #ffffff */
+  --foreground: 248 25% 6%;        /* ink #0d0c14 */
+  --card: 0 0% 100%;               /* paper #ffffff */
+  --card-foreground: 248 25% 6%;   /* ink #0d0c14 */
+  --popover: 0 0% 100%;            /* paper #ffffff */
+  --popover-foreground: 248 25% 6%; /* ink #0d0c14 */
+  --primary: 248 25% 6%;           /* ink #0d0c14 */
+  --primary-foreground: 0 0% 100%; /* paper #ffffff */
+  --secondary: 250 43% 97%;        /* mist #f6f5fb */
+  --secondary-foreground: 248 25% 6%; /* ink #0d0c14 */
+  --muted: 250 43% 97%;            /* mist #f6f5fb */
+  --muted-foreground: 247 12% 43%; /* muted #63607a */
+  --accent: 252 100% 96%;          /* violet-soft #efebff */
+  --accent-foreground: 250 77% 57%; /* violet-700 #5b3fe6 */
+  --destructive: 4 76% 40%;        /* danger #b42318 */
+  --destructive-foreground: 0 0% 100%; /* paper #ffffff */
+  --border: 252 25% 92%;           /* line #e8e6f0 */
+  --input: 251 20% 83%;            /* line-strong #cfccdd */
+  --ring: 250 89% 63%;             /* violet-600 #6a4df5 */
+  --radius: 1rem;                 /* r 16px — buttons stay fully round, see below */
+
+  /* extras the website uses beyond the shadcn set */
+  --brand: 250 100% 69%;        /* violet #7d62ff — decorative brand colour */
+  --brand-strong: 250 89% 63%; /* violet-600 #6a4df5 — accent fills with white text */
+  --success: 152 77% 39%;       /* ok #17b26a */
+}
+
+/* The website has no dark theme. Dark SECTIONS use these on a light page. */
+.dark, [data-surface="night"] {
+  --background: 249 39% 6%;
+  --foreground: 0 0% 100%;
+  --card: 249 34% 12%;
+  --card-foreground: 0 0% 100%;
+  --muted: 249 34% 12%;
+  --muted-foreground: 250 18% 75%;
+  --primary: 0 0% 100%;
+  --primary-foreground: 248 25% 6%;
+  --accent: 249 34% 12%;
+  --accent-foreground: 250 100% 82%;
+  --border: 0 0% 100% / 0.14;
+  --input: 0 0% 100% / 0.3;
+  --ring: 250 100% 69%;
+}
