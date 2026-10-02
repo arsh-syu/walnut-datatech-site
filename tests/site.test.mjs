@@ -210,7 +210,7 @@ test('every page ships the security policy and no placeholders', () => {
 
 test('server configuration sets security headers and caching', () => {
   const htaccess = readFileSync(join(dist, '.htaccess'), 'utf8');
-  for (const needle of ['X-Content-Type-Options "nosniff"', 'X-Frame-Options "DENY"', 'Referrer-Policy', 'Strict-Transport-Security', 'ErrorDocument 404', 'max-age=31536000, immutable']) {
+  for (const needle of ['X-Content-Type-Options "nosniff"', 'X-Frame-Options "DENY"', 'Referrer-Policy', 'Strict-Transport-Security', 'ErrorDocument 404', 'max-age=31536000, immutable', 'RewriteCond %{HTTPS} !=on']) {
     assert.ok(htaccess.includes(needle), needle);
   }
   const api = readFileSync(join(dist, 'api/.htaccess'), 'utf8');

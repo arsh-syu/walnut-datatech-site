@@ -109,7 +109,7 @@ if (config.siteUrl && !config.noindex) {
 writeFileSync(join(dist, 'robots.txt'), config.noindex ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nAllow: /\n${config.siteUrl ? `Sitemap: ${config.siteUrl}/sitemap.xml\n` : ''}`);
 writeFileSync(join(dist, '.nojekyll'), '');
 
-// Apache / LiteSpeed configuration (ignored by GitHub Pages): error pages, one canonical host,
+// Apache / LiteSpeed configuration (ignored by GitHub Pages): error pages, HTTPS, one canonical host,
 // security headers, compression and caching. Versioned assets are cached for a year; pages always revalidate.
 writeFileSync(
   join(dist, '.htaccess'),
@@ -120,7 +120,10 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]
+${config.siteUrl.startsWith('https://') ? `  RewriteCond %{HTTPS} !=on
+  RewriteCond %{REQUEST_URI} !^/\\.well-known/
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+` : ''}  RewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]
   RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
 </IfModule>
 
