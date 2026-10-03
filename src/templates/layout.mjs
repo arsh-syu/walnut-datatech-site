@@ -123,7 +123,9 @@ export function ctaBand(root, { title = 'Ready to build your online programme?',
 export const accountUrl = (page, type) => (config.links.account ? `${config.links.account}/${page}${type ? `?type=${type}` : ''}` : '');
 export function accountPrompt(type, text = 'Track everything in one place.') {
   if (!config.links.account) return '';
-  return `<p class="account-prompt">${text} <a href="${esc(accountUrl('register', type))}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${esc(accountUrl('login'))}" data-track="account_sign_in">sign in</a>.</p>`;
+  // One screen does both: a one-time code by email or mobile signs an existing person in and
+  // creates the account for a new one, with this audience already chosen.
+  return `<p class="account-prompt">${text} <a href="${esc(accountUrl('login', type))}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${esc(accountUrl('login'))}" data-track="account_sign_in">sign in</a>.</p>`;
 }
 
 function header(root, path) {

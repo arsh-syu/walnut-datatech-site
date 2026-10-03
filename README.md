@@ -108,6 +108,7 @@ Leave `ONBOARDING_API_URL` / `ONBOARDING_API_KEY` empty and nothing is filed —
 Accounts live in the Onboarding Tool, which is also the account portal: one login for universities, agents and students, with a dashboard for each.
 
 - Set `links.account` in `site.config.mjs` to the portal's public address. That switches on **Sign in** in the header and the **Create your Walnut account** links on the home page (one per audience, pre-selecting *As a University / As an Agent / As a Student*), the request confirmation and the course confirmation. Left empty, none of them appear.
+- Signing in is by one-time code (email or mobile), Google or password; the first code a new person verifies also creates their account. The code, its limits and the SMS / email providers all live in the portal.
 - A university's dashboard lists its empanelment requests and their status — matched by the official email on the request.
 - A student's dashboard lists the courses bought on this site. After a payment is verified, `api/verify-payment.php` records the purchase in the portal (`/api/v1/public/enrolments`, same shared key as University requests) against the email used at checkout.
 - `ACCOUNT_URL=http://localhost:4000 node build.mjs` builds the site against a locally running portal.

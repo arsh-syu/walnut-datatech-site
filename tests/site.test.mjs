@@ -253,7 +253,7 @@ test('account links stay hidden until the account portal has an address', () => 
     const config = (await import('./site.config.mjs')).default;
     config.links.account = process.env.ACCOUNT_URL.replace(/\\/+$/, '');
     const { accountUrl, accountPrompt } = await import('./src/templates/layout.mjs');
-    console.log(accountUrl('register', 'agent'), accountPrompt('student').includes('register?type=student'));
+    console.log(accountUrl('register', 'agent'), accountPrompt('student').includes('login?type=student'));
   `, '--input-type=module'], { cwd: projectRoot, encoding: 'utf8' });
   assert.equal(built.stdout.trim(), 'https://account.example.com/register?type=agent true', built.stderr);
 });
