@@ -214,7 +214,7 @@ export function coursePage({ root }, course) {
         <h2>You’re enrolled.</h2>
         <p>Payment received for ${course.name}. ${config.legal.courseAccess ? `Your course access is delivered ${esc(config.legal.courseAccess)}, to` : 'We’ll send your course access details to'} <strong data-success-email></strong>.</p>
         <p class="pay-ref">Payment reference: <span data-success-ref></span></p>
-        ${accountPrompt('student', 'Use the same email to see your courses and progress.')}
+        ${accountPrompt(root, 'student', 'Use the same email to see your courses and progress.')}
       </div>
     </div>
   </div>

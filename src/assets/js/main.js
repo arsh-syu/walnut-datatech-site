@@ -2,6 +2,7 @@
 
 import { initForms } from './forms.js';
 import { initAnalytics, track } from './analytics.js';
+import { paintHeader } from './session.js';
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -379,3 +380,4 @@ $$('[data-launcher]').forEach((root) => {
 
 initForms();
 initAnalytics();
+paintHeader(); // "Sign in" becomes the person's name once they are signed in

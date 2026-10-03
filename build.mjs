@@ -24,6 +24,7 @@ const { default: home } = await import('./src/templates/home.mjs');
 const { solutionsIndex, servicePage } = await import('./src/templates/solutions.mjs');
 const { default: configure } = await import('./src/templates/configure.mjs');
 const { partners, academy, coursePage, about, contact, requestStatus, privacy, terms, notFound, serverError } = await import('./src/templates/pages.mjs');
+const { login, account } = await import('./src/templates/account.mjs');
 const { areas } = await import('./src/data/services.mjs');
 const { courses, currency } = await import('./src/data/courses.mjs');
 const emailTemplates = await import('./src/emails/templates.mjs');
@@ -31,14 +32,15 @@ const { questions } = await import('./src/data/questions.mjs');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = join(here, 'src');
-const dist = join(here, 'dist');
+// OUT_DIR builds somewhere other than dist/ (the tests use it to try a different configuration).
+const dist = process.env.OUT_DIR || join(here, 'dist');
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(join(dist, 'assets/css'), { recursive: true });
 
 /* ---------- assets ---------- */
 
-const cssFiles = ['base.css', 'components.css', 'sections.css', 'journeys.css', 'vignettes.css', 'configure.css'];
+const cssFiles = ['base.css', 'components.css', 'sections.css', 'journeys.css', 'vignettes.css', 'configure.css', 'account.css'];
 const css = cssFiles
   .map((f) => readFileSync(join(src, 'assets/css', f), 'utf8'))
   .join('\n')
@@ -92,11 +94,15 @@ const pages = [
   ['contact/', contact],
   ['privacy/', privacy],
   ['terms/', terms],
+  // The Walnut account, once the account service has an address.
+  ...(config.links.account ? [['login/', login], ['account/', account]] : []),
 ];
+const hidden = []; // pages search engines should not list
 
 for (const [path, render] of pages) {
   const root = '../'.repeat(path.split('/').filter(Boolean).length);
   const page = render({ root, path });
+  if (page.noindex) hidden.push(path);
   const dir = join(dist, path);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'index.html'), layout({ ...page, path, root, hasOg }));
@@ -110,7 +116,7 @@ writeFileSync(join(dist, '500.html'), layout({ ...serverError({ root: basePath }
 /* ---------- crawl files ---------- */
 
 if (config.siteUrl && !config.noindex) {
-  const urls = pages.map(([p]) => `  <url><loc>${config.siteUrl}/${p}</loc></url>`).join('\n');
+  const urls = pages.filter(([p]) => !hidden.includes(p)).map(([p]) => `  <url><loc>${config.siteUrl}/${p}</loc></url>`).join('\n');
   writeFileSync(join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
 }
 writeFileSync(join(dist, 'robots.txt'), config.noindex ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nAllow: /\n${config.siteUrl ? `Sitemap: ${config.siteUrl}/sitemap.xml\n` : ''}`);
@@ -131,9 +137,7 @@ ${config.siteUrl.startsWith('https://') ? `  RewriteCond %{HTTPS} !=on
   RewriteCond %{REQUEST_URI} !^/\\.well-known/
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 ` : ''}  RewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]
-  RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]${config.links.account ? `
-  # walnutdatatech.com/login (and /register, /account) open the Walnut account portal
-  RewriteRule ^(login|register|account)/?$ ${config.links.account}/$1 [R=302,L]` : ''}
+  RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
 </IfModule>
 
 <IfModule mod_headers.c>

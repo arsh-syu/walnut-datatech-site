@@ -103,16 +103,17 @@ The three journeys stay separate. Only the **University** journey — the empane
 
 Leave `ONBOARDING_API_URL` / `ONBOARDING_API_KEY` empty and nothing is filed — University requests reach the team by email only. `scripts/dev-server.mjs` mirrors all of this for local testing; run the Onboarding Tool on `http://localhost:4000` and set those two values in `.env` to try it end to end.
 
-## Walnut accounts (sign in / create account)
+## Walnut accounts (login and profile)
 
-Accounts live in the Onboarding Tool, which is also the account portal: one login for universities, agents and students, with a dashboard for each.
+Login and the profile are pages of this website — `login/` and `account/` — in the site's own design. The data lives in the account service (the Onboarding Tool): one account for universities, learners and agents.
 
-- Set `links.account` in `site.config.mjs` to the portal's public address. That switches on **Sign in** in the header and the **Create your Walnut account** links on the home page (one per audience, pre-selecting *As a University / As an Agent / As a Student*), the request confirmation and the course confirmation. Left empty, none of them appear.
-- Signing in is by one-time code (email or mobile), Google or password; the first code a new person verifies also creates their account. The code, its limits and the SMS / email providers all live in the portal.
-- A university's dashboard lists its empanelment requests and their status — matched by the official email on the request.
-- A student's dashboard lists the courses bought on this site. After a payment is verified, `api/verify-payment.php` records the purchase in the portal (`/api/v1/public/enrolments`, same shared key as University requests) against the email used at checkout.
-- With `links.account` set, `walnutdatatech.com/login`, `/register` and `/account` redirect to the portal, so the login has a simple address on the main domain.
-- `ACCOUNT_URL=http://localhost:4000 node build.mjs` builds the site against a locally running portal.
+- **Switching it on.** Set `links.account` in `site.config.mjs` to the service's public address. That builds the two pages, adds **Sign in** to the header (it becomes the person's first name once they are signed in) and the **Create your Walnut account** links under each audience on the home page, on the request confirmation and on the course confirmation. Left empty, none of it is built.
+- **Hosting rule.** The service must be on a subdomain of this site (for example `account.walnutdatatech.com`) and list this site in its `CLIENT_ORIGIN` setting. The browser then keeps the session across the two; on an unrelated domain sign-in would not persist.
+- **Login** (`assets/js/login.js`): Email OTP or Mobile OTP into the same account, password as a fallback. A new person is asked "How can we help you?" (University / Learn / Agent) and their name. `?type=university|student|agent` pre-selects the answer.
+- **Profile** (`assets/js/account.js`): the person's card (name, verified email and mobile) and tabs — *My requests* (empanelment requests and their status), *My courses* (purchases and progress), *Partner application* (the agent form and its status) and *Profile* (name, verify email, add a mobile number, other Walnut services).
+- **What is stored in the browser.** Only the person's first name, for the header. The session itself is a cookie the scripts cannot read plus a short-lived token kept in memory (`assets/js/session.js`). A one-time code is never stored anywhere.
+- **Purchases.** After a payment is verified, `api/verify-payment.php` records the purchase in the service against the email used at checkout, so it appears under *My courses*.
+- The codes, their limits and the SMS / email providers all live in the service. `ACCOUNT_URL=http://localhost:4000 node build.mjs` builds the site against a locally running service.
 
 ## Security
 

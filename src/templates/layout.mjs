@@ -118,19 +118,18 @@ export function ctaBand(root, { title = 'Ready to build your online programme?',
 
 /* ---------- shell ---------- */
 
-// Links into the Walnut account portal. Empty until `links.account` is set, so nothing dangles.
+// The Walnut account lives on this site (login/ and account/), backed by the account service at
+// `links.account`. Until that address is set none of it is built and nothing links to it.
 // `type` is the kind of account to offer first: university | agent | student.
-export const accountUrl = (page, type) => (config.links.account ? `${config.links.account}/${page}${type ? `?type=${type}` : ''}` : '');
-export function accountPrompt(type, text = 'Track everything in one place.') {
+export function accountPrompt(root, type, text = 'Track everything in one place.') {
   if (!config.links.account) return '';
-  // One screen does both: a one-time code by email or mobile signs an existing person in and
-  // creates the account for a new one, with this audience already chosen.
-  return `<p class="account-prompt">${text} <a href="${esc(accountUrl('login', type))}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${esc(accountUrl('login'))}" data-track="account_sign_in">sign in</a>.</p>`;
+  return `<p class="account-prompt">${text} <a href="${root}login/?type=${type}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${root}login/" data-track="account_sign_in">sign in</a>.</p>`;
 }
 
 function header(root, path) {
+  // The script swaps "Sign in" for the person's name (and a link to their profile) once they are signed in.
   const login =
-    (config.links.account ? `<a class="nav-login" href="${esc(accountUrl('login'))}" data-track="account_sign_in">${icon('user')}<span>Sign in</span></a>` : '') +
+    (config.links.account ? `<a class="nav-login" href="${root}login/" data-account-link data-profile="${root}account/" data-track="account_sign_in">${icon('user')}<span>Sign in</span></a>` : '') +
     (config.links.studentLogin ? `<a class="nav-login" href="${esc(config.links.studentLogin)}" rel="noopener">${icon('user')}<span>Student Login</span></a>` : '');
   return `<header class="site-header" data-header>
   <div class="wrap header-in">
@@ -236,7 +235,12 @@ function consentBanner(root) {
 export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
-  const clientConfig = JSON.stringify({ api: `${root}api/`, analytics: { ga: config.analytics.gaMeasurementId } }).replace(/</g, '\\u003c');
+  const clientConfig = JSON.stringify({
+    api: `${root}api/`,
+    analytics: { ga: config.analytics.gaMeasurementId },
+    // the account service's API, and this site's root (for links the scripts build)
+    ...(config.links.account ? { account: `${config.links.account}/api/v1`, portal: config.links.account, root } : {}),
+  }).replace(/</g, '\\u003c');
   const v = config.assetVersion ? `?v=${config.assetVersion}` : '';
   return `<!doctype html>
 <html lang="en">

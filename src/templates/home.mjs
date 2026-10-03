@@ -127,7 +127,7 @@ export default function home({ root }) {
           ${journeySteps(a.steps)}
         </div>
         ${audienceBody(root, a.id)}
-        ${accountPrompt({ universities: 'university', learners: 'student', partners: 'agent' }[a.id], { universities: 'Follow your request from submission to approval.', learners: 'See the courses you bought and your progress.', partners: 'Apply and follow your application.' }[a.id])}
+        ${accountPrompt(root, { universities: 'university', learners: 'student', partners: 'agent' }[a.id], { universities: 'Follow your request from submission to approval.', learners: 'See the courses you bought and your progress.', partners: 'Apply and follow your application.' }[a.id])}
       </div>`
         )
         .join('\n      ')}

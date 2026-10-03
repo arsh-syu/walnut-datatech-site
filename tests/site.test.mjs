@@ -7,7 +7,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { projectRoot } from '../scripts/env.mjs';
@@ -248,15 +248,18 @@ test('account links stay hidden until the account portal has an address', () => 
   for (const path of ['', 'configure', 'academy/agentic-ai']) {
     assert.ok(!page(path).includes('Create your Walnut account') && !page(path).includes('>Sign in<'), `${path || 'home'} shows no account links by default`);
   }
-  assert.ok(!readFileSync(join(dist, '.htaccess'), 'utf8').includes('login|register'), 'and /login is not redirected anywhere');
-  const built = spawnSync(process.execPath, ['-e', `
-    process.env.ACCOUNT_URL = 'https://account.example.com/';
-    const config = (await import('./site.config.mjs')).default;
-    config.links.account = process.env.ACCOUNT_URL.replace(/\\/+$/, '');
-    const { accountUrl, accountPrompt } = await import('./src/templates/layout.mjs');
-    console.log(accountUrl('register', 'agent'), accountPrompt('student').includes('login?type=student'));
-  `, '--input-type=module'], { cwd: projectRoot, encoding: 'utf8' });
-  assert.equal(built.stdout.trim(), 'https://account.example.com/register?type=agent true', built.stderr);
+  assert.ok(!existsSync(join(dist, 'login')) && !existsSync(join(dist, 'account')), 'and the login and profile pages are not built');
+  // With an address, the account lives on this site: its own login and profile pages, allowed to reach the service.
+  const out = mkdtempSync(join(tmpdir(), 'walnut-account-'));
+  const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, ACCOUNT_URL: 'https://account.example.com/', OUT_DIR: out } });
+  assert.equal(built.status, 0, built.stderr);
+  const made = (path) => readFileSync(join(out, path), 'utf8');
+  assert.ok(made('index.html').includes('href="login/" data-account-link') && made('index.html').includes('login/?type=student'), 'the header and the audience links lead to the site\'s own login');
+  assert.ok(made('login/index.html').includes('id="login"') && made('login/index.html').includes('assets/js/login.js'));
+  assert.ok(made('account/index.html').includes('<meta name="robots" content="noindex">') && !made('sitemap.xml').includes('/account/'), 'the profile page is not listed for search engines');
+  assert.ok(made('login/index.html').includes("connect-src 'self' https://account.example.com"), 'the pages may talk to the account service, and nothing else new');
+  assert.ok(!made('index.html').includes('account.example.com/login'), 'visitors are never sent to another site to sign in');
+  rmSync(out, { recursive: true, force: true });
 });
 
 test('the questions are data: unique ids, known types and conditions that point somewhere', () => {

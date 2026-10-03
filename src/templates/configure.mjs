@@ -61,7 +61,7 @@ export default function configure({ root }) {
     </div>
     <p class="cfg-done-note">Our team will review your request and communicate with you on your registered email address.</p>
     <p class="cfg-done-note" id="cfg-done-keep" hidden>Please keep your Request ID for future reference.</p>
-    ${accountPrompt('university', 'Create an account with the same official email to follow this request.')}
+    ${accountPrompt(root, 'university', 'Create an account with the same official email to follow this request.')}
     <div class="actions center">
       <a class="btn btn-primary btn-lg" href="${root || './'}"><span>Back to Walnut Data Tech</span></a>
       <a class="btn btn-ghost btn-lg" id="cfg-done-status" href="${root}request-status/" hidden><span>Check request status</span></a>

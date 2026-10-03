@@ -43,7 +43,7 @@ for (const [file, html] of cache) {
   const noindex = /<meta name="robots" content="noindex">/.test(html);
   const canonical = /<link rel="canonical" href="https?:\/\/[^"]+">/.test(html);
   if (system && !noindex) fail(file, 'system page must be noindex');
-  if (!system && !mirror && siteUrl && !canonical) fail(file, 'missing canonical URL');
+  if (!system && !mirror && siteUrl && !canonical && !noindex) fail(file, 'missing canonical URL');
   if (mirror && !noindex) fail(file, 'mirror build must be noindex');
   if (!/<html lang="[a-z-]+">/i.test(html)) fail(file, 'missing lang attribute');
   if (!/<meta property="og:title"/.test(html) || !/<meta property="og:description"/.test(html)) fail(file, 'missing Open Graph metadata');
@@ -111,7 +111,7 @@ const robots = readFileSync(join(dist, 'robots.txt'), 'utf8');
 if (mirror ? !/Disallow: \//.test(robots) : !/Allow: \//.test(robots)) fail(join(dist, 'robots.txt'), 'robots.txt does not match the build type');
 if (!mirror && siteUrl) {
   const sitemap = existsSync(join(dist, 'sitemap.xml')) ? readFileSync(join(dist, 'sitemap.xml'), 'utf8') : '';
-  const pages = htmlFiles.filter((f) => !/\/(404|500)\.html$/.test(f)).length;
+  const pages = htmlFiles.filter((f) => !/<meta name="robots" content="noindex">/.test(cache.get(f))).length;
   const listed = (sitemap.match(/<loc>/g) || []).length;
   if (listed !== pages) fail(join(dist, 'sitemap.xml'), `sitemap lists ${listed} URLs but there are ${pages} pages`);
 }

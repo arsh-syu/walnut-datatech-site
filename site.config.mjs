@@ -17,8 +17,10 @@ export default {
   },
 
   links: {
-    // The Walnut account portal (the Onboarding Tool's public address, no trailing slash), e.g.
-    // https://account.walnutdatatech.com — switches on "Sign in" and "Create account" across the site.
+    // The Walnut account service (the Onboarding Tool's public address, no trailing slash). Setting it
+    // builds this site's own login/ and account/ pages and switches on "Sign in" across the site.
+    // It must be a subdomain of this site, e.g. https://account.walnutdatatech.com, so the browser
+    // keeps the session across the two; the service must list this site in its CLIENT_ORIGIN.
     account: '',
     studentLogin: '',
     selectYourUniversity: 'https://selectyouruniversity.com',
