@@ -1,5 +1,10 @@
-// Solution configurator: Goal → Services → Modules → Engagement → Review.
+// University empanelment request: Goal → Services → Modules → Engagement → Requirements → University → Review.
 // State lives in one object, is saved to sessionStorage, and every view is derived from it.
+// The questions asked in the last steps are data (src/data/questions.mjs), drawn by questions.js.
+
+import { track } from './analytics.js';
+import { setError, deliver } from './forms.js';
+import { isShown, clean, problemWith, display, fieldHtml, readAnswer } from './questions.js';
 
 const { data, icons } = JSON.parse(document.getElementById('cfg-data').textContent);
 const root = document.querySelector('[data-configurator]');
@@ -12,6 +17,8 @@ const el = {
   layout: $('.cfg-layout'),
   summary: $('#cfg-summary'),
   form: $('#cfg-form'),
+  status: $('#cfg-status'),
+  submit: $('[data-submit]'),
   hint: $('#cfg-hint'),
   back: $('[data-back]'),
   next: $('[data-next]'),
@@ -20,7 +27,8 @@ const el = {
 };
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const STORAGE_KEY = 'walnut-solution-v1';
+const STORAGE_KEY = 'walnut-solution-v2';
+const LAST = 6;
 const areaBy = Object.fromEntries(data.areas.map((a) => [a.slug, a]));
 const modelBy = Object.fromEntries(data.models.map((m) => [m.id, m]));
 const ADVISE = 'advise';
@@ -30,7 +38,11 @@ const check = `<span class="check-badge" aria-hidden="true">${icons.check}</span
 
 /* ---------- state ---------- */
 
-const fresh = () => ({ step: 0, maxStep: 0, goal: null, areas: [], items: {}, model: null, areaModel: {} });
+const questions = data.questions;
+const inSection = (section) => questions.filter((q) => q.section === section);
+// Answers the question data pre-fills (e.g. the country).
+const defaults = () => Object.fromEntries(questions.filter((q) => q.value).map((q) => [q.id, q.value]));
+const fresh = () => ({ step: 0, maxStep: 0, goal: null, areas: [], items: {}, model: null, areaModel: {}, answers: defaults() });
 
 // Saved state comes back from the browser, so it is rebuilt field by field rather than trusted.
 function load() {
@@ -48,7 +60,10 @@ function load() {
     }
     if (data.goals.some((g) => g.id === saved.goal)) state.goal = saved.goal;
     if ([...models, ADVISE].includes(saved.model)) state.model = saved.model;
-    const clampStep = (n) => (Number.isInteger(n) && n >= 0 && n <= 4 ? n : 0);
+    if (saved.answers && typeof saved.answers === 'object') {
+      for (const q of questions) if (q.id in saved.answers) state.answers[q.id] = clean(q, saved.answers[q.id]);
+    }
+    const clampStep = (n) => (Number.isInteger(n) && n >= 0 && n <= LAST ? n : 0);
     state.step = clampStep(saved.step);
     state.maxStep = Math.max(state.step, clampStep(saved.maxStep));
   } catch {}
@@ -127,12 +142,30 @@ const steps = [
     problem: () => (state.model ? '' : 'Choose an engagement model to continue.'),
   },
   {
-    title: 'Review your solution.',
-    sub: 'Check the details, then tell us where to send your proposal.',
+    name: 'requirements',
+    title: 'Tell us what you need.',
+    sub: 'A few questions about the services you chose. Answer what you can — most are optional.',
+    sections: ['requirements'],
+    render: () => renderQuestions(['requirements']),
+    problem: () => (firstInvalid(['requirements']) ? 'Please complete the highlighted answers.' : ''),
+  },
+  {
+    name: 'university',
+    title: 'Tell us about your university.',
+    sub: 'These details identify your university and the person we should work with.',
+    sections: ['university', 'contact'],
+    render: () => renderQuestions(['university', 'contact']),
+    problem: () => (firstInvalid(['university', 'contact']) ? 'Please complete the highlighted details.' : ''),
+  },
+  {
+    name: 'review',
+    title: 'Review your request.',
+    sub: 'Check everything, then submit your empanelment request.',
     render: renderReview,
     problem: () => '',
   },
 ];
+const stepNames = ['goal', 'services', 'modules', 'engagement', 'requirements', 'university', 'review'];
 
 function renderGoal() {
   el.step.innerHTML = `<div class="opts opts-lg opts-goal" role="radiogroup" aria-labelledby="cfg-title">${data.goals
@@ -245,7 +278,56 @@ function renderPerArea() {
     .join('')}`;
 }
 
+/* ---------- questions (requirements, university, contact) ---------- */
+
+const sectionTitles = { university: 'University information', contact: 'Primary point of contact' };
+// Everything a question's condition may look at.
+const ctx = () => ({ ...state.answers, services: state.areas });
+const shownIn = (sections) => questions.filter((q) => sections.includes(q.section) && isShown(q, ctx()));
+const firstInvalid = (sections) => shownIn(sections).find((q) => problemWith(q, state.answers[q.id]));
+const shownIds = () => questions.filter((q) => isShown(q, ctx())).map((q) => q.id).join();
+
+function renderQuestions(sections) {
+  el.step.innerHTML = `<form class="form q-form" novalidate>${sections
+    .map((section) => {
+      const shown = shownIn([section]);
+      const groups = [...new Set(shown.map((q) => q.group ?? ''))];
+      const heading = sectionTitles[section] ? `<h2 class="q-section field-wide">${sectionTitles[section]}</h2>` : '';
+      return (
+        heading +
+        groups
+          .map((group) => (group ? `<h2 class="q-group field-wide">${esc(group)}</h2>` : '') + shown.filter((q) => (q.group ?? '') === group).map((q) => fieldHtml(q, state.answers[q.id], 'cfg')).join(''))
+          .join('')
+      );
+    })
+    .join('')}</form>`;
+}
+
+// Marks every unanswered or invalid question on the step in view and moves to the first one.
+function showProblems() {
+  let first = null;
+  for (const q of shownIn(steps[state.step].sections ?? [])) {
+    const input = el.step.querySelector(`[data-q="${q.id}"]`);
+    if (!input) continue;
+    const problem = problemWith(q, state.answers[q.id]);
+    setError(input, problem);
+    if (problem && !first) first = input;
+  }
+  first?.focus();
+}
+
+const answerRows = (sections) =>
+  shownIn(sections)
+    .filter((q) => display(state.answers[q.id]))
+    .map((q) => `<div><dt>${esc(q.label)}</dt><dd>${esc(display(state.answers[q.id]))}</dd></div>`)
+    .join('');
+
 function renderReview() {
+  const blocks = [
+    ['Requirements', ['requirements'], 4],
+    ['University information', ['university'], 5],
+    ['Primary point of contact', ['contact'], 5],
+  ];
   el.step.innerHTML = `<div class="review">${state.areas
     .map((slug) => {
       const a = areaBy[slug];
@@ -260,6 +342,16 @@ function renderReview() {
       <ul class="review-mods">${chosen.map((it) => `<li>${icons.check}<span>${esc(it.title)}</span></li>`).join('')}</ul>
     </article>`;
     })
+    .join('')}${blocks
+    .map(
+      ([title, sections, step]) => `<article class="review-item">
+      <header>
+        <h2>${title}</h2>
+        <button class="text-btn" type="button" data-goto="${step}" aria-label="Edit ${title.toLowerCase()}">Edit</button>
+      </header>
+      <dl class="review-answers">${answerRows(sections)}</dl>
+    </article>`
+    )
     .join('')}</div>`;
 }
 
@@ -347,6 +439,7 @@ function paint(direction = 1, focus = false) {
     else btn.removeAttribute('aria-current');
   });
   setHint(defaultHint());
+  if (state.step === LAST) setStatus('');
   renderSummary();
   save();
 
@@ -371,10 +464,12 @@ function go(target) {
         state.step = blocked.step;
         paint(-1, true);
       }
+      if (steps[state.step].sections) showProblems();
       return setHint(blocked.problem, true);
     }
   }
   const direction = target > state.step ? 1 : -1;
+  if (direction > 0) track('university_request_step_completed', { step: stepNames[state.step] });
   state.step = target;
   state.maxStep = Math.max(state.maxStep, target);
   el.step.classList.toggle('is-back', direction < 0);
@@ -418,22 +513,37 @@ root.addEventListener('click', (e) => {
     acc.querySelector('.acc-panel').inert = !open;
   }
 
-  if (e.target.closest('[data-restart]')) {
-    state = fresh();
-    lastTotals = '';
-    root.classList.remove('is-done');
-    el.done.hidden = true;
-    const form = el.form.querySelector('form');
-    form.reset();
-    form.hidden = false;
-    el.form.querySelector('.form-success').hidden = true;
-    paint(1, true);
+  const copy = e.target.closest('[data-copy]');
+  if (copy) {
+    navigator.clipboard?.writeText($('#cfg-ref').textContent).then(() => {
+      copy.textContent = 'Copied';
+      setTimeout(() => (copy.textContent = 'Copy'), 2000);
+    });
+  }
+});
+
+// Answers to the questions. `input` covers typing as well as selects, radios and checkboxes.
+root.addEventListener('input', (e) => {
+  const input = e.target;
+  const q = input.dataset?.q && questions.find((x) => x.id === input.dataset.q);
+  if (!q) return;
+  const before = shownIds();
+  state.answers[q.id] = readAnswer(el.step, q);
+  if (input.closest('.field.has-error')) setError(el.step.querySelector(`[data-q="${q.id}"]`), '');
+  save();
+  // An answer can bring further questions with it, or take them away.
+  if (shownIds() !== before) {
+    steps[state.step].render();
+    const option = input.type === 'radio' || input.type === 'checkbox' ? `[value="${CSS.escape(input.value)}"]` : '';
+    el.step.querySelector(`[data-q="${q.id}"]${option}`)?.focus();
   }
 });
 
 root.addEventListener('change', (e) => {
   const input = e.target;
+  if (input.dataset.q) return;
   if (input.name === 'goal') {
+    if (!state.goal) track('university_request_started');
     state.goal = input.value;
     setAreas(data.goals.find((g) => g.id === input.value).areas);
   } else if (input.name === 'area') {
@@ -463,20 +573,105 @@ function refresh() {
   save();
 }
 
-// Hand the configuration to the shared enquiry form, and celebrate once it is sent.
-const form = el.form.querySelector('form');
-form.addEventListener('enquiry:collect', (e) => {
-  e.detail.extra.configuration = configurationText();
-});
-form.addEventListener('enquiry:sent', () => {
+/* ---------- submit ---------- */
+
+// Answers that are columns of the request in the Onboarding Tool; the rest travel as `form` data.
+const CORE = ['organisation', 'institutionType', 'name', 'email', 'phone', 'message'];
+const NETWORK = 'We couldn’t submit your request right now. Please check your internet connection and try again.';
+const SERVER = 'We couldn’t process your request at the moment. Please try again later.';
+
+function setStatus(text) {
+  el.status.textContent = text;
+  el.status.classList.toggle('is-error', Boolean(text));
+  el.submit.querySelector('span').textContent = text ? 'Try again' : 'Submit university request';
+}
+
+// Only what is on screen is sent: an answer to a question that no longer applies is left behind.
+function requestPayload() {
+  const answers = Object.fromEntries(
+    questions
+      .filter((q) => isShown(q, ctx()) && display(state.answers[q.id]))
+      .map((q) => [q.id, q.type === 'url' && !/^https?:\/\//i.test(state.answers[q.id]) ? `https://${state.answers[q.id]}` : state.answers[q.id]])
+  );
+  const core = Object.fromEntries(CORE.map((id) => [id, answers[id] ?? '']));
+  const form = Object.fromEntries(Object.entries(answers).filter(([id]) => !CORE.includes(id)));
+  form.goal = data.goals.find((g) => g.id === state.goal)?.name ?? '';
+  form.engagement = engagementLabel();
+  form.services = state.areas.map((slug) => areaBy[slug].name);
+  return {
+    topic: 'University empanelment request',
+    flow: 'university',
+    ...core,
+    configuration: configurationText(),
+    form,
+    botcheck: $('[name="botcheck"]').checked, // a hidden box only a bot would tick; the server quietly drops those
+    page: location.pathname,
+  };
+}
+
+let submitting = false;
+
+el.submit.addEventListener('click', async () => {
+  if (submitting) return; // a second click must never send a second request
+  const blocked = firstProblem(LAST);
+  if (blocked) {
+    state.step = blocked.step;
+    paint(-1, true);
+    if (steps[state.step].sections) showProblems();
+    return setHint(blocked.problem, true);
+  }
+
+  submitting = true;
+  el.submit.disabled = true;
+  el.submit.classList.add('is-loading');
+  setStatus('');
   try {
-    sessionStorage.removeItem(STORAGE_KEY);
-  } catch {}
+    const reply = await deliver(requestPayload());
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {}
+    showDone(reply);
+    track('university_request_submitted', { services: state.areas.length, filed: Boolean(reply.reference) });
+  } catch (err) {
+    track('university_request_submission_failed', { reason: err.network ? 'network' : err.field ? 'validation' : 'server' });
+    const q = err.field && questions.find((x) => x.id === err.field);
+    if (q) {
+      // The server refused one answer: take the visitor to it.
+      state.step = steps.findIndex((s) => s.sections?.includes(q.section));
+      paint(-1, true);
+      const input = el.step.querySelector(`[data-q="${q.id}"]`);
+      if (input) setError(input, err.message), input.focus();
+      setHint(err.message, true);
+    } else {
+      setStatus(err.network ? NETWORK : err.status >= 500 ? SERVER : err.message || SERVER);
+    }
+  } finally {
+    submitting = false;
+    el.submit.disabled = false;
+    el.submit.classList.remove('is-loading');
+  }
+});
+
+// The confirmation: with a Request ID when the Onboarding Tool issued one, without when the request
+// reached the team by email only.
+function showDone({ reference = '', duplicate = false } = {}) {
+  $('#cfg-done-title').textContent = reference ? 'Request submitted successfully' : 'Request received';
+  $('#cfg-done-text').textContent = !reference
+    ? 'Thank you. Your empanelment request has reached our team.'
+    : duplicate
+      ? 'We already had an open request from this email address, so we have updated it with these details.'
+      : 'Your university empanelment request has been submitted successfully.';
+  $('#cfg-ref').textContent = reference;
+  $('#cfg-ref-box').hidden = !reference;
+  $('#cfg-done-keep').hidden = !reference;
+  const status = $('#cfg-done-status');
+  status.hidden = !reference;
+  if (reference) status.href = `${status.getAttribute('href').split('?')[0]}?ref=${encodeURIComponent(reference)}`;
   root.classList.add('is-done');
   el.done.hidden = false;
   scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   el.done.focus({ preventScroll: true });
-});
+}
 
 /* ---------- start ---------- */
 
@@ -492,3 +687,4 @@ if (add && areaBy[add]) {
 if (firstProblem(state.step)) state.step = firstProblem(state.step).step;
 
 paint();
+track('university_request_form_opened');

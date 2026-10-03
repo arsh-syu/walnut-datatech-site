@@ -373,6 +373,49 @@ ${ctaBand(root, {
 
 /* ---------- /contact/ ---------- */
 
+// Where a university looks up the empanelment request it submitted (assets/js/status.js).
+export function requestStatus({ root }) {
+  const body = `
+<section class="page-hero page-hero-form">
+  <div class="wrap form-section">
+    <div>
+      <p class="eyebrow hero-fade">For universities</p>
+      <h1 class="display display-md">${splitWords('Check your request.')}</h1>
+      <p class="lede hero-fade" style="--d:.4s">Enter the Request ID from your confirmation and the official email address you registered with.</p>
+      <ul class="contact-alt hero-fade" style="--d:.55s">
+        <li><a class="link-arrow" href="${root}configure/"><span>No request yet? Start one</span>${icon('arrow')}</a></li>
+        <li><a class="link-arrow" href="${root}contact/"><span>Lost your Request ID? Contact us</span>${icon('arrow')}</a></li>
+      </ul>
+    </div>
+    <div class="form-card hero-fade" style="--d:.3s">
+      <form class="form" data-status-form novalidate>
+        <div class="field field-wide">
+          <label for="status-reference">Request ID</label>
+          <input id="status-reference" name="reference" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="UR-000123" required>
+        </div>
+        <div class="field field-wide">
+          <label for="status-email">Official email</label>
+          <input id="status-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" required>
+        </div>
+        <div class="form-foot field-wide">
+          <button class="btn btn-primary btn-lg" type="submit"><span>Check status</span>${icon('arrow')}</button>
+        </div>
+        <p class="form-status field-wide" role="alert"></p>
+      </form>
+      <div class="status-result" data-status-result hidden tabindex="-1"></div>
+    </div>
+  </div>
+</section>
+`;
+  return {
+    title: 'Check your request',
+    description: `Check the status of your university empanelment request with ${config.company.name} using your Request ID and registered email address.`,
+    body,
+    bodyClass: 'page-contact',
+    scripts: ['status.js'],
+  };
+}
+
 export function contact({ root }) {
   const body = `
 <section class="page-hero page-hero-form">

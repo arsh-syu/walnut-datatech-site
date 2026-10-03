@@ -34,7 +34,7 @@ Requires Node 20+. There is nothing to install — no dependencies.
 | Deploy script, local dev server | `scripts/` |
 | Tests | `tests/` |
 | Brand kit for re-theming other tools (tokens, component styles, logos, icons, guidelines) | `brand/` — start with `brand/brand-book.html` |
-| Secrets (FTP login, Razorpay keys, Twilio API key) — never committed | `.env` (see `.env.example`) |
+| Secrets (FTP login, Razorpay keys, Twilio API key, Onboarding Tool key) — never committed | `.env` (see `.env.example`) |
 
 ## Common edits
 
@@ -76,6 +76,32 @@ The site sends four emails through Twilio, all from the address in `EMAIL_FROM`:
 - Enrolment emails take the learner's details from the order stored at Razorpay, not from the browser, and are sent once per payment.
 - Wording and design live in `src/emails/templates.mjs`. Preview them by running `npm run dev`, submitting a form, and opening `/api/_outbox` — the dev server captures emails instead of sending them unless started with `--send-emails`.
 - Twilio must have the sending domain verified before it will deliver mail from it.
+
+## University empanelment requests → Onboarding Tool
+
+The three journeys stay separate. Only the **University** journey — the empanelment request at `/configure/` — is filed in the Walnut Onboarding Tool.
+
+**The request** has seven steps: Goal → Services → Modules → Engagement → Requirements → University → Review. The first four are the solution builder; the last three ask the questions in `src/data/questions.mjs`.
+
+- **Questions are data.** Each has an audience, section, type, options, `required` and optional `showIf` / `hideIf` conditions (for example, the examination questions appear only when *Online Examination Management* is selected, and the proctoring type only after answering *Yes*). Add, reword, reorder or switch one off there and rebuild — no script changes. `assets/js/questions.js` draws and validates them.
+- **Submitting.** The browser posts to `api/enquiry.php` with `flow: 'university'`. The server validates everything again, rate-limits, then posts it server-to-server to the Onboarding Tool (`ONBOARDING_API_URL` + `/api/v1/public/university-requests`) with the shared `ONBOARDING_API_KEY`. The key never reaches the browser.
+- **Request ID.** The tool stores the request as *Pending review* and returns its reference (`UR-000123`), which the confirmation screen and the acknowledgement email show. An email that already has an open request updates that request and gets the same ID back.
+- **Review.** In the tool it appears under **University Requests**. An admin approves, rejects, asks for changes or sends a counter proposal; the tool sends those emails. No account exists until approval; the university then receives a secure link to set a password and continue onboarding. Documents are collected there, not on the website.
+- **Status.** `/request-status/` looks a request up by Request ID + registered email (`api/request-status.php` → the tool's `/api/v1/public/university-requests/status`). It shows where the request stands and nothing internal.
+- **If the tool is unreachable** the request still reaches the team by email (which says it could not be filed) and the visitor gets a confirmation without a Request ID.
+
+| Website field | Sent as | Stored in the tool as |
+|---|---|---|
+| University name | `organisation` → `universityName` | `UniversityRequest.universityName` |
+| University type | `institutionType` → `universityType` | `universityType` |
+| Contact full name | `name` → `contactName` | `contactName` |
+| Official email | `email` | `email` (lower-cased; the registered email) |
+| Mobile number | `phone` | `phone` |
+| Other requirements | `message` | `message` |
+| Selected services, modules, engagement | `configuration` (text) | `configuration` |
+| Every other answer (website, address, city, state, country, PIN, year, accreditation, designation, alternate number, requirement answers, goal, engagement, services) | `form.<questionId>` | `formData.<questionId>` — shown on the request page under its question |
+
+Leave `ONBOARDING_API_URL` / `ONBOARDING_API_KEY` empty and nothing is filed — University requests reach the team by email only. `scripts/dev-server.mjs` mirrors all of this for local testing; run the Onboarding Tool on `http://localhost:4000` and set those two values in `.env` to try it end to end.
 
 ## Security
 

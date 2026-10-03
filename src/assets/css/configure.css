@@ -137,8 +137,20 @@
 .review-mods li { display: flex; align-items: flex-start; gap: 8px; }
 .review-mods .ico { margin-top: .22em; color: var(--ok); }
 .cfg-form { margin-top: var(--s-7); padding: clamp(22px, 3.4vw, 40px); border-radius: var(--r-xl); background: var(--mist); animation: rise .6s var(--ease) both; }
+.review-item:not(:has(.opt-ico)) h2 { flex-basis: auto; }
+.review-answers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3) var(--s-5); font-size: .9375rem; }
+.review-answers dt { font-size: .8125rem; color: var(--muted); }
+.review-answers dd { font-weight: 500; overflow-wrap: anywhere; white-space: pre-line; }
 .cfg-form[hidden] { display: none; }
-.cfg-form-title { font: 500 clamp(1.3rem, 2.4vw, 1.75rem)/1.15 var(--font-display); letter-spacing: -.03em; margin-bottom: var(--s-5); }
+.cfg-form-title { font: 500 clamp(1.3rem, 2.4vw, 1.75rem)/1.15 var(--font-display); letter-spacing: -.03em; margin-bottom: var(--s-3); }
+.cfg-form-text { max-width: 60ch; margin-bottom: var(--s-5); color: var(--muted); }
+.cfg-form .form-status { margin-top: var(--s-4); }
+
+/* questions */
+.q-form { padding: clamp(20px, 3vw, 36px); border-radius: var(--r-xl); background: var(--mist); }
+.q-section, .q-group { font: 500 1.2rem/1.2 var(--font-display); letter-spacing: -.02em; }
+.q-group { font-size: 1rem; color: var(--violet-700); letter-spacing: 0; font-family: var(--font-body); font-weight: 600; }
+.q-form > :is(.q-section, .q-group):not(:first-child) { margin-top: var(--s-4); padding-top: var(--s-5); border-top: 1px solid var(--line-strong); }
 
 /* nav */
 .cfg-nav { display: flex; align-items: center; gap: var(--s-4); margin-top: var(--s-6); }
@@ -176,7 +188,11 @@
   .cfg-step, .cfg-form { order: 1; }
   .cfg-nav { order: 3; }
   .review-mods { grid-template-columns: 1fr; padding-left: 0; }
+  .review-answers { grid-template-columns: 1fr; }
   .acc-tools { padding-left: 0; }
+}
+@media (max-width: 640px) {
+  .q-form { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
   .opts { grid-template-columns: 1fr; }
@@ -190,6 +206,11 @@
 .cfg-done:focus { outline: none; }
 .cfg-done-mark { width: 84px; animation: mark-turn 1.4s var(--ease) backwards; }
 .cfg-done-mark .arm { animation: arm-in 1.1s var(--spring) both; }
+.cfg-ref { display: grid; justify-items: center; gap: 4px; padding: 20px 36px; border: 1.5px dashed var(--violet); border-radius: var(--r-lg); background: var(--violet-soft); }
+.cfg-ref[hidden], .cfg-done-note[hidden], .cfg-done .btn[hidden] { display: none; }
+.cfg-ref-label { font-size: .8125rem; font-weight: 600; color: var(--violet-700); }
+.cfg-ref-value { font: 500 clamp(1.6rem, 4vw, 2.25rem)/1.1 var(--font-display); letter-spacing: .02em; }
+.cfg-done-note { max-width: 46ch; color: var(--muted); }
 .cfg.is-done > .wrap { display: none; }
 .cfg-noscript { padding: var(--s-5); border-radius: var(--r-lg); background: var(--mist); }
 .cfg-noscript a { color: var(--violet-700); font-weight: 600; text-decoration: underline; }

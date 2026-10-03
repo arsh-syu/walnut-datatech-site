@@ -6,11 +6,15 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { projectRoot } from '../scripts/env.mjs';
 import { courses, offerOf } from '../src/data/courses.mjs';
 import { externalApps, audiences } from '../src/data/site.mjs';
+import { areas } from '../src/data/services.mjs';
+import { questions, questionsFor } from '../src/data/questions.mjs';
 
 const dist = join(projectRoot, 'dist');
 const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
@@ -19,7 +23,21 @@ const api = (path, body, headers = { 'Content-Type': 'application/json' }) =>
   fetch(`http://localhost:${PORT}/api/${path}`, body === undefined ? {} : { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 const learner = { name: 'Test Learner', email: 'test@example.com', phone: '9999999999' };
 const enquiry = { topic: 'General enquiry', name: 'Asha Rao', organisation: 'Example University', email: 'asha@example.com', message: 'Hello' };
+const request = { ...enquiry, topic: 'University empanelment request', flow: 'university', institutionType: 'Private university', phone: '+91 98200 00001', configuration: 'Goal: Launch', page: '/configure/' };
 const outbox = async () => (await (await fetch(`http://localhost:${PORT}/api/_outbox`)).json());
+
+// A second dev server wired to a stand-in Onboarding Tool, to test where University requests go.
+const TOOL_PORT = 4393;
+const LINKED_PORT = 4392;
+const TOOL_KEY = 'test-onboarding-key-0123456789abcdef';
+const tool = { received: [], status: 201 };
+const linked = (body, endpoint = 'enquiry.php') => fetch(`http://localhost:${LINKED_PORT}/api/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const linkedOutbox = async () => (await (await fetch(`http://localhost:${LINKED_PORT}/api/_outbox`)).json()).emails;
+const started = (child) => new Promise((resolve, reject) => {
+  child.stdout.on('data', (chunk) => String(chunk).includes('dev server') && resolve());
+  child.on('error', reject);
+});
+let toolServer, linkedServer, tmp;
 
 let server;
 before(async () => {
@@ -27,12 +45,32 @@ before(async () => {
   assert.equal(build.status, 0, build.stderr);
   // No keys: the API must validate everything and then refuse to create an order.
   server = spawn(process.execPath, ['scripts/dev-server.mjs', String(PORT)], { cwd: projectRoot, env: { ...process.env, WALNUT_ENV_FILE: '/dev/null' } });
-  await new Promise((resolve, reject) => {
-    server.stdout.on('data', (chunk) => String(chunk).includes('dev server') && resolve());
-    server.on('error', reject);
+  await started(server);
+
+  toolServer = createServer(async (req, res) => {
+    let raw = '';
+    for await (const chunk of req) raw += chunk;
+    const body = JSON.parse(raw || 'null');
+    tool.received.push({ method: req.method, url: req.url, key: req.headers['x-walnut-key'], body });
+    // The status lookup knows one request; everything else is the intake.
+    const lookup = req.url.endsWith('/status');
+    const known = lookup && body.reference === 'UR-000042' && body.email === 'asha@example.com';
+    const status = lookup ? (known ? 200 : 404) : tool.status;
+    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(lookup ? (known ? { reference: 'UR-000042', status: 'UNDER_REVIEW', universityName: 'Example University', submittedAt: '2026-10-03T08:00:00.000Z', updatedAt: '2026-10-03T09:00:00.000Z', adminRemarks: 'internal' } : { error: { message: 'Not found' } }) : { ok: status < 300, reference: 'UR-000042' }));
   });
+  await new Promise((resolve) => toolServer.listen(TOOL_PORT, resolve));
+  tmp = mkdtempSync(join(tmpdir(), 'walnut-test-'));
+  writeFileSync(join(tmp, 'env'), `ONBOARDING_API_URL=http://localhost:${TOOL_PORT}/\nONBOARDING_API_KEY=${TOOL_KEY}\n`);
+  linkedServer = spawn(process.execPath, ['scripts/dev-server.mjs', String(LINKED_PORT)], { cwd: projectRoot, env: { ...process.env, WALNUT_ENV_FILE: join(tmp, 'env') } });
+  await started(linkedServer);
 });
-after(() => server?.kill());
+after(() => {
+  server?.kill();
+  linkedServer?.kill();
+  toolServer?.close();
+  if (tmp) rmSync(tmp, { recursive: true, force: true });
+});
 
 /* ---------- business rules ---------- */
 
@@ -86,7 +124,7 @@ test('the audience selector only controls its own three tabs', () => {
 
 test('health endpoint reports status without leaking details', async () => {
   const data = await (await api('health.php')).json();
-  assert.deepEqual(data, { ok: true, curl: true, configured: false, email: true, mode: null });
+  assert.deepEqual(data, { ok: true, curl: true, configured: false, email: true, onboarding: false, mode: null });
 });
 
 test('create-order rejects an unknown course', async () => {
@@ -172,15 +210,135 @@ test('a bot that ticks the hidden box gets a polite answer and no email', async 
   assert.equal((await outbox()).emails.length, before);
 });
 
+test('without Onboarding Tool settings a University request reaches the team by email, with no Request ID', async () => {
+  const before = (await outbox()).emails.length;
+  const res = await api('enquiry.php', request);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true });
+  const sent = (await outbox()).emails.slice(before);
+  assert.deepEqual(sent.map((e) => e.template), ['enquiry_notify', 'request_ack']);
+  assert.ok(!sent[0].html.includes('Onboarding Tool') && !sent[1].html.includes('Request ID'));
+  assert.equal((await api('request-status.php', { reference: 'UR-000042', email: 'asha@example.com' })).status, 503, 'status needs the Onboarding Tool');
+});
+
 test('enquiries are rate-limited per visitor', async () => {
   let last;
   for (let i = 0; i < 9; i++) last = await api('enquiry.php', enquiry);
   assert.equal(last.status, 429);
 });
 
+/* ---------- University requests → Onboarding Tool ---------- */
+
+test('only the University journey files requests', () => {
+  const page = (path) => readFileSync(join(dist, path, 'index.html'), 'utf8');
+  const script = (name) => readFileSync(join(projectRoot, 'src/assets/js', name), 'utf8');
+  assert.ok(page('configure').includes('data-submit') && script('configure.js').includes("flow: 'university'"), 'the empanelment request is marked as the university flow');
+  assert.ok(!script('forms.js').includes('university') && !script('checkout.js').includes('university'), 'the shared enquiry form and the checkout are not');
+  for (const path of ['contact', 'partners', 'academy', 'academy/agentic-ai', 'academy/online-programme-course']) {
+    assert.ok(!page(path).includes('data-submit') && !page(path).includes('configure.js'), `${path} must not file University requests`);
+  }
+  // The live site runs the PHP twin of the dev server: same condition, same fields.
+  const php = readFileSync(join(projectRoot, 'src/api/enquiry.php'), 'utf8');
+  assert.ok(php.includes("$university = $flow === 'university';") && php.includes('if ($university && onboarding_configured($config))'));
+  assert.ok(php.includes("'universityType' => $institutionType") && php.includes("'form' => $answers ?: null"), 'the PHP twin forwards the same fields');
+});
+
+test('the questions are data: unique ids, known types and conditions that point somewhere', () => {
+  const ids = questions.map((q) => q.id);
+  assert.equal(new Set(ids).size, ids.length, 'question ids are unique');
+  const slugs = areas.map((a) => a.slug);
+  for (const q of questions) {
+    assert.match(q.id, /^[a-z][A-Za-z0-9]{0,39}$/, q.id);
+    assert.ok(['text', 'email', 'tel', 'url', 'number', 'textarea', 'select', 'choice', 'multi'].includes(q.type), `${q.id}: ${q.type}`);
+    assert.equal(['select', 'choice', 'multi'].includes(q.type), Array.isArray(q.options), `${q.id} options`);
+    for (const c of [q.showIf, q.hideIf].flatMap((rule) => [...(rule?.all ?? []), ...(rule?.any ?? [])])) {
+      assert.ok(['equals', 'notEquals', 'contains', 'notContains', 'answered'].includes(c.op), `${q.id}: ${c.op}`);
+      if (c.field === 'services') assert.ok(slugs.includes(c.value), `${q.id} depends on an unknown service "${c.value}"`);
+      else assert.ok(ids.includes(c.field), `${q.id} depends on an unknown question "${c.field}"`);
+    }
+  }
+  // The request record needs these; the form must always ask for them.
+  for (const id of ['organisation', 'institutionType', 'name', 'email', 'phone']) assert.ok(questionsFor('university').find((q) => q.id === id)?.required, id);
+  const { labels } = JSON.parse(readFileSync(join(dist, 'api/emails.json'), 'utf8'));
+  assert.equal(labels.designation, 'Designation', 'emails can name every answer');
+  assert.ok(readFileSync(join(dist, 'configure/index.html'), 'utf8').includes('"id":"examProctoringType"'), 'the page carries the questions');
+});
+
+test('a University request is filed in the Onboarding Tool and answered with its Request ID; other enquiries are not', async () => {
+  tool.status = 201;
+  tool.received.length = 0;
+  assert.equal((await linked({ ...enquiry, page: '/contact/' })).status, 200);
+  assert.equal(tool.received.length, 0, 'a general enquiry never reaches the Onboarding Tool');
+  assert.equal((await linked({ ...enquiry, flow: 'student' })).status, 200);
+  assert.equal(tool.received.length, 0, 'only the exact university flow is filed');
+
+  const before = (await linkedOutbox()).length;
+  const form = { designation: 'Registrar', city: 'Pune', regulatoryBodies: ['UGC-DEB', 'NAAC'], examProctoring: 'Yes', services: ['Online Examination Management'] };
+  const res = await linked({ ...request, form });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, reference: 'UR-000042', duplicate: false });
+  assert.equal(tool.received.length, 1);
+  const [call] = tool.received;
+  assert.equal(`${call.method} ${call.url}`, 'POST /api/v1/public/university-requests');
+  assert.equal(call.key, TOOL_KEY, 'authenticated with the shared key');
+  assert.deepEqual(call.body, { universityName: 'Example University', universityType: 'Private university', contactName: 'Asha Rao', email: 'asha@example.com', phone: '+91 98200 00001', message: 'Hello', interests: '', configuration: 'Goal: Launch', form, page: '/configure/' }, 'no submitted field is dropped');
+  const [notify, ack] = (await linkedOutbox()).slice(before);
+  assert.ok(notify.html.includes('Filed as request UR-000042'), 'the team is told it was filed');
+  assert.ok(notify.text.includes('Designation: Registrar') && notify.text.includes('Which bodies do you report to?: UGC-DEB, NAAC'), 'answers are listed under their question');
+  assert.equal(ack.template, 'request_ack');
+  assert.ok(ack.subject.endsWith('UR-000042') && ack.text.includes('Request ID: UR-000042') && ack.text.includes('keep your Request ID'), 'the university gets its Request ID');
+  assert.ok(!ack.html.includes('Onboarding Tool') && !ack.html.includes(TOOL_KEY), 'the visitor sees nothing internal');
+});
+
+test('a repeat submission is reported as an update of the open request', async () => {
+  tool.status = 200; // the Onboarding Tool answers 200 when it updated an open request instead of creating one
+  const res = await linked(request);
+  assert.deepEqual(await res.json(), { ok: true, reference: 'UR-000042', duplicate: true });
+  tool.status = 201;
+});
+
+test('a University request needs a phone number and well-formed answers', async () => {
+  tool.received.length = 0;
+  const refused = async (body) => {
+    const res = await linked(body);
+    assert.equal(res.status, 422, JSON.stringify(body.form ?? body.phone));
+    return res.json();
+  };
+  assert.equal((await refused({ ...request, phone: '12' })).field, 'phone');
+  await refused({ ...request, form: { 'bad key': 'x' } });
+  await refused({ ...request, form: { city: { nested: true } } });
+  await refused({ ...request, form: { city: 'x'.repeat(4001) } });
+  await refused({ ...request, form: { tags: Array(51).fill('x') } });
+  assert.equal(tool.received.length, 0, 'nothing refused reaches the Onboarding Tool');
+});
+
+test('an Onboarding Tool outage never loses the request', async () => {
+  tool.status = 500;
+  const before = (await linkedOutbox()).length;
+  const res = await linked(request);
+  assert.equal(res.status, 200, 'the visitor still gets a confirmation');
+  assert.deepEqual(await res.json(), { ok: true }, 'without a Request ID that was never issued');
+  const [notify] = (await linkedOutbox()).slice(before);
+  assert.ok(notify.html.includes('Could NOT be filed automatically'), 'the team is told to add it by hand');
+  tool.status = 201;
+});
+
+test('request status needs the Request ID and the registered email, and returns nothing internal', async () => {
+  const status = (body) => linked(body, 'request-status.php');
+  assert.equal((await (await status({ reference: 'nope', email: 'asha@example.com' })).json()).field, 'reference');
+  assert.equal((await (await status({ reference: 'UR-000042', email: 'nope' })).json()).field, 'email');
+  assert.equal((await status({ reference: 'UR-000042', email: 'someone@else.com' })).status, 404);
+  assert.equal((await status({ reference: 'UR-000041', email: 'asha@example.com' })).status, 404);
+  const res = await status({ reference: 'ur-000042', email: 'asha@example.com' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, reference: 'UR-000042', status: 'UNDER_REVIEW', universityName: 'Example University', submittedAt: '2026-10-03T08:00:00.000Z', updatedAt: '2026-10-03T09:00:00.000Z' });
+  const php = readFileSync(join(projectRoot, 'src/api/request-status.php'), 'utf8');
+  assert.ok(php.includes("'/api/v1/public/university-requests/status'") && php.includes("rate_limit('request-status'"), 'the PHP twin asks the same endpoint');
+});
+
 test('every email template is complete and on-brand', () => {
   const { row, emails } = JSON.parse(readFileSync(join(dist, 'api/emails.json'), 'utf8'));
-  assert.deepEqual(Object.keys(emails).sort(), ['enquiry_ack', 'enquiry_notify', 'enrol_confirm', 'enrol_notify']);
+  assert.deepEqual(Object.keys(emails).sort(), ['enquiry_ack', 'enquiry_notify', 'enrol_confirm', 'enrol_notify', 'request_ack']);
   assert.ok(row.includes('{{label}}') && row.includes('{{{value}}}'));
   for (const [name, email] of Object.entries(emails)) {
     assert.ok(email.subject && email.html && email.text, name);
@@ -198,6 +356,7 @@ test('nothing secret is published', () => {
     assert.ok(!/rzp_(test|live)_[A-Za-z0-9]{6,}/.test(text), `Razorpay key in ${file}`);
     assert.ok(!/key_secret['"]?\s*(=>|:|=)\s*['"][^'"]{8,}/.test(text), `secret in ${file}`);
     assert.ok(!/FTP_(USER|PASS|HOST)\s*=\s*\S/.test(text), `FTP setting in ${file}`);
+    assert.ok(!/onboarding_key['"]?\s*(=>|:|=)\s*['"][^'"]{8,}/.test(text) && !/ONBOARDING_API_KEY\s*=\s*\S/.test(text), `Onboarding Tool key in ${file}`);
     assert.ok(!/\bSK[0-9a-f]{32}\b|\bAC[0-9a-f]{32}\b|twilio_secret['"]?\s*(=>|:|=)\s*['"][^'"]{8,}/.test(text), `Twilio credential in ${file}`);
   }
   assert.ok(!walk(dist).some((f) => /config\.php$|\.env/.test(f)), 'config.php or .env must not be in dist');

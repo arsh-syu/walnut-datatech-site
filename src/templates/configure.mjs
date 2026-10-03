@@ -1,18 +1,20 @@
 import { areas, stages, models, goals } from '../data/services.mjs';
+import { questionsFor } from '../data/questions.mjs';
 import { icon } from './icons.mjs';
-import { enquiryForm, mark } from './layout.mjs';
+import { mark } from './layout.mjs';
 
-// The configurator is an app: the shell is rendered here, the steps are rendered client-side
-// from the same service data (embedded below as JSON) by assets/js/configure.js.
+// The university empanelment request is an app: the shell is rendered here, the steps are rendered
+// client-side from the same service and question data (embedded below as JSON) by assets/js/configure.js.
 export default function configure({ root }) {
   const data = {
     stages,
     goals,
     models,
     areas: areas.map(({ slug, stage, name, short, tagline, items }) => ({ slug, stage, name, short, tagline, items })),
+    questions: questionsFor('university'),
   };
   const icons = Object.fromEntries([...areas.map((a) => a.slug), 'check', 'chevron', 'arrow'].map((n) => [n, icon(n)]));
-  const steps = ['Goal', 'Services', 'Modules', 'Engagement', 'Review'];
+  const steps = ['Goal', 'Services', 'Modules', 'Engagement', 'Requirements', 'University', 'Review'];
 
   const body = `
 <section class="cfg" data-configurator>
@@ -29,8 +31,14 @@ export default function configure({ root }) {
       <div class="cfg-main">
         <div class="cfg-step" id="cfg-step"></div>
         <div class="cfg-form" id="cfg-form" hidden>
-          <h2 class="cfg-form-title">Where should we send your proposal?</h2>
-          ${enquiryForm({ id: 'cfg', topic: 'Solution configuration', root, submit: 'Request a consultation', messageLabel: 'Anything else we should know?' })}
+          <h2 class="cfg-form-title">Ready to submit?</h2>
+          <p class="cfg-form-text">Your request goes to the Walnut team for review. We reply to the official email address you gave, and supporting documents are collected securely once the request is approved.</p>
+          <input class="hp" type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <div class="form-foot">
+            <button class="btn btn-primary btn-lg" type="button" data-submit><span>Submit university request</span>${icon('arrow')}</button>
+            <p class="form-note">We use these details only to review and respond to your request. See our <a href="${root}privacy/">privacy policy</a> and <a href="${root}terms/">terms</a>.</p>
+          </div>
+          <p class="form-status" id="cfg-status" role="alert"></p>
         </div>
         <div class="cfg-nav" id="cfg-nav">
           <button class="btn btn-ghost" type="button" data-back hidden><span>Back</span></button>
@@ -44,11 +52,18 @@ export default function configure({ root }) {
   </div>
   <div class="cfg-done" id="cfg-done" hidden tabindex="-1">
     ${mark('cfg-done-mark')}
-    <h2 class="title">Your solution is on its way to us.</h2>
-    <p class="lede">Thank you. Our team will review your configuration and get back to you with a proposal.</p>
+    <h2 class="title" id="cfg-done-title">Request submitted successfully</h2>
+    <p class="lede" id="cfg-done-text">Your university empanelment request has been submitted successfully.</p>
+    <div class="cfg-ref" id="cfg-ref-box" hidden>
+      <span class="cfg-ref-label">Request ID</span>
+      <strong class="cfg-ref-value" id="cfg-ref"></strong>
+      <button class="text-btn" type="button" data-copy>Copy</button>
+    </div>
+    <p class="cfg-done-note">Our team will review your request and communicate with you on your registered email address.</p>
+    <p class="cfg-done-note" id="cfg-done-keep" hidden>Please keep your Request ID for future reference.</p>
     <div class="actions center">
-      <a class="btn btn-primary btn-lg" href="${root || './'}"><span>Back to home</span></a>
-      <button class="btn btn-ghost btn-lg" type="button" data-restart><span>Start a new configuration</span></button>
+      <a class="btn btn-primary btn-lg" href="${root || './'}"><span>Back to Walnut Data Tech</span></a>
+      <a class="btn btn-ghost btn-lg" id="cfg-done-status" href="${root}request-status/" hidden><span>Check request status</span></a>
     </div>
   </div>
 </section>
@@ -57,7 +72,7 @@ export default function configure({ root }) {
 
   return {
     title: 'Build your solution',
-    description: 'Configure the services your university needs for its online programmes — choose service areas, select modules, pick an engagement model and request a consultation.',
+    description: 'Request empanelment with Walnut Data Tech: choose the services your university needs for its online programmes, tell us your requirements and submit your request.',
     body,
     bodyClass: 'page-configure',
     scripts: ['configure.js'],

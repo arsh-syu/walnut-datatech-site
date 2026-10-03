@@ -161,7 +161,8 @@ function footer(root) {
       <nav class="footer-col footer-col-wide" aria-label="For universities">
         <h2>For universities</h2>
         <ul>${areas.map((a) => `<li><a href="${root}solutions/${a.slug}/">${a.name}</a></li>`).join('')}
-          <li><a href="${root}configure/">Build your solution</a></li></ul>
+          <li><a href="${root}configure/">Build your solution</a></li>
+          <li><a href="${root}request-status/">Check your request</a></li></ul>
       </nav>
       <nav class="footer-col" aria-label="Courses">
         <h2>Courses</h2>

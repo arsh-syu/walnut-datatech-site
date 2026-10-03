@@ -86,6 +86,23 @@ export const emails = {
     text: `Thank you, {{name}}.\n\nWe’ve received your enquiry. Our team will read it and reply to this address.\n\nHere’s a copy of what you sent:\n\n{{{rows}}}\n${config.company.name}\n${config.siteUrl}/\n`,
   },
 
+  // → the university's contact, confirming their empanelment request arrived
+  request_ack: {
+    subject: 'We’ve received your empanelment request{{subjectRef}}',
+    html: shell({
+      preheader: 'Our team will review your request and reply to this address.',
+      heading: 'Thank you, {{name}}.',
+      body:
+        p('We’ve received the empanelment request for <strong>{{from}}</strong>.') +
+        p('Our team will review it and communicate with you on this email address.{{keep}}') +
+        p('Here’s a copy of what you sent:') +
+        details +
+        button('Visit the website', `${config.siteUrl}/`),
+      footer: 'You’re receiving this because you submitted a university empanelment request on our website.',
+    }),
+    text: `Thank you, {{name}}.\n\nWe’ve received the empanelment request for {{from}}.\n\nOur team will review it and communicate with you on this email address.{{keep}}\n\nHere’s a copy of what you sent:\n\n{{{rows}}}\n${config.company.name}\n${config.siteUrl}/\n`,
+  },
+
   // → the learner, after a verified payment
   enrol_confirm: {
     subject: 'You’re enrolled: {{course}}',

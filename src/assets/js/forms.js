@@ -28,10 +28,12 @@ const messages = {
 export function setError(input, message) {
   const field = input.closest('.field');
   let note = field.querySelector('.field-error');
+  const help = field.querySelector('.field-help')?.id; // stays announced with or without an error
   if (!message) {
     field.classList.remove('has-error');
     input.removeAttribute('aria-invalid');
-    input.removeAttribute('aria-describedby');
+    if (help) input.setAttribute('aria-describedby', help);
+    else input.removeAttribute('aria-describedby');
     note?.remove();
     return;
   }
@@ -44,7 +46,7 @@ export function setError(input, message) {
   note.textContent = message;
   field.classList.add('has-error');
   input.setAttribute('aria-invalid', 'true');
-  input.setAttribute('aria-describedby', note.id);
+  input.setAttribute('aria-describedby', [note.id, help].filter(Boolean).join(' '));
 }
 
 export function validate(form) {
@@ -58,22 +60,28 @@ export function validate(form) {
   return !first;
 }
 
-// Resolves once the server has emailed the enquiry; otherwise throws a message fit to show the visitor.
-export async function deliver(payload) {
+// Posts JSON to one of the site's own API endpoints. Resolves with the reply; otherwise throws a
+// message fit to show the visitor (`network` when the server was never reached, `status` and `field`
+// when it answered).
+export async function send(endpoint, payload, fallback = UNAVAILABLE) {
   let res;
   try {
-    res = await fetch(`${api}enquiry.php`, {
+    res = await fetch(`${api}${endpoint}`, {
       signal: AbortSignal.timeout(25000), // never leave the visitor waiting on a hung request
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(payload),
     });
   } catch {
-    throw new Error('We couldn’t reach the server. Check your connection and try again.');
+    throw Object.assign(new Error('We couldn’t reach the server. Check your connection and try again.'), { network: true });
   }
   const reply = await res.json().catch(() => null);
-  if (!res.ok || !reply?.ok) throw Object.assign(new Error(reply?.error || UNAVAILABLE), { field: reply?.field });
+  if (!res.ok || !reply?.ok) throw Object.assign(new Error(reply?.error || fallback), { field: reply?.field, status: res.status });
+  return reply;
 }
+
+// Resolves once the server has emailed the enquiry.
+export const deliver = (payload) => send('enquiry.php', payload);
 
 function bind(form) {
   const wrap = form.closest('[data-form-wrap]');

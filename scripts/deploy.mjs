@@ -28,6 +28,11 @@ for (const key of ['FTP_HOST', 'FTP_USER', 'FTP_PASS', 'SITE_URL']) {
 const siteUrl = env.SITE_URL.replace(/\/+$/, '');
 const hasKeys = Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
 const hasEmail = Boolean(env.TWILIO_API_KEY && env.TWILIO_API_SECRET && env.EMAIL_FROM && env.EMAIL_NOTIFY);
+// The Onboarding Tool must be a public https address: a localhost value left over from development
+// would make the live site try to reach itself.
+const onboardingUrl = (env.ONBOARDING_API_URL || '').replace(/\/+$/, '');
+const onboardingPublic = /^https:\/\/(?!localhost\b|127\.|\[::1\])/i.test(onboardingUrl);
+const hasOnboarding = Boolean(onboardingPublic && env.ONBOARDING_API_KEY);
 
 // Real money must not be taken before the refund terms are published.
 if (hasKeys && env.RAZORPAY_KEY_ID.startsWith('rzp_live_') && !config.legal.refundPolicy) {
@@ -142,11 +147,20 @@ console.log(`✓ Payment API is running${state.data.curl ? '' : ' — WARNING: t
 if (!hasKeys) console.log('! RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are not set in .env — checkout is disabled.');
 if (!hasEmail) console.log('! TWILIO_API_KEY / TWILIO_API_SECRET / EMAIL_FROM / EMAIL_NOTIFY are not all set in .env — enquiry forms and confirmation emails are disabled.');
 
-if (hasKeys || hasEmail) {
+if (!hasOnboarding) {
+  console.log(
+    onboardingUrl && !onboardingPublic
+      ? '! ONBOARDING_API_URL is not a public https address — University requests will not be filed in the Onboarding Tool.'
+      : '! ONBOARDING_API_URL / ONBOARDING_API_KEY are not set in .env — University requests reach the team by email only.'
+  );
+}
+
+if (hasKeys || hasEmail || hasOnboarding) {
   const phpStr = (v) => `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
   const settings = {
     ...(hasKeys ? { key_id: env.RAZORPAY_KEY_ID, key_secret: env.RAZORPAY_KEY_SECRET } : {}),
     ...(hasEmail ? { twilio_key: env.TWILIO_API_KEY, twilio_secret: env.TWILIO_API_SECRET, email_from: env.EMAIL_FROM, email_from_name: env.EMAIL_FROM_NAME || 'Walnut Data Tech', email_notify: env.EMAIL_NOTIFY } : {}),
+    ...(hasOnboarding ? { onboarding_url: onboardingUrl, onboarding_key: env.ONBOARDING_API_KEY } : {}),
   };
   const configFile = join(tmp, 'config.php');
   writeFileSync(
@@ -158,17 +172,19 @@ if (hasKeys || hasEmail) {
 
   // The secrets must never be readable over the web.
   const probe = await fetch(`${siteUrl}/api/config.php?t=${Date.now()}`).then((r) => r.text()).catch(() => '');
-  const leaked = ['key_secret', 'twilio_secret', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET].filter(Boolean).some((needle) => probe.includes(needle));
+  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY].filter(Boolean).some((needle) => probe.includes(needle));
   if (leaked) {
     curl([`url = ${q(ftpUrl(remoteDir))}`, `quote = ${q(`DELE ${remoteDir}api/config.php`)}`, 'list-only'], { quiet: true });
-    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay and Twilio secrets and contact the host about PHP handling.');
+    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay, Twilio and Onboarding Tool secrets and contact the host about PHP handling.');
   }
 
   state = await health();
   if (hasKeys && !state.data?.configured) fail('The keys were uploaded but the payment API does not see them.');
   if (hasEmail && !state.data?.email) fail('The email settings were uploaded but the API does not see them.');
+  if (hasOnboarding && !state.data?.onboarding) fail('The Onboarding Tool settings were uploaded but the API does not see them.');
   if (hasKeys) console.log(`✓ Razorpay connected in ${state.data.mode.toUpperCase()} mode`);
   if (hasEmail) console.log(`✓ Email connected — sending from ${env.EMAIL_FROM}, notifications to ${env.EMAIL_NOTIFY}`);
+  if (hasOnboarding) console.log(`✓ University requests will be filed in the Onboarding Tool at ${onboardingUrl}`);
 }
 
 const home200 = await fetch(`${siteUrl}/?t=${Date.now()}`).then((r) => r.status).catch(() => 0);

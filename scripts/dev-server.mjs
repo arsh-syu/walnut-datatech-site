@@ -22,6 +22,9 @@ const port = Number(process.argv.find((a) => /^\d+$/.test(a))) || 4173;
 const reallySend = process.argv.includes('--send-emails') && emailConfigured(env);
 const notifyAddress = env.EMAIL_NOTIFY || 'support@walnutdatatech.com';
 const outbox = [];
+// Where University requests are filed (mirrors onboarding_url / onboarding_key in api/config.php).
+const onboardingUrl = (env.ONBOARDING_API_URL || '').replace(/\/+$/, '');
+const onboardingKey = env.ONBOARDING_API_KEY || '';
 const dist = join(projectRoot, 'dist');
 const keyId = env.RAZORPAY_KEY_ID || '';
 const keySecret = env.RAZORPAY_KEY_SECRET || '';
@@ -67,6 +70,50 @@ async function email(template, to, vars, rows) {
   return result.ok;
 }
 
+// mirrors forward_university_request() in src/api/lib.php
+async function forwardUniversityRequest(request) {
+  try {
+    const res = await fetch(`${onboardingUrl}/api/v1/public/university-requests`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(10000),
+      headers: { 'Content-Type': 'application/json', 'X-Walnut-Key': onboardingKey },
+      body: JSON.stringify(request),
+    });
+    const reply = await res.json().catch(() => null);
+    if (!res.ok || typeof reply?.reference !== 'string') {
+      console.error(`University request was not filed: the Onboarding Tool responded HTTP ${res.status}`);
+      return null;
+    }
+    return { reference: reply.reference.slice(0, 40), duplicate: res.status === 200 };
+  } catch (err) {
+    console.error(`University request was not filed: ${err.message}`);
+    return null;
+  }
+}
+
+// mirrors read_answers() and answer_label() in src/api/lib.php
+function readAnswers(raw) {
+  const answers = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return answers;
+  const text = (value, max) => {
+    if (typeof value !== 'string') throw new Error('refused');
+    const cleaned = value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+/g, ' ').trim();
+    if (Buffer.byteLength(cleaned) > max) throw new Error('refused');
+    return cleaned;
+  };
+  for (const [key, value] of Object.entries(raw)) {
+    if (!/^[A-Za-z][A-Za-z0-9]{0,39}$/.test(key) || Object.keys(answers).length >= 50) throw new Error('refused');
+    let answer;
+    if (Array.isArray(value)) {
+      if (value.length > 50) throw new Error('refused');
+      answer = value.map((item) => text(item, 300)).filter(Boolean);
+    } else answer = text(value, 4000);
+    if (answer.length) answers[key] = answer;
+  }
+  return answers;
+}
+const answerLabel = (key) => loadTemplates().labels?.[key] ?? key.replace(/(?<=[a-z0-9])(?=[A-Z])/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+
 async function readBody(req) {
   if (!(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) return null;
   let raw = '';
@@ -92,7 +139,7 @@ async function razorpay(method, path, payload) {
 
 const api = {
   'GET /api/health.php': async (req, res) =>
-    json(res, 200, { ok: true, curl: true, configured, email: true, mode: configured ? 'test' : null }),
+    json(res, 200, { ok: true, curl: true, configured, email: true, onboarding: Boolean(onboardingUrl && onboardingKey), mode: configured ? 'test' : null }),
 
   'GET /api/_outbox': async (req, res) => json(res, 200, { sending: reallySend, emails: outbox }),
 
@@ -102,7 +149,7 @@ const api = {
     if (!input) return json(res, 400, { error: 'Invalid request.' });
     if (input.botcheck) return json(res, 200, { ok: true });
 
-    const limits = { topic: 80, name: 120, organisation: 160, email: 254, phone: 40, message: 4000, interests: 300, configuration: 8000, page: 200 };
+    const limits = { topic: 80, flow: 40, name: 120, organisation: 160, institutionType: 80, email: 254, phone: 40, message: 4000, interests: 300, configuration: 8000, page: 200 };
     const f = {};
     for (const [key, max] of Object.entries(limits)) {
       const multiline = key === 'message' || key === 'configuration';
@@ -114,14 +161,68 @@ const api = {
     if (f.organisation.length < 2) return json(res, 422, { error: 'Please enter your organisation.', field: 'organisation' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) return json(res, 422, { error: 'Please enter a valid email address.', field: 'email' });
     f.topic ||= 'General enquiry';
+    const university = f.flow === 'university';
+    let answers = {};
+    if (university) {
+      try {
+        answers = readAnswers(input.form);
+      } catch {
+        return json(res, 422, { error: 'Some of the details could not be accepted. Please check them and try again.' });
+      }
+      const digits = f.phone.replace(/\D+/g, '').length;
+      if (digits < 7 || digits > 15) return json(res, 422, { error: 'Please enter a valid phone number.', field: 'phone' });
+    }
     if (rateLimited(req, res, 'enquiry', 8, 600)) return;
 
+    // University journey only. Filed before the team's email so that email can say whether it worked.
+    const onboarding = [];
+    let filed = null;
+    if (university && onboardingUrl && onboardingKey) {
+      filed = await forwardUniversityRequest({ universityName: f.organisation, universityType: f.institutionType, contactName: f.name, email: f.email, phone: f.phone, message: f.message, interests: f.interests, configuration: f.configuration, form: Object.keys(answers).length ? answers : null, page: f.page });
+      onboarding.push(['Onboarding Tool', filed ? `Filed as request ${filed.reference}${filed.duplicate ? ' (an open request from this email was updated)' : ''} — review and approve it in the Onboarding Tool.` : 'Could NOT be filed automatically — please add this university in the Onboarding Tool by hand.']);
+    }
+    const reference = filed?.reference ?? '';
+
     const vars = { topic: f.topic, name: f.name, email: f.email, from: f.organisation };
-    const rows = [['Name', f.name], ['Organisation', f.organisation], ['Email', f.email], ['Phone', f.phone], ['Message', f.message], ['Interested in', f.interests], ['Configuration', f.configuration]];
-    const delivered = await email('enquiry_notify', { address: notifyAddress, name: 'Walnut Data Tech' }, vars, [['Topic', f.topic], ...rows, ['Sent from', f.page]]);
-    if (!delivered) return json(res, 502, { error: 'Sorry — your enquiry could not be sent. Please try again in a moment.' });
-    await email('enquiry_ack', { address: f.email, name: f.name }, vars, [['Topic', f.topic], ...rows]);
-    json(res, 200, { ok: true });
+    const rows = [
+      ['Name', f.name], ['Organisation', f.organisation], ['Institution type', f.institutionType], ['Email', f.email], ['Phone', f.phone], ['Message', f.message], ['Interested in', f.interests],
+      ...Object.entries(answers).map(([key, value]) => [answerLabel(key), Array.isArray(value) ? value.join(', ') : value]),
+      ['Configuration', f.configuration],
+    ];
+    const first = [...(reference ? [['Request ID', reference]] : []), ['Topic', f.topic]];
+    const delivered = await email('enquiry_notify', { address: notifyAddress, name: 'Walnut Data Tech' }, vars, [...first, ...rows, ['Sent from', f.page], ...onboarding]);
+    // A filed request is safe in the Onboarding Tool even if the team's email could not go out.
+    if (!delivered && !reference) return json(res, 502, { error: 'Sorry — your enquiry could not be sent. Please try again in a moment.' });
+    if (university) Object.assign(vars, { subjectRef: reference ? ` — ${reference}` : '', keep: reference ? ' Please keep your Request ID for future reference.' : '' });
+    await email(university ? 'request_ack' : 'enquiry_ack', { address: f.email, name: f.name }, vars, [...first, ...rows]);
+    json(res, 200, reference ? { ok: true, reference, duplicate: filed.duplicate } : { ok: true });
+  },
+
+  // mirrors src/api/request-status.php
+  'POST /api/request-status.php': async (req, res) => {
+    const input = await readBody(req);
+    if (!input) return json(res, 400, { error: 'Invalid request.' });
+    const reference = String(typeof input.reference === 'string' ? input.reference : '').trim().toUpperCase();
+    const address = String(typeof input.email === 'string' ? input.email : '').trim();
+    if (!/^UR-\d{1,9}$/.test(reference)) return json(res, 422, { error: 'Please enter your Request ID, for example UR-000123.', field: 'reference' });
+    if (address.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return json(res, 422, { error: 'Please enter a valid email address.', field: 'email' });
+    if (!onboardingUrl || !onboardingKey) return json(res, 503, { error: 'Request status is not available right now. Please try again later.' });
+    if (rateLimited(req, res, 'request-status', 15, 600)) return;
+    let status = 0;
+    let reply = {};
+    try {
+      const answer = await fetch(`${onboardingUrl}/api/v1/public/university-requests/status`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(10000),
+        headers: { 'Content-Type': 'application/json', 'X-Walnut-Key': onboardingKey },
+        body: JSON.stringify({ reference, email: address }),
+      });
+      status = answer.status;
+      reply = (await answer.json().catch(() => null)) ?? {};
+    } catch {}
+    if (status === 404) return json(res, 404, { error: 'We could not find a request with that Request ID and email address.' });
+    if (status !== 200 || typeof reply.status !== 'string') return json(res, 502, { error: 'We could not check your request right now. Please try again later.' });
+    json(res, 200, { ok: true, reference: String(reply.reference ?? reference), status: reply.status, universityName: String(reply.universityName ?? ''), submittedAt: String(reply.submittedAt ?? ''), updatedAt: String(reply.updatedAt ?? '') });
   },
 
   'POST /api/create-order.php': async (req, res) => {
@@ -225,4 +326,5 @@ createServer(async (req, res) => {
   console.log(`Walnut dev server → http://localhost:${port}`);
   console.log(configured ? 'Payments: Razorpay TEST mode' : 'Payments: not configured (add Razorpay test keys to .env)');
   console.log(reallySend ? 'Emails: SENDING through Twilio' : 'Emails: captured locally (see /api/_outbox), nothing is sent');
+  console.log(onboardingUrl && onboardingKey ? `University requests: filed in the Onboarding Tool at ${onboardingUrl}` : 'University requests: not filed (set ONBOARDING_API_URL and ONBOARDING_API_KEY in .env)');
 });

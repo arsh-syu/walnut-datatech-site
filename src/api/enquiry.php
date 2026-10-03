@@ -1,6 +1,9 @@
 <?php
-// POST { topic?, name, organisation, email, phone?, message?, interests?, configuration?, page? }
+// POST { topic?, flow?, name, organisation, institutionType?, email, phone?, message?, interests?, configuration?, form?, page? }
 // → emails the enquiry to the team and an acknowledgement to the sender.
+// → for the University journey (flow = "university") also files it as an empanelment request in the
+//   Onboarding Tool, where an admin reviews it, and answers with its Request ID:
+//   { ok, reference?, duplicate? }. No other form or journey does this.
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
 
@@ -25,8 +28,10 @@ $field = function (string $key, int $max, bool $multiline = false) use ($in): st
 };
 
 $topic = $field('topic', 80);
+$flow = $field('flow', 40);
 $name = $field('name', 120);
 $organisation = $field('organisation', 160);
+$institutionType = $field('institutionType', 80);
 $email = $field('email', 254);
 $phone = $field('phone', 40);
 $message = $field('message', 4000, true);
@@ -46,6 +51,14 @@ if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
 if ($topic === '') {
     $topic = 'General enquiry';
 }
+$university = $flow === 'university';
+$answers = $university ? read_answers($in['form'] ?? null) : [];
+if ($university) {
+    $digits = strlen((string) preg_replace('/\D+/', '', $phone));
+    if ($digits < 7 || $digits > 15) {
+        respond(422, ['error' => 'Please enter a valid phone number.', 'field' => 'phone']);
+    }
+}
 
 $config = load_config();
 if (!email_configured($config)) {
@@ -53,21 +66,55 @@ if (!email_configured($config)) {
 }
 rate_limit('enquiry', 8, 600);
 
+// University journey only. Filed before the team's email so that email can say whether it worked.
+$onboarding = [];
+$filed = null;
+if ($university && onboarding_configured($config)) {
+    $filed = forward_university_request($config, [
+        'universityName' => $organisation,
+        'universityType' => $institutionType,
+        'contactName' => $name,
+        'email' => $email,
+        'phone' => $phone,
+        'message' => $message,
+        'interests' => $interests,
+        'configuration' => $configuration,
+        'form' => $answers ?: null,
+        'page' => $page,
+    ]);
+    $onboarding = [['Onboarding Tool', $filed
+        ? 'Filed as request ' . $filed['reference'] . ($filed['duplicate'] ? ' (an open request from this email was updated)' : '') . ' — review and approve it in the Onboarding Tool.'
+        : 'Could NOT be filed automatically — please add this university in the Onboarding Tool by hand.']];
+}
+$reference = $filed['reference'] ?? '';
+
 $vars = ['topic' => $topic, 'name' => $name, 'email' => $email, 'from' => $organisation];
 $rows = [
     ['Name', $name],
     ['Organisation', $organisation],
+    ['Institution type', $institutionType],
     ['Email', $email],
     ['Phone', $phone],
     ['Message', $message],
     ['Interested in', $interests],
-    ['Configuration', $configuration],
 ];
+foreach ($answers as $key => $value) {
+    $rows[] = [answer_label($key), is_array($value) ? implode(', ', $value) : $value];
+}
+$rows[] = ['Configuration', $configuration];
+$first = array_merge($reference !== '' ? [['Request ID', $reference]] : [], [['Topic', $topic]]);
 
 // The enquiry only counts as sent if the team's copy went out.
-if (!send_email($config, 'enquiry_notify', $config['email_notify'], 'Walnut Data Tech', $vars, array_merge([['Topic', $topic]], $rows, [['Sent from', $page]]))) {
-    respond(502, ['error' => 'Sorry — your enquiry could not be sent. Please try again in a moment.']);
+if (!send_email($config, 'enquiry_notify', $config['email_notify'], 'Walnut Data Tech', $vars, array_merge($first, $rows, [['Sent from', $page]], $onboarding))) {
+    // A filed request is safe in the Onboarding Tool even if the team's email could not go out.
+    if ($reference === '') {
+        respond(502, ['error' => 'Sorry — your enquiry could not be sent. Please try again in a moment.']);
+    }
 }
-send_email($config, 'enquiry_ack', $email, $name, $vars, array_merge([['Topic', $topic]], $rows));
+if ($university) {
+    $vars['subjectRef'] = $reference !== '' ? ' — ' . $reference : '';
+    $vars['keep'] = $reference !== '' ? ' Please keep your Request ID for future reference.' : '';
+}
+send_email($config, $university ? 'request_ack' : 'enquiry_ack', $email, $name, $vars, array_merge($first, $rows));
 
-respond(200, ['ok' => true]);
+respond(200, $reference !== '' ? ['ok' => true, 'reference' => $reference, 'duplicate' => $filed['duplicate']] : ['ok' => true]);

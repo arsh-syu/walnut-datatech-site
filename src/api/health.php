@@ -11,5 +11,6 @@ respond(200, [
     'curl' => function_exists('curl_init'),
     'configured' => $configured,
     'email' => email_configured($config),
+    'onboarding' => onboarding_configured($config),
     'mode' => $configured ? (strpos($config['key_id'], 'rzp_live_') === 0 ? 'live' : 'test') : null,
 ]);
