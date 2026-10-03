@@ -248,6 +248,7 @@ test('account links stay hidden until the account portal has an address', () => 
   for (const path of ['', 'configure', 'academy/agentic-ai']) {
     assert.ok(!page(path).includes('Create your Walnut account') && !page(path).includes('>Sign in<'), `${path || 'home'} shows no account links by default`);
   }
+  assert.ok(!readFileSync(join(dist, '.htaccess'), 'utf8').includes('login|register'), 'and /login is not redirected anywhere');
   const built = spawnSync(process.execPath, ['-e', `
     process.env.ACCOUNT_URL = 'https://account.example.com/';
     const config = (await import('./site.config.mjs')).default;

@@ -111,6 +111,7 @@ Accounts live in the Onboarding Tool, which is also the account portal: one logi
 - Signing in is by one-time code (email or mobile), Google or password; the first code a new person verifies also creates their account. The code, its limits and the SMS / email providers all live in the portal.
 - A university's dashboard lists its empanelment requests and their status — matched by the official email on the request.
 - A student's dashboard lists the courses bought on this site. After a payment is verified, `api/verify-payment.php` records the purchase in the portal (`/api/v1/public/enrolments`, same shared key as University requests) against the email used at checkout.
+- With `links.account` set, `walnutdatatech.com/login`, `/register` and `/account` redirect to the portal, so the login has a simple address on the main domain.
 - `ACCOUNT_URL=http://localhost:4000 node build.mjs` builds the site against a locally running portal.
 
 ## Security

@@ -131,7 +131,9 @@ ${config.siteUrl.startsWith('https://') ? `  RewriteCond %{HTTPS} !=on
   RewriteCond %{REQUEST_URI} !^/\\.well-known/
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 ` : ''}  RewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]
-  RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+  RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]${config.links.account ? `
+  # walnutdatatech.com/login (and /register, /account) open the Walnut account portal
+  RewriteRule ^(login|register|account)/?$ ${config.links.account}/$1 [R=302,L]` : ''}
 </IfModule>
 
 <IfModule mod_headers.c>
