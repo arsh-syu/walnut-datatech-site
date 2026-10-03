@@ -17,11 +17,9 @@ export default {
   },
 
   links: {
-    // The Walnut account service (the Onboarding Tool's public address, no trailing slash). Setting it
-    // builds this site's own login/ and account/ pages and switches on "Sign in" across the site.
-    // It must be a subdomain of this site, e.g. https://account.walnutdatatech.com, so the browser
-    // keeps the session across the two; the service must list this site in its CLIENT_ORIGIN.
-    account: '',
+    // The Onboarding Tool's own address, where an approved university continues its onboarding and
+    // a password is reset. Optional: without it those two links are simply not shown.
+    portal: '',
     studentLogin: '',
     selectYourUniversity: 'https://selectyouruniversity.com',
     youtube: '',
@@ -29,6 +27,11 @@ export default {
     facebook: '',
     instagram: '',
   },
+
+  // Walnut accounts: login/ and dashboard/ on this site, with "Sign in" in the header.
+  // The pages talk only to this site's own API (api/account.php), which relays to the account
+  // service set as ONBOARDING_API_URL in .env — so that must be set before switching this on.
+  accounts: false,
 
   // YouTube / Vimeo embed URLs, e.g. https://www.youtube.com/embed/VIDEO_ID
   videos: {

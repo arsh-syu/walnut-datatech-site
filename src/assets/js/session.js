@@ -1,7 +1,7 @@
 // The Walnut account session, shared by the login page, the profile page and the header.
 //
 // The account service holds the session: a short-lived access token (kept in memory only) and a
-// refresh cookie that the browser cannot read. Nothing secret is ever stored by this script —
+// session cookie on this site that the scripts cannot read. Nothing secret is ever stored by this script —
 // the only thing kept in localStorage is the person's first name, so the header can greet them.
 
 const config = (() => {
@@ -47,14 +47,15 @@ export class AccountError extends Error {
   }
 }
 
+// Every call goes to this site's own relay (api/account.php), which passes it to the account service.
 async function request(path, { method, body, auth = true } = {}) {
   let res;
   try {
-    res = await fetch(accountApi + path, {
+    res = await fetch(accountApi + encodeURIComponent(path), {
       method: method || (body === undefined ? 'GET' : 'POST'),
-      credentials: 'include', // the refresh cookie belongs to the account service
+      credentials: 'same-origin', // the session cookie is this site's own, and the scripts cannot read it
       signal: AbortSignal.timeout(25000),
-      headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(auth && accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+      headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(auth && accessToken ? { 'X-Walnut-Token': accessToken } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {

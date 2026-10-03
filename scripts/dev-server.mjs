@@ -320,9 +320,55 @@ async function serveStatic(req, res, pathname) {
   }
 }
 
-createServer(async (req, res) => {
-  const { pathname } = new URL(req.url, 'http://localhost');
+// mirrors src/api/account.php — relays the login and dashboard calls to the account service
+async function relayAccount(req, res, path) {
+  const fail = (status, message) => json(res, status, { error: { message } });
+  if (!['GET', 'POST', 'PATCH'].includes(req.method)) return fail(405, 'Method not allowed.');
+  if (!/^\/(auth|account)(\/[A-Za-z0-9_-]{1,60}){1,4}$/.test(path)) return fail(404, 'Not found.');
+  const origin = req.headers.origin;
+  if (origin && new URL(origin).hostname !== String(req.headers.host).replace(/:\d+$/, '')) return fail(403, 'Cross-site requests are not allowed.');
+  let body = '';
+  if (req.method !== 'GET') {
+    for await (const chunk of req) body += chunk;
+    if (Buffer.byteLength(body) > 32768 || (body && !(req.headers['content-type'] || '').toLowerCase().startsWith('application/json'))) return fail(400, 'Invalid request.');
+  }
+  if (!onboardingUrl || !onboardingKey) return fail(503, 'Login is not available right now. Please try again later.');
+  if (rateLimited(req, res, 'account', 240, 600)) return;
+
+  const token = req.headers['x-walnut-token'] || '';
+  const session = (req.headers.cookie || '').match(/(?:^|;\s*)walnut_rt=([A-Za-z0-9._~-]{20,400})/)?.[1];
+  let reply;
   try {
+    reply = await fetch(`${onboardingUrl}/api/v1${path}`, {
+      method: req.method,
+      signal: AbortSignal.timeout(20000),
+      headers: {
+        Accept: 'application/json',
+        'X-Walnut-Key': onboardingKey,
+        'X-Walnut-Client-Ip': (req.socket.remoteAddress || '').replace(/^::ffff:/, ''),
+        'User-Agent': String(req.headers['user-agent'] || 'walnut-site').slice(0, 250),
+        ...(/^[A-Za-z0-9._-]{20,2000}$/.test(token) ? { Authorization: `Bearer ${token}` } : {}),
+        ...(session ? { Cookie: `walnut_rt=${session}` } : {}),
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body || undefined,
+    });
+  } catch {
+    return fail(502, 'We couldn’t reach the server. Please try again in a moment.');
+  }
+  // Only the session cookie is passed on, re-scoped to this site.
+  const cookies = reply.headers
+    .getSetCookie()
+    .filter((c) => c.startsWith('walnut_rt='))
+    .map((c) => `${c.split(';').map((part) => part.trim()).filter((part) => part && !/^(path|domain)=/i.test(part)).join('; ')}; Path=/`);
+  res.writeHead(reply.status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...(cookies.length ? { 'Set-Cookie': cookies } : {}) });
+  res.end(await reply.text());
+}
+
+createServer(async (req, res) => {
+  const { pathname, searchParams } = new URL(req.url, 'http://localhost');
+  try {
+    if (pathname === '/api/account.php') return await relayAccount(req, res, searchParams.get('p') || '');
     if (pathname.startsWith('/api/')) {
       const handler = api[`${req.method} ${pathname}`];
       return handler ? await handler(req, res) : json(res, 404, { error: 'Not found.' });

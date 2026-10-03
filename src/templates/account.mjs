@@ -1,6 +1,6 @@
-// The Walnut account on the website: the login page and the signed-in profile.
-// Both are shells — assets/js/login.js and account.js draw them from the account service
-// (`links.account` in site.config.mjs), so they are only built when that address is set.
+// The Walnut account on the website: the login page and the signed-in dashboard.
+// Both are shells — assets/js/login.js and account.js draw them through this site's own API
+// (api/account.php). They are only built when `accounts` is switched on in site.config.mjs.
 
 import { splitWords } from './layout.mjs';
 import { icon } from './icons.mjs';
@@ -34,19 +34,19 @@ export function login() {
   };
 }
 
-export function account() {
+export function dashboard() {
   const body = `
 <section class="acct">
   <div class="wrap">
-    <h1 class="sr-only">My Walnut account</h1>
-    <div id="account" aria-live="polite"><p class="acct-loading">Loading your account…</p></div>
+    <h1 class="sr-only">My Walnut dashboard</h1>
+    <div id="account" aria-live="polite"><p class="acct-loading">Loading your dashboard…</p></div>
     <noscript><p class="form-status is-error">Your account needs JavaScript. Please enable it and reload this page.</p></noscript>
   </div>
 </section>
 `;
   return {
-    title: 'My account',
-    description: 'Your Walnut account: your profile, requests, courses and applications.',
+    title: 'My dashboard',
+    description: 'Your Walnut dashboard: your profile, requests, courses and applications.',
     body,
     bodyClass: 'page-account',
     scripts: ['account.js'],

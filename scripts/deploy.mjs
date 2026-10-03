@@ -107,8 +107,10 @@ async function health() {
 /* ---------- deploy ---------- */
 
 console.log(`Building for ${siteUrl} …`);
-const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl } });
-if (build.status !== 0) fail('Build failed.');
+// Login and the dashboard are published exactly when the account service they rely on is configured.
+if (config.accounts && !hasOnboarding) console.log('! `accounts` is on in site.config.mjs but ONBOARDING_API_URL / ONBOARDING_API_KEY are not set — login and the dashboard are left out of this deploy.');
+const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasOnboarding ? '1' : '', ACCOUNTS_OFF: hasOnboarding ? '' : '1' } });
+if (build.status !== 0) fail('The build failed.');
 const check = spawnSync(process.execPath, ['check.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl } });
 if (check.status !== 0) fail('Link check failed — nothing was uploaded.');
 

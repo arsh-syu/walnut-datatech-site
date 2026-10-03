@@ -15,16 +15,19 @@ config.siteUrl = config.siteUrl.replace(/\/+$/, '');
 config.noindex = process.env.NOINDEX === '1';
 // GA_MEASUREMENT_ID overrides the analytics ID for one build (used to test the consent banner).
 if (process.env.GA_MEASUREMENT_ID) config.analytics.gaMeasurementId = process.env.GA_MEASUREMENT_ID;
-// ACCOUNT_URL overrides where "Sign in" / "Create account" lead (e.g. http://localhost:4000 for local testing).
-if (process.env.ACCOUNT_URL) config.links.account = process.env.ACCOUNT_URL;
-config.links.account = config.links.account.replace(/\/+$/, '');
+// ACCOUNTS=1 switches the login and dashboard pages on for one build (local testing, or the deploy
+// script once the account service is configured); PORTAL_URL sets the Onboarding Tool's own address.
+if (process.env.ACCOUNTS === '1') config.accounts = true;
+if (process.env.ACCOUNTS_OFF === '1') config.accounts = false; // the deploy script, when the account service is not configured
+if (process.env.PORTAL_URL) config.links.portal = process.env.PORTAL_URL;
+config.links.portal = (config.links.portal || '').replace(/\/+$/, '');
 
 const { layout } = await import('./src/templates/layout.mjs');
 const { default: home } = await import('./src/templates/home.mjs');
 const { solutionsIndex, servicePage } = await import('./src/templates/solutions.mjs');
 const { default: configure } = await import('./src/templates/configure.mjs');
 const { partners, academy, coursePage, about, contact, requestStatus, privacy, terms, notFound, serverError } = await import('./src/templates/pages.mjs');
-const { login, account } = await import('./src/templates/account.mjs');
+const { login, dashboard } = await import('./src/templates/account.mjs');
 const { areas } = await import('./src/data/services.mjs');
 const { courses, currency } = await import('./src/data/courses.mjs');
 const emailTemplates = await import('./src/emails/templates.mjs');
@@ -94,8 +97,8 @@ const pages = [
   ['contact/', contact],
   ['privacy/', privacy],
   ['terms/', terms],
-  // The Walnut account, once the account service has an address.
-  ...(config.links.account ? [['login/', login], ['account/', account]] : []),
+  // The Walnut account: its login page and the signed-in dashboard.
+  ...(config.accounts ? [['login/', login], ['dashboard/', dashboard]] : []),
 ];
 const hidden = []; // pages search engines should not list
 

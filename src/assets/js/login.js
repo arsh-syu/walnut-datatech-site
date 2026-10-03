@@ -6,7 +6,7 @@ import { accountApi, portal, siteRoot, esc, call, adopt, restore, AccountError }
 import { otpStep } from './otp.js';
 
 const box = document.getElementById('login');
-const profile = `${siteRoot}account/`;
+const profile = `${siteRoot}dashboard/`;
 const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 // Dialling codes offered beside the mobile field; the service's default is selected.
 const COUNTRIES = [['+91', 'India'], ['+971', 'UAE'], ['+1', 'US / Canada'], ['+44', 'UK'], ['+65', 'Singapore'], ['+61', 'Australia'], ['+977', 'Nepal'], ['+880', 'Bangladesh'], ['+94', 'Sri Lanka']];

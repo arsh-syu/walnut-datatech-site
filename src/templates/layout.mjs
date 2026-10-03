@@ -118,18 +118,18 @@ export function ctaBand(root, { title = 'Ready to build your online programme?',
 
 /* ---------- shell ---------- */
 
-// The Walnut account lives on this site (login/ and account/), backed by the account service at
-// `links.account`. Until that address is set none of it is built and nothing links to it.
+// The Walnut account lives on this site (login/ and dashboard/). Until `accounts` is switched on
+// in site.config.mjs none of it is built and nothing links to it.
 // `type` is the kind of account to offer first: university | agent | student.
 export function accountPrompt(root, type, text = 'Track everything in one place.') {
-  if (!config.links.account) return '';
+  if (!config.accounts) return '';
   return `<p class="account-prompt">${text} <a href="${root}login/?type=${type}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${root}login/" data-track="account_sign_in">sign in</a>.</p>`;
 }
 
 function header(root, path) {
   // The script swaps "Sign in" for the person's name (and a link to their profile) once they are signed in.
   const login =
-    (config.links.account ? `<a class="nav-login" href="${root}login/" data-account-link data-profile="${root}account/" data-track="account_sign_in">${icon('user')}<span>Sign in</span></a>` : '') +
+    (config.accounts ? `<a class="nav-login" href="${root}login/" data-account-link data-profile="${root}dashboard/" data-track="account_sign_in">${icon('user')}<span>Sign in</span></a>` : '') +
     (config.links.studentLogin ? `<a class="nav-login" href="${esc(config.links.studentLogin)}" rel="noopener">${icon('user')}<span>Student Login</span></a>` : '');
   return `<header class="site-header" data-header>
   <div class="wrap header-in">
@@ -238,8 +238,9 @@ export function layout({ title, description, path, root, body, bodyClass = '', j
   const clientConfig = JSON.stringify({
     api: `${root}api/`,
     analytics: { ga: config.analytics.gaMeasurementId },
-    // the account service's API, and this site's root (for links the scripts build)
-    ...(config.links.account ? { account: `${config.links.account}/api/v1`, portal: config.links.account, root } : {}),
+    // accounts: this site's relay to the account service, the Onboarding Tool's address (if any)
+    // and this site's root, for the links the scripts build
+    ...(config.accounts ? { account: `${root}api/account.php?p=`, portal: config.links.portal, root } : {}),
   }).replace(/</g, '\\u003c');
   const v = config.assetVersion ? `?v=${config.assetVersion}` : '';
   return `<!doctype html>

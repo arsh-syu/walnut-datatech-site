@@ -51,12 +51,12 @@ before(async () => {
     let raw = '';
     for await (const chunk of req) raw += chunk;
     const body = JSON.parse(raw || 'null');
-    tool.received.push({ method: req.method, url: req.url, key: req.headers['x-walnut-key'], body });
+    tool.received.push({ method: req.method, url: req.url, key: req.headers['x-walnut-key'], authorization: req.headers.authorization, cookie: req.headers.cookie, body });
     // The status lookup knows one request; everything else is the intake.
     const lookup = req.url.endsWith('/status');
     const known = lookup && body.reference === 'UR-000042' && body.email === 'asha@example.com';
     const status = lookup ? (known ? 200 : 404) : tool.status;
-    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.writeHead(status, { 'Content-Type': 'application/json', 'Set-Cookie': ['walnut_rt=issued; Path=/api/v1/auth; HttpOnly; SameSite=Lax', 'other=1; Path=/'] });
     res.end(JSON.stringify(lookup ? (known ? { reference: 'UR-000042', status: 'UNDER_REVIEW', universityName: 'Example University', submittedAt: '2026-10-03T08:00:00.000Z', updatedAt: '2026-10-03T09:00:00.000Z', adminRemarks: 'internal' } : { error: { message: 'Not found' } }) : { ok: status < 300, reference: 'UR-000042' }));
   });
   await new Promise((resolve) => toolServer.listen(TOOL_PORT, resolve));
@@ -243,23 +243,47 @@ test('only the University journey files requests', () => {
   assert.ok(php.includes("'universityType' => $institutionType") && php.includes("'form' => $answers ?: null"), 'the PHP twin forwards the same fields');
 });
 
-test('account links stay hidden until the account portal has an address', () => {
+test('login and the dashboard are part of this site, and built only when accounts are switched on', () => {
   const page = (path) => readFileSync(join(dist, path, 'index.html'), 'utf8');
   for (const path of ['', 'configure', 'academy/agentic-ai']) {
     assert.ok(!page(path).includes('Create your Walnut account') && !page(path).includes('>Sign in<'), `${path || 'home'} shows no account links by default`);
   }
-  assert.ok(!existsSync(join(dist, 'login')) && !existsSync(join(dist, 'account')), 'and the login and profile pages are not built');
-  // With an address, the account lives on this site: its own login and profile pages, allowed to reach the service.
+  assert.ok(!existsSync(join(dist, 'login')) && !existsSync(join(dist, 'dashboard')), 'and the login and dashboard pages are not built');
+
   const out = mkdtempSync(join(tmpdir(), 'walnut-account-'));
-  const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, ACCOUNT_URL: 'https://account.example.com/', OUT_DIR: out } });
+  const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, ACCOUNTS: '1', OUT_DIR: out } });
   assert.equal(built.status, 0, built.stderr);
   const made = (path) => readFileSync(join(out, path), 'utf8');
-  assert.ok(made('index.html').includes('href="login/" data-account-link') && made('index.html').includes('login/?type=student'), 'the header and the audience links lead to the site\'s own login');
+  assert.ok(made('index.html').includes('href="login/" data-account-link data-profile="dashboard/"') && made('index.html').includes('login/?type=student'), 'the header and the audience links lead to the site\'s own login');
   assert.ok(made('login/index.html').includes('id="login"') && made('login/index.html').includes('assets/js/login.js'));
-  assert.ok(made('account/index.html').includes('<meta name="robots" content="noindex">') && !made('sitemap.xml').includes('/account/'), 'the profile page is not listed for search engines');
-  assert.ok(made('login/index.html').includes("connect-src 'self' https://account.example.com"), 'the pages may talk to the account service, and nothing else new');
-  assert.ok(!made('index.html').includes('account.example.com/login'), 'visitors are never sent to another site to sign in');
+  assert.ok(made('dashboard/index.html').includes('<meta name="robots" content="noindex">') && !made('sitemap.xml').includes('/dashboard/'), 'the dashboard is not listed for search engines');
+  // Everything stays on this domain: the pages call the site's own API and nothing else.
+  assert.ok(made('login/index.html').includes('"account":"../api/account.php?p="'));
+  assert.match(made('login/index.html'), /connect-src 'self' https:\/\/\*\.razorpay\.com;/);
   rmSync(out, { recursive: true, force: true });
+});
+
+test('the account relay only reaches sign-in and "my account", and needs the account service', async () => {
+  const relay = (path, init) => fetch(`http://localhost:${PORT}/api/account.php?p=${encodeURIComponent(path)}`, init);
+  assert.equal((await relay('/auth/refresh', { method: 'POST' })).status, 503, 'without the account service, login is unavailable');
+  const linkedRelay = (path, init) => fetch(`http://localhost:${LINKED_PORT}/api/account.php?p=${encodeURIComponent(path)}`, init);
+  for (const path of ['/users', '/university-requests', '/universities/abc', '/auth/../users', '/public/enrolments', '/agent-applications']) {
+    assert.equal((await linkedRelay(path)).status, 404, `${path} must not be reachable through the website`);
+  }
+  assert.equal((await linkedRelay('/auth/refresh', { method: 'DELETE' })).status, 405);
+  assert.equal((await linkedRelay('/auth/refresh', { method: 'POST', headers: { Origin: 'https://evil.example' } })).status, 403);
+  tool.received.length = 0;
+  const res = await linkedRelay('/auth/otp/send', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Walnut-Token': 'a'.repeat(40), Cookie: 'walnut_rt=' + 'b'.repeat(40) + '; other=1' }, body: JSON.stringify({ channel: 'email', destination: 'asha@example.com' }) });
+  assert.equal(res.status, 201);
+  const [call] = tool.received;
+  assert.equal(`${call.method} ${call.url}`, 'POST /api/v1/auth/otp/send');
+  assert.equal(call.key, TOOL_KEY, 'the relay proves itself with the shared key');
+  assert.deepEqual(call.body, { channel: 'email', destination: 'asha@example.com' });
+  assert.equal(call.authorization, 'Bearer ' + 'a'.repeat(40));
+  assert.equal(call.cookie, 'walnut_rt=' + 'b'.repeat(40), 'only the session cookie travels');
+  assert.equal(res.headers.getSetCookie().join(), 'walnut_rt=issued; HttpOnly; SameSite=Lax; Path=/', 'the session cookie becomes this site\'s own');
+  const php = readFileSync(join(projectRoot, 'src/api/account.php'), 'utf8');
+  assert.ok(php.includes("'#^/(auth|account)(/[A-Za-z0-9_-]{1,60}){1,4}$#'") && php.includes("'X-Walnut-Key: '"), 'the PHP twin has the same allow-list');
 });
 
 test('the questions are data: unique ids, known types and conditions that point somewhere', () => {

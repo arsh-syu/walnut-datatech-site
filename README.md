@@ -103,17 +103,24 @@ The three journeys stay separate. Only the **University** journey — the empane
 
 Leave `ONBOARDING_API_URL` / `ONBOARDING_API_KEY` empty and nothing is filed — University requests reach the team by email only. `scripts/dev-server.mjs` mirrors all of this for local testing; run the Onboarding Tool on `http://localhost:4000` and set those two values in `.env` to try it end to end.
 
-## Walnut accounts (login and profile)
+## Walnut accounts (login and dashboard)
 
-Login and the profile are pages of this website — `login/` and `account/` — in the site's own design. The data lives in the account service (the Onboarding Tool): one account for universities, learners and agents.
+Login and the dashboard are pages of this website — `walnutdatatech.com/login/` and `/dashboard/` — in the site's own design. Nothing happens on another domain or subdomain: the pages call this site's own API, and that relays to the account service (the Onboarding Tool) behind the scenes.
 
-- **Switching it on.** Set `links.account` in `site.config.mjs` to the service's public address. That builds the two pages, adds **Sign in** to the header (it becomes the person's first name once they are signed in) and the **Create your Walnut account** links under each audience on the home page, on the request confirmation and on the course confirmation. Left empty, none of it is built.
-- **Hosting rule.** The service must be on a subdomain of this site (for example `account.walnutdatatech.com`) and list this site in its `CLIENT_ORIGIN` setting. The browser then keeps the session across the two; on an unrelated domain sign-in would not persist.
+```
+browser → walnutdatatech.com/login, /dashboard
+        → walnutdatatech.com/api/account.php      (this site; only sign-in and "my account" calls pass)
+        → the account service                     (ONBOARDING_API_URL in .env — never seen by the browser)
+```
+
+- **Switching it on.** Set `ONBOARDING_API_URL` and `ONBOARDING_API_KEY` in `.env` and deploy: the deploy script then publishes `login/` and `dashboard/`, adds **Sign in** to the header (it becomes the person's first name once signed in) and the **Create your Walnut account** links. Without those two settings none of it is published. (`accounts: true` in `site.config.mjs`, or `ACCOUNTS=1 node build.mjs`, does the same for a local build.)
 - **Login** (`assets/js/login.js`): Email OTP or Mobile OTP into the same account, password as a fallback. A new person is asked "How can we help you?" (University / Learn / Agent) and their name. `?type=university|student|agent` pre-selects the answer.
-- **Profile** (`assets/js/account.js`): the person's card (name, verified email and mobile) and tabs — *My requests* (empanelment requests and their status), *My courses* (purchases and progress), *Partner application* (the agent form and its status) and *Profile* (name, verify email, add a mobile number, other Walnut services).
-- **What is stored in the browser.** Only the person's first name, for the header. The session itself is a cookie the scripts cannot read plus a short-lived token kept in memory (`assets/js/session.js`). A one-time code is never stored anywhere.
+- **Dashboard** (`assets/js/account.js`): the person's card (name, verified email and mobile) and tabs — *My requests* (empanelment requests and their status), *My courses* (purchases and progress), *Partner application* (the agent form and its status) and *Profile* (name, verify email, add a mobile number, other Walnut services).
+- **The relay** (`api/account.php`) forwards only `/auth/…` and `/account/…` calls, refuses other sites, rate-limits, and authenticates to the service with the shared key. The service's session cookie is handed to the browser as this site's own `HttpOnly` cookie.
+- **What the browser stores.** Only the person's first name, for the header. The session is that cookie (scripts cannot read it) plus a short-lived token kept in memory (`assets/js/session.js`). A one-time code is never stored.
 - **Purchases.** After a payment is verified, `api/verify-payment.php` records the purchase in the service against the email used at checkout, so it appears under *My courses*.
-- The codes, their limits and the SMS / email providers all live in the service. `ACCOUNT_URL=http://localhost:4000 node build.mjs` builds the site against a locally running service.
+- **`links.portal`** (optional) is the Onboarding Tool's own address, used for two links only: an approved university's "Continue onboarding" and "Forgot password?".
+- Local testing: run the Onboarding Tool on `http://localhost:4000`, set the two `.env` values, then `ACCOUNTS=1 node build.mjs` and `npm run dev`.
 
 ## Security
 

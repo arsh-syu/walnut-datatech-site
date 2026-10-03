@@ -16,8 +16,6 @@ const sha256 = (text) => `'sha256-${createHash('sha256').update(text).digest('ba
 // Content-Security-Policy: only this site's own files plus the third parties it actually uses.
 export function contentSecurityPolicy(config) {
   const ga = Boolean(config.analytics?.gaMeasurementId);
-  // The login and profile pages talk to the account service.
-  const account = config.links?.account ? new URL(config.links.account).origin : false;
   const policy = {
     'default-src': ["'self'"],
     // Razorpay Checkout loads its own helper scripts (e.g. risk detection) from cdn.razorpay.com
@@ -25,7 +23,7 @@ export function contentSecurityPolicy(config) {
     'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // inline is needed for style="" attributes only
     'font-src': ["'self'", 'https://fonts.gstatic.com'],
     'img-src': ["'self'", 'data:', 'https://*.razorpay.com', ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com'],
-    'connect-src': ["'self'", account, 'https://*.razorpay.com', ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com'],
+    'connect-src': ["'self'", 'https://*.razorpay.com', ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com'],
     'frame-src': ['https://*.razorpay.com', 'https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
     'base-uri': ["'self'"],
     'form-action': ["'self'"],
