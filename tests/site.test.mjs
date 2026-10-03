@@ -243,6 +243,21 @@ test('only the University journey files requests', () => {
   assert.ok(php.includes("'universityType' => $institutionType") && php.includes("'form' => $answers ?: null"), 'the PHP twin forwards the same fields');
 });
 
+test('account links stay hidden until the account portal has an address', () => {
+  const page = (path) => readFileSync(join(dist, path, 'index.html'), 'utf8');
+  for (const path of ['', 'configure', 'academy/agentic-ai']) {
+    assert.ok(!page(path).includes('Create your Walnut account') && !page(path).includes('>Sign in<'), `${path || 'home'} shows no account links by default`);
+  }
+  const built = spawnSync(process.execPath, ['-e', `
+    process.env.ACCOUNT_URL = 'https://account.example.com/';
+    const config = (await import('./site.config.mjs')).default;
+    config.links.account = process.env.ACCOUNT_URL.replace(/\\/+$/, '');
+    const { accountUrl, accountPrompt } = await import('./src/templates/layout.mjs');
+    console.log(accountUrl('register', 'agent'), accountPrompt('student').includes('register?type=student'));
+  `, '--input-type=module'], { cwd: projectRoot, encoding: 'utf8' });
+  assert.equal(built.stdout.trim(), 'https://account.example.com/register?type=agent true', built.stderr);
+});
+
 test('the questions are data: unique ids, known types and conditions that point somewhere', () => {
   const ids = questions.map((q) => q.id);
   assert.equal(new Set(ids).size, ids.length, 'question ids are unique');

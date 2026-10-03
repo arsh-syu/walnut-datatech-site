@@ -258,6 +258,8 @@ a.social:hover { background: var(--violet-600); transform: translateY(-3px); }
 .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--violet-600); box-shadow: 0 0 0 4px rgba(125, 98, 255, .2); }
 .field.has-error input, .field.has-error textarea, .field.has-error select { border-color: var(--danger); }
 .field-help { font-size: .8125rem; color: var(--muted); }
+.account-prompt { margin-top: var(--s-5); font-size: .9375rem; color: var(--muted); }
+.account-prompt a { color: var(--violet-700); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 
 /* request status */
 .status-result { display: grid; gap: var(--s-4); margin-top: var(--s-5); padding-top: var(--s-5); border-top: 1px solid var(--line); animation: rise .5s var(--ease) both; }

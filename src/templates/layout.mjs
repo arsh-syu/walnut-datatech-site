@@ -118,10 +118,18 @@ export function ctaBand(root, { title = 'Ready to build your online programme?',
 
 /* ---------- shell ---------- */
 
+// Links into the Walnut account portal. Empty until `links.account` is set, so nothing dangles.
+// `type` is the kind of account to offer first: university | agent | student.
+export const accountUrl = (page, type) => (config.links.account ? `${config.links.account}/${page}${type ? `?type=${type}` : ''}` : '');
+export function accountPrompt(type, text = 'Track everything in one place.') {
+  if (!config.links.account) return '';
+  return `<p class="account-prompt">${text} <a href="${esc(accountUrl('register', type))}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${esc(accountUrl('login'))}" data-track="account_sign_in">sign in</a>.</p>`;
+}
+
 function header(root, path) {
-  const login = config.links.studentLogin
-    ? `<a class="nav-login" href="${esc(config.links.studentLogin)}" rel="noopener">${icon('user')}<span>Student Login</span></a>`
-    : '';
+  const login =
+    (config.links.account ? `<a class="nav-login" href="${esc(accountUrl('login'))}" data-track="account_sign_in">${icon('user')}<span>Sign in</span></a>` : '') +
+    (config.links.studentLogin ? `<a class="nav-login" href="${esc(config.links.studentLogin)}" rel="noopener">${icon('user')}<span>Student Login</span></a>` : '');
   return `<header class="site-header" data-header>
   <div class="wrap header-in">
     <a class="brand" href="${root || './'}" aria-label="Walnut Data Tech — home">

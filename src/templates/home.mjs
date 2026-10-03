@@ -4,7 +4,7 @@ import { audiences, externalApps } from '../data/site.mjs';
 import { courses } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
 import { vignette } from './vignettes.mjs';
-import { button, mark, splitWords, sectionHead, videoTile, ctaBand, esc } from './layout.mjs';
+import { button, mark, splitWords, sectionHead, videoTile, ctaBand, esc, accountPrompt } from './layout.mjs';
 import { journeySteps, courseCard, appLauncher } from './blocks.mjs';
 
 // Interactive service showcase: a tab list of all service areas, grouped by lifecycle stage.
@@ -127,6 +127,7 @@ export default function home({ root }) {
           ${journeySteps(a.steps)}
         </div>
         ${audienceBody(root, a.id)}
+        ${accountPrompt({ universities: 'university', learners: 'student', partners: 'agent' }[a.id], { universities: 'Follow your request from submission to approval.', learners: 'See the courses you bought and your progress.', partners: 'Apply and follow your application.' }[a.id])}
       </div>`
         )
         .join('\n      ')}

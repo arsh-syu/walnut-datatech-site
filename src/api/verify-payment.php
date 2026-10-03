@@ -24,15 +24,32 @@ if (!hash_equals($expected, $signature)) {
     respond(400, ['ok' => false, 'error' => 'We could not verify this payment. If money was deducted, please contact us with your payment reference.']);
 }
 
-// The payment is genuine. Emails are a courtesy on top: nothing below may fail the response.
+// The payment is genuine. What follows is a courtesy on top: nothing below may fail the response.
 // Learner details come from the order stored at Razorpay, never from the browser.
-if (email_configured($config) && first_time('enrolment-' . $paymentId)) {
+if ((email_configured($config) || onboarding_configured($config)) && first_time('enrolment-' . $paymentId)) {
     $order = razorpay('GET', '/orders/' . $orderId, null, $config, false);
     $notes = isset($order['notes']) && is_array($order['notes']) ? $order['notes'] : [];
     $email = (string) ($notes['email'] ?? '');
     if (filter_var($email, FILTER_VALIDATE_EMAIL) !== false) {
         $name = (string) ($notes['name'] ?? '');
         $coupon = (string) ($notes['coupon'] ?? 'none');
+        // Recorded against the learner's email, so the course shows in their Walnut account.
+        if (onboarding_configured($config) && function_exists('curl_init')) {
+            [$status] = onboarding_post($config, '/api/v1/public/enrolments', [
+                'email' => $email,
+                'name' => $name,
+                'phone' => (string) ($notes['phone'] ?? ''),
+                'courseSlug' => (string) ($notes['slug'] ?? ''),
+                'courseName' => (string) ($notes['course'] ?? ''),
+                'amount' => intdiv((int) ($order['amount'] ?? 0), 100),
+                'coupon' => $coupon === 'none' ? null : $coupon,
+                'paymentId' => $paymentId,
+                'orderId' => $orderId,
+            ]);
+            if ($status < 200 || $status >= 300) {
+                error_log('Enrolment ' . $paymentId . ' was not recorded: the Onboarding Tool responded HTTP ' . $status);
+            }
+        }
         $vars = [
             'name' => $name,
             'email' => $email,

@@ -277,6 +277,16 @@ const api = {
         const order = await razorpay('GET', `/orders/${orderId}`);
         const notes = order.notes || {};
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notes.email || '')) {
+          // Recorded against the learner's email, so the course shows in their Walnut account.
+          if (onboardingUrl && onboardingKey) {
+            const recorded = await fetch(`${onboardingUrl}/api/v1/public/enrolments`, {
+              method: 'POST',
+              signal: AbortSignal.timeout(10000),
+              headers: { 'Content-Type': 'application/json', 'X-Walnut-Key': onboardingKey },
+              body: JSON.stringify({ email: notes.email, name: notes.name || '', phone: notes.phone || '', courseSlug: notes.slug || '', courseName: notes.course || '', amount: Math.floor(order.amount / 100), coupon: notes.coupon === 'none' ? null : notes.coupon || null, paymentId, orderId }),
+            }).catch(() => null);
+            if (!recorded?.ok) console.error(`Enrolment ${paymentId} was not recorded: the Onboarding Tool responded HTTP ${recorded?.status ?? 0}`);
+          }
           const vars = { name: notes.name || '', email: notes.email, course: notes.course || 'your course', slug: notes.slug || '' };
           const rows = [['Course', vars.course], ['Amount paid', `₹${(order.amount / 100).toLocaleString('en-IN')}`], ['Coupon', notes.coupon === 'none' ? '' : notes.coupon || ''], ['Payment reference', paymentId]];
           await email('enrol_confirm', { address: notes.email, name: vars.name }, vars, rows);

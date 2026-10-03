@@ -15,6 +15,9 @@ config.siteUrl = config.siteUrl.replace(/\/+$/, '');
 config.noindex = process.env.NOINDEX === '1';
 // GA_MEASUREMENT_ID overrides the analytics ID for one build (used to test the consent banner).
 if (process.env.GA_MEASUREMENT_ID) config.analytics.gaMeasurementId = process.env.GA_MEASUREMENT_ID;
+// ACCOUNT_URL overrides where "Sign in" / "Create account" lead (e.g. http://localhost:4000 for local testing).
+if (process.env.ACCOUNT_URL) config.links.account = process.env.ACCOUNT_URL;
+config.links.account = config.links.account.replace(/\/+$/, '');
 
 const { layout } = await import('./src/templates/layout.mjs');
 const { default: home } = await import('./src/templates/home.mjs');

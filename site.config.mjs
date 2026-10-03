@@ -17,6 +17,9 @@ export default {
   },
 
   links: {
+    // The Walnut account portal (the Onboarding Tool's public address, no trailing slash), e.g.
+    // https://account.walnutdatatech.com — switches on "Sign in" and "Create account" across the site.
+    account: '',
     studentLogin: '',
     selectYourUniversity: 'https://selectyouruniversity.com',
     youtube: '',

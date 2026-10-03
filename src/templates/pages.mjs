@@ -3,7 +3,7 @@ import { areas, stages } from '../data/services.mjs';
 import { audiences, externalApps } from '../data/site.mjs';
 import { courses, currency, inr, offerOf } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
-import { button, mark, splitWords, sectionHead, videoTile, enquiryForm, ctaBand, esc } from './layout.mjs';
+import { button, mark, splitWords, sectionHead, videoTile, enquiryForm, ctaBand, esc, accountPrompt } from './layout.mjs';
 import { journeySteps, priceFlow, courseCard, appLauncher } from './blocks.mjs';
 
 const audience = (id) => audiences.find((a) => a.id === id);
@@ -214,6 +214,7 @@ export function coursePage({ root }, course) {
         <h2>You’re enrolled.</h2>
         <p>Payment received for ${course.name}. ${config.legal.courseAccess ? `Your course access is delivered ${esc(config.legal.courseAccess)}, to` : 'We’ll send your course access details to'} <strong data-success-email></strong>.</p>
         <p class="pay-ref">Payment reference: <span data-success-ref></span></p>
+        ${accountPrompt('student', 'Use the same email to see your courses and progress.')}
       </div>
     </div>
   </div>
