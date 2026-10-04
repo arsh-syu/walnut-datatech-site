@@ -4,7 +4,7 @@ import { audiences, externalApps } from '../data/site.mjs';
 import { courses } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
 import { vignette } from './vignettes.mjs';
-import { button, mark, splitWords, sectionHead, videoTile, ctaBand, esc, accountPrompt } from './layout.mjs';
+import { button, mark, splitWords, sectionHead, videoTile, ctaBand, esc, accountPrompt, clientele } from './layout.mjs';
 import { journeySteps, courseCard, applicationLauncher } from './blocks.mjs';
 
 // Interactive service showcase: a tab list of all service areas, grouped by lifecycle stage.
@@ -91,8 +91,8 @@ export default function home({ root }) {
   <div class="wrap hero-in">
     ${mark('hero-mark')}
     <p class="eyebrow hero-fade" style="--d:.5s">Technology · Learning · Partnerships</p>
-    <h1 class="display">${splitWords('The technology ecosystem behind online education.')}</h1>
-    <p class="lede hero-fade" style="--d:.75s">Walnut Data Tech runs online programmes for universities, teaches career skills through short courses, and gives education agents the tools to grow.</p>
+    <h1 class="display">${splitWords('The technology ecosystem behind')} <span class="hero-hl">${splitWords('online education.', 4)}</span></h1>
+    <p class="lede hero-fade" style="--d:.75s">Walnut Data Tech runs online programmes for universities, teaches career skills through short courses, and gives education partners the tools to grow.</p>
     <div class="actions center hero-fade" style="--d:.9s">
       ${button({ href: '#start', label: 'Find your path', size: 'lg', arrow: true })}
       ${config.videos.company ? `<button class="btn btn-ghost btn-lg" type="button" data-video="${esc(config.videos.company)}" data-video-title="Walnut Data Tech — company film">${icon('play')}<span>Watch the film</span></button>` : ''}
@@ -138,6 +138,8 @@ export default function home({ root }) {
 
 ${film}
 
+${clientele(root, { mist: false })}
+
 <section class="section section-dark" id="apps">
   <div class="wrap">
     ${sectionHead({ eyebrow: 'Walnut applications', title: 'Already working with us? Open your application.', text: 'Choose the applications you need — one or several — and open each from here. University applications are handled on their own.' })}
@@ -158,7 +160,7 @@ ${ctaBand(root, {
   return {
     title: 'Walnut Data Tech — Technology for online education',
     description:
-      'Walnut Data Tech powers online education: technology and services for universities, short certification courses for learners, and applications for education agents and partners.',
+      'Walnut Data Tech powers online education: technology and services for universities, short certification courses for learners, and applications for education partners.',
     body,
     bodyClass: 'page-home',
     jsonLd: [

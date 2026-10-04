@@ -130,7 +130,7 @@
 .acct-row div, .acct-more div { display: grid; gap: 2px; min-width: 0; }
 .acct-row span:not(.status-badge), .acct-more span { font-size: .9375rem; color: var(--muted); overflow-wrap: anywhere; }
 .acct-mobile { display: grid; grid-template-columns: minmax(0, 320px) auto; gap: var(--s-3); align-items: end; }
-.acct-mobile .field-error { grid-column: 1 / -1; }
+.acct-mobile .field-error, .acct-mobile .field-help { grid-column: 1 / -1; }
 .acct-verify [data-verify-box]:not(:empty) { max-width: 420px; padding: var(--s-5); border-radius: var(--r-lg); background: var(--mist); }
 .acct-more-title { margin-top: var(--s-3); padding-top: var(--s-4); border-top: 1px solid var(--line); font: 500 1.125rem var(--font-display); letter-spacing: -.02em; }
 .acct-more { list-style: none; display: grid; gap: var(--s-3); }

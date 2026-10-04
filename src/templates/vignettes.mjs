@@ -55,7 +55,7 @@ const scenes = {
     card(1, 'right:5%;top:36%;width:40%', done('Admissions') + done('Fees collection') + done('Examination data') + done('Academic records')),
 
   automation: () =>
-    card(0, 'left:6%;top:10%;width:58%', head('Workflow', pill(`${dot('ok')}Automated`, 'ok')) + `<div class="vg-steps"><span class="done">Trigger</span><span class="done">Agent</span><span class="done">Review</span><span class="now">Done</span></div>` + done('No manual steps')) +
+    card(0, 'left:6%;top:10%;width:58%', head('Workflow', pill(`${dot('ok')}Automated`, 'ok')) + `<div class="vg-steps"><span class="done">Trigger</span><span class="done">AI agent</span><span class="done">Review</span><span class="now">Done</span></div>` + done('No manual steps')) +
     card(1, 'right:5%;top:40%;width:38%', head('AI agent') + `<span class="vg-sub">${dot('ok')}Working on a task</span><div class="vg-wave">${'<i></i>'.repeat(12)}</div>`, 'dark') +
     card(2, 'left:16%;bottom:8%;width:44%', head('Tasks') + bar(82)),
 

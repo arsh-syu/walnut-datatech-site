@@ -29,25 +29,23 @@ export const audiences = [
   {
     id: 'partners',
     icon: 'handshake',
-    who: 'I want to become a Walnut agent or partner',
+    who: 'I want to become a Walnut partner',
     title: 'Join Walnut',
-    line: 'Onboard as an agent and use Walnut’s applications to grow.',
+    line: 'Onboard as a partner and use Walnut’s applications to grow.',
     steps: ['Explore the partnership', 'Select an application', 'Open it and get started'],
   },
 ];
 
 // Walnut's connected applications. Exactly one can be selected at a time; the action opens `url`.
 // `sso` is this app's id in api/sso.php, for the apps that accept a Walnut sign-in. An app without one
-// is opened at its own address; Agent Onboard has no SSO receiver yet.
+// is opened at its own address; Partner Onboarding has no SSO receiver yet.
 export const externalApps = [
   {
     id: 'agent-onboard',
-    launch: 'Partner Onboarding', // what it is called in "Open your application"
-    launchDesc: 'Become a Walnut partner and get onboarded.',
     icon: 'handshake',
-    name: 'Agent Onboard',
-    desc: 'Register as a Walnut agent and complete your onboarding.',
-    action: 'Open Agent Onboarding',
+    name: 'Partner Onboarding',
+    desc: 'Register as a Walnut partner and complete your onboarding.',
+    action: 'Open Partner Onboarding',
     url: 'https://syuapptracker.softsolanalytics.com',
   },
   {

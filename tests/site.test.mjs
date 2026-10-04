@@ -101,7 +101,7 @@ test('course pages show the right prices', () => {
 
 test('partner applications point at the right addresses, and there are three audiences', () => {
   assert.deepEqual(Object.fromEntries(externalApps.map((a) => [a.name, a.url])), {
-    'Agent Onboard': 'https://syuapptracker.softsolanalytics.com',
+    'Partner Onboarding': 'https://syuapptracker.softsolanalytics.com',
     'Course Finder': 'https://syu-course-finder.vercel.app',
     'Online Leads': 'https://syu-leads.vercel.app',
   });
@@ -326,6 +326,34 @@ test('programme selection: four tick boxes and Other, which opens a list', () =>
   assert.ok(!qs.some((q) => q.id === 'programmesPlanned'), 'the old free-text field is replaced');
   const { labels } = JSON.parse(readFileSync(join(dist, 'api/emails.json'), 'utf8'));
   assert.equal(labels.programmes, 'Which programme do you want to apply for?', 'the answer is named in the emails');
+});
+
+test('the site speaks of partners, names its clients and carries the company details', () => {
+  const page = (path) => readFileSync(join(dist, path, 'index.html'), 'utf8');
+  const visible = (html) => html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ');
+  // "Agent" is not used for the partner role anywhere (the AI course may still speak of AI agents).
+  for (const path of ['', 'partners', 'about', 'contact', 'academy', 'terms', 'privacy']) {
+    assert.ok(!/\bagents?\b/i.test(visible(page(path)).replace(/AI agents?/gi, '')), `${path || 'home'} still says "agent"`);
+  }
+  for (const path of ['', 'about']) {
+    const html = page(path);
+    assert.ok(html.includes('id="clients"') && html.includes('Savitribai Phule Pune University') && html.includes('Guru Ghasidas Vishwavidyalaya'), `${path || 'home'} lists the clientele`);
+    assert.ok(html.includes('assets/img/client-sppu.webp') && html.includes('assets/img/client-ggv.webp'));
+  }
+  for (const logo of ['client-sppu.webp', 'client-ggv.webp']) assert.equal(readFileSync(join(dist, 'assets/img', logo)).subarray(8, 12).toString(), 'WEBP', `${logo} is a WebP image`);
+  const home = page('');
+  assert.ok(home.includes('support@walnutdatatech.com') && home.includes('Sector 62, Noida') && home.includes('GSTIN 09AADCW6322K1Z1'), 'the footer carries the address, email and GSTIN');
+  assert.ok(page('contact').includes('mailto:support@walnutdatatech.com') && page('privacy').includes('Walnut Data Tech Private Limited'));
+  assert.ok(home.includes('class="hero-hl"'), 'the headline carries its highlight');
+});
+
+test('login asks existing or new once, and a profile can hold a mobile number either way', () => {
+  const login = readFileSync(join(projectRoot, 'src/assets/js/login.js'), 'utf8');
+  assert.ok(login.includes('data-mode="existing"') && login.includes('data-mode="new"'), 'the page offers both');
+  assert.ok(login.includes("returning() ? start() : choice()"), 'someone who has signed in before goes straight to the login');
+  assert.ok(!/localStorage\.setItem\([^)]*(email|mobile|otp|code|token)/i.test(login), 'nothing personal is remembered for that');
+  const account = readFileSync(join(projectRoot, 'src/assets/js/account.js'), 'utf8');
+  assert.ok(account.includes('data-mobile-form') && account.includes('data-phone-form'), 'verified by OTP where SMS is on, saved to the profile where it is not');
 });
 
 test('the questions are data: unique ids, known types and conditions that point somewhere', () => {

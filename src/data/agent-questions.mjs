@@ -1,4 +1,4 @@
-// The questions an agent / partner answers when applying from their dashboard. They are data: add,
+// The questions a partner answers when applying from their dashboard. They are data: add,
 // reword, reorder or switch one off (`active: false`) here — the application form, its validation
 // (api/account-lib.php) and the team's email all follow.
 //

@@ -32,11 +32,36 @@ export function mark(cls = '') {
 }
 
 // Wraps each word so headlines can rise in word by word (pure CSS, no layout shift).
-export function splitWords(text) {
+// Words that rise into place one after another. `from` continues the count of an earlier call,
+// so a headline built from two calls still reveals as one sentence.
+export function splitWords(text, from = 0) {
   return text
     .split(' ')
-    .map((w, i) => `<span class="w"><span style="--i:${i}">${w}</span></span>`)
+    .map((w, i) => `<span class="w"><span style="--i:${from + i}">${w}</span></span>`)
     .join(' ');
+}
+
+// The universities Walnut works with, as cards: logo, name and where it is. Used on the home and
+// about pages; renders nothing until `clients` in site.config.mjs has entries.
+export function clientele(root, { mist = true } = {}) {
+  if (!config.clients.length) return '';
+  return `<section class="section${mist ? ' section-mist' : ''}" id="clients">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Clientele', title: 'The universities we work with.', center: true })}
+    <ul class="clients">
+      ${config.clients
+        .map(
+          (c, i) => `<li class="client spot" data-reveal style="--d:${i * 0.1}s">
+        ${c.photo ? `<img class="client-photo" src="${root}assets/img/${esc(c.photo)}" alt="${esc(c.name)} campus" loading="lazy">` : ''}
+        <img class="client-logo" src="${root}assets/img/${esc(c.logo)}" alt="${esc(c.name)} logo" width="${c.width}" height="${c.height}" loading="lazy">
+        <h3>${esc(c.name)}</h3>
+        ${c.place ? `<p>${esc(c.place)}</p>` : ''}
+      </li>`
+        )
+        .join('\n      ')}
+    </ul>
+  </div>
+</section>`;
 }
 
 export function sectionHead({ eyebrow, title, text, center = false, tag = 'h2' }) {
@@ -165,6 +190,10 @@ function footer(root) {
       <div class="footer-brand">
         <img src="${root}assets/img/logo-light.svg" alt="${esc(config.company.legalName)}" width="230" height="44" loading="lazy">
         <p>Technology, learning and partnerships for online education.</p>
+        <address class="footer-address">
+          ${config.company.address ? `<span>${esc(config.company.address)}</span>` : ''}
+          ${config.company.email ? `<a href="mailto:${esc(config.company.email)}">${esc(config.company.email)}</a>` : ''}
+        </address>
         ${social ? `<div class="socials">${social}</div>` : ''}
       </div>
       <nav class="footer-col footer-col-wide" aria-label="For universities">
@@ -191,7 +220,7 @@ function footer(root) {
         <h2>Company</h2>
         <ul>
           <li><a href="${root}about/">About</a></li>
-          ${config.clients.length ? `<li><a href="${root}about/#clients">Our clients</a></li>` : ''}
+          ${config.clients.length ? `<li><a href="${root}about/#clients">Clientele</a></li>` : ''}
           ${config.certifications.length ? `<li><a href="${root}about/#certifications">Certifications</a></li>` : ''}
           <li><a href="${root}contact/">Contact</a></li>
           <li><a href="${esc(config.links.selectYourUniversity)}" rel="noopener">Select Your University ${icon('external')}</a></li>
@@ -199,7 +228,7 @@ function footer(root) {
       </nav>
     </div>
     <div class="footer-bottom">
-      <p>© ${new Date().getFullYear()} ${esc(config.company.legalName)}. All rights reserved.</p>
+      <p>© ${new Date().getFullYear()} ${esc(config.company.legalName)}. All rights reserved.${config.company.gstin ? ` GSTIN ${esc(config.company.gstin)}` : ''}</p>
       <ul>
         <li><a href="${root}privacy/">Privacy policy</a></li>
         <li><a href="${root}terms/">Terms &amp; conditions</a></li>

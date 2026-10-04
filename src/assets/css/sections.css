@@ -12,9 +12,33 @@
     radial-gradient(30% 36% at 78% 12%, rgba(125, 98, 255, .12), transparent 70%);
 }
 .hero-in { display: grid; justify-items: center; gap: var(--s-5); text-align: center; }
+
+/* Hero motion. The headline's last words take the brand violet in a sweep of light once they have
+   risen into place; the glow behind drifts slowly; the mark floats; and the whole block eases back
+   as the page scrolls on. All of it is switched off for people who ask for reduced motion. */
+.hero-hl .w > span {
+  background: linear-gradient(100deg, var(--violet-700) 0%, var(--violet) 26%, #b9abff 40%, var(--ink) 54%, var(--ink) 100%);
+  background-size: 260% 100%; background-position: 100% 0;
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+  animation: word-up .95s var(--ease) both, hl-sweep 1.6s var(--ease) both;
+  animation-delay: calc(var(--i) * 55ms + .12s), calc(var(--i) * 90ms + 1s);
+}
+@keyframes hl-sweep { to { background-position: 0 0; } }
+.hero-glow { animation: glow-drift 16s ease-in-out infinite alternate; }
+@keyframes glow-drift { from { transform: translate3d(-2%, 0, 0) scale(1); } to { transform: translate3d(3%, 2%, 0) scale(1.08); } }
+.hero-mark { animation: mark-turn 1.5s var(--ease) backwards, mark-float 7s ease-in-out 1.8s infinite; }
+@keyframes mark-float { 50% { translate: 0 -7px; filter: drop-shadow(0 14px 18px rgba(125, 98, 255, .28)); } }
+@supports (animation-timeline: scroll()) {
+  .hero-in { animation: hero-away linear both; animation-timeline: scroll(root); animation-range: 0 85vh; }
+  @keyframes hero-away { to { opacity: 0; transform: translateY(-32px) scale(.94); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-hl .w > span { background-position: 0 0; }
+  .hero-in, .hero-glow, .hero-mark { animation: none; }
+}
 .hero-in .display { max-width: 12.5em; }
 .hero-in .lede { max-width: 36em; }
-.hero-mark { width: clamp(52px, 6vw, 72px); animation: mark-turn 1.5s var(--ease) backwards; transition: rotate .8s var(--spring); }
+.hero-mark { width: clamp(52px, 6vw, 72px); transition: rotate .8s var(--spring); }
 .hero-mark .arm { animation: arm-in 1.1s var(--spring) both; }
 .hero-mark .arm-t { animation-delay: .08s; }
 .hero-mark .arm-l { animation-delay: .16s; }
@@ -162,6 +186,11 @@
 .page-hero-form { padding-bottom: var(--section); }
 .page-hero-form .wrap.form-section > div:first-child { gap: var(--s-5); }
 .contact-alt { list-style: none; display: grid; gap: var(--s-3); margin-top: var(--s-3); }
+.contact-details { display: grid; gap: var(--s-4); margin-top: var(--s-3); padding-top: var(--s-5); border-top: 1px solid var(--line); }
+.contact-details dt { font-size: .8125rem; font-weight: 600; color: var(--violet-700); }
+.contact-details dd { color: var(--ink-2); }
+.contact-details a { text-decoration: underline; text-underline-offset: 3px; }
+.about-legal p { text-align: center; }
 .notfound { padding-block: var(--section); }
 .notfound .hero-mark { margin-bottom: var(--s-3); }
 
@@ -285,15 +314,25 @@
 .lifecycle ul { list-style: none; display: grid; gap: 8px; margin-top: var(--s-3); font-size: .9375rem; font-weight: 500; }
 .lifecycle ul a { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; transition: text-decoration-color .2s, color .2s; }
 .lifecycle ul a:hover { color: var(--violet-700); text-decoration-color: currentColor; }
-.clients { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-4); }
-.client { display: grid; place-items: center; aspect-ratio: 3 / 2; padding: var(--s-4); border-radius: var(--r-lg); background: var(--mist); }
+.clients { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: var(--s-4); max-width: 880px; margin-inline: auto; }
+.client {
+  position: relative; isolation: isolate; overflow: hidden; display: grid; justify-items: center; align-content: start; gap: var(--s-3);
+  padding: clamp(24px, 4vw, 44px); border: 1.5px solid var(--line); border-radius: var(--r-xl); background: #fff; text-align: center;
+  transition: translate .4s var(--ease), box-shadow .4s var(--ease), border-color .3s;
+}
+.client:hover { translate: 0 -4px; border-color: var(--line-strong); box-shadow: var(--shadow-lg); }
+.client-photo { width: calc(100% + 2 * clamp(24px, 4vw, 44px)); max-width: none; margin: calc(-1 * clamp(24px, 4vw, 44px)) 0 var(--s-3); aspect-ratio: 16 / 9; object-fit: cover; }
+.client-logo { width: auto; height: clamp(120px, 14vw, 160px); object-fit: contain; transition: transform .6s var(--spring); }
+.client:hover .client-logo { transform: scale(1.05); }
+.client h3 { font: 500 clamp(1.15rem, 2vw, 1.4rem)/1.2 var(--font-display); letter-spacing: -.02em; }
+.client p { font-size: .9375rem; color: var(--muted); }
 .certs { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); }
 .certs li { padding: var(--s-5); border-radius: var(--r-lg); background: #fff; }
 .about-legal { display: grid; justify-items: center; gap: var(--s-3); color: var(--muted); font-size: .9375rem; }
 .about-legal img { height: 50px; width: auto; }
 @media (max-width: 860px) {
   .about-stats, .lifecycle { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .clients { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
   .certs { grid-template-columns: 1fr; }
 }
 

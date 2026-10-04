@@ -12,7 +12,7 @@ export function login() {
     <div>
       <p class="eyebrow hero-fade">Your Walnut account</p>
       <h1 class="display display-md">${splitWords('Welcome to Walnut.')}</h1>
-      <p class="lede hero-fade" style="--d:.4s">Login to your Walnut account to continue. One account for universities, learners and agents.</p>
+      <p class="lede hero-fade" style="--d:.4s">Login to your Walnut account to continue. One account for universities, learners and partners.</p>
       <ul class="login-points hero-fade" style="--d:.55s">
         <li>${icon('check')}<span>No password needed — we send a one-time code to your email or mobile.</span></li>
         <li>${icon('check')}<span>New to Walnut? The same steps create your account.</span></li>
@@ -27,7 +27,7 @@ export function login() {
 `;
   return {
     title: 'Login',
-    description: 'Login to your Walnut account with a one-time code sent to your email or mobile number — for universities, learners and agents.',
+    description: 'Login to your Walnut account with a one-time code sent to your email or mobile number — for universities, learners and partners.',
     body,
     bodyClass: 'page-contact',
     scripts: ['login.js'],

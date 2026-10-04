@@ -63,8 +63,8 @@ export function applicationLauncher(root) {
             (app) => `<label class="app">
           <input class="sr-only" type="checkbox" name="application" value="${app.id}">
           <span class="app-top"><span class="app-ico">${icon(app.icon)}</span><span class="check-badge" aria-hidden="true">${icon('check')}</span></span>
-          <span class="app-name">${app.launch ?? app.name}</span>
-          <span class="app-desc">${app.launchDesc ?? app.desc}</span>
+          <span class="app-name">${app.name}</span>
+          <span class="app-desc">${app.desc}</span>
         </label>`
           )
           .join('\n        ')}
@@ -86,8 +86,8 @@ export function applicationLauncher(root) {
           return `<div class="launcher-panel" data-app="${app.id}">
         <div>
           <p class="launcher-kicker">Selected</p>
-          <p class="launcher-name">${app.launch ?? app.name}</p>
-          <p class="launcher-url">${app.launch ? `${app.name} · ` : ''}${new URL(app.url).host}</p>
+          <p class="launcher-name">${app.name}</p>
+          <p class="launcher-url">${new URL(app.url).host}</p>
         </div>
         <a class="btn btn-light btn-lg" href="${href}" target="_blank" rel="noopener" data-track="app_open" data-track-item="${app.id}"><span>${app.action}</span>${icon(away ? 'external' : 'arrow')}<span class="sr-only"> (opens in a new tab)</span></a>
       </div>`;

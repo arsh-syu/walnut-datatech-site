@@ -18,7 +18,7 @@ const greeting = () => {
   const hour = new Date().getHours();
   return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 };
-const TYPE = { UNIVERSITY: 'University', STUDENT: 'Learner', AGENT: 'Agent / Partner' };
+const TYPE = { UNIVERSITY: 'University', STUDENT: 'Learner', AGENT: 'Partner' };
 const tick = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
 // What the account is used for: one or several of UNIVERSITY, STUDENT, AGENT (the first is the main one).
@@ -142,11 +142,22 @@ function profilePanel() {
     </form>
     <div class="acct-verify">
       <div class="acct-row"><div><strong>Email</strong><span>${esc(p.email)}</span></div>${p.emailVerified ? `<span class="status-badge is-ok">Verified</span>` : '<button class="btn btn-ghost btn-sm" type="button" data-verify="email"><span>Verify email</span></button>'}</div>
-      <div class="acct-row"><div><strong>Mobile</strong><span>${p.mobile ? esc(p.mobile) : p.mobileCodes === false ? 'Not added' : 'Add a mobile number to login with'}</span></div>${p.mobileVerified ? `<span class="status-badge is-ok">Verified</span>` : ''}</div>
-      ${p.mobileCodes === false ? '' : `<form class="acct-mobile" data-mobile-form novalidate>
-        <div class="field"><label for="profile-mobile">${p.mobile ? 'Change mobile number' : 'Mobile number'}</label><input id="profile-mobile" name="mobile" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+91 98765 43210"></div>
+      <div class="acct-row"><div><strong>Mobile</strong><span>${p.mobile ? esc(p.mobile) : p.phone ? esc(p.phone) : 'Not added yet'}</span></div>${p.mobileVerified ? `<span class="status-badge is-ok">Verified</span>` : p.phone ? '<span class="status-badge">Saved</span>' : ''}</div>
+      ${
+        // With SMS codes the number is proved with an OTP and can then be used to login. Without them it
+        // is still saved to the profile, as the number Walnut can reach the person on.
+        p.mobileCodes === false
+          ? `<form class="acct-mobile" data-phone-form novalidate>
+        <div class="field"><label for="profile-phone">${p.phone ? 'Change mobile number' : 'Add mobile number'}</label><input id="profile-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+91 98765 43210" value="${esc(p.phone ?? '')}"></div>
+        <button class="btn btn-ghost" type="submit"><span>Save number</span></button>
+        <p class="field-help">Login with a mobile OTP is not switched on yet, so for now you login with your email. Your number is kept on your profile.</p>
+      </form>`
+          : `<form class="acct-mobile" data-mobile-form novalidate>
+        <div class="field"><label for="profile-mobile">${p.mobile ? 'Change mobile number' : 'Add mobile number'}</label><input id="profile-mobile" name="mobile" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+91 98765 43210"></div>
         <button class="btn btn-ghost" type="submit"><span>Send OTP</span></button>
-      </form>`}
+        <p class="field-help">We send a one-time code to the number. Once verified, you can login with it.</p>
+      </form>`
+      }
       <div data-verify-box></div>
     </div>
     ${more().length ? `<h3 class="acct-more-title">More from Walnut</h3><ul class="acct-more">${more().map((m) => `<li><div><strong>${m.label}</strong><span>${m.line}</span></div>${m.href ? `<a class="btn btn-ghost btn-sm" href="${m.href}"><span>Open</span></a>` : `<button class="btn btn-ghost btn-sm" type="button" data-start="${m.start}"><span>Start</span></button>`}</li>`).join('')}</ul>` : ''}`;
@@ -159,7 +170,7 @@ function more() {
   // a partner or learner account is not invited into the university one: that flow stays separate.
   if (universityOnly()) return [];
   return [
-    !types.includes('AGENT') && !data.agent.application && !applying && { label: 'Become an agent or partner', line: 'Apply with this account.', start: 'agent' },
+    !types.includes('AGENT') && !data.agent.application && !applying && { label: 'Become a partner', line: 'Apply with this account.', start: 'agent' },
     !types.includes('STUDENT') && !data.student.enrolments.length && { label: 'Take a short course', line: 'Courses bought with this email appear here.', href: `${siteRoot}academy/` },
   ].filter(Boolean);
 }
@@ -195,7 +206,7 @@ function paint() {
       ${typesOf(p).length ? `<p class="acct-chips">${typesOf(p).map((t) => `<span class="chip">${TYPE[t]}</span>`).join('')}</p>` : ''}
       <dl class="acct-facts">
         <div><dt>Email</dt><dd>${esc(p.email)}${p.emailVerified ? ` <span class="acct-ok" title="Verified">${tick}<span class="sr-only">verified</span></span>` : ''}</dd></div>
-        <div><dt>Mobile</dt><dd>${p.mobile ? `${esc(p.mobile)} <span class="acct-ok" title="Verified">${tick}<span class="sr-only">verified</span></span>` : '—'}</dd></div>
+        <div><dt>Mobile</dt><dd>${p.mobile ? `${esc(p.mobile)} <span class="acct-ok" title="Verified">${tick}<span class="sr-only">verified</span></span>` : p.phone ? esc(p.phone) : '—'}</dd></div>
         <div><dt>Member since</dt><dd>${day(p.memberSince)}</dd></div>
       </dl>
       <button class="btn btn-ghost" type="button" data-sign-out><span>Sign out</span></button>
@@ -335,6 +346,20 @@ box.addEventListener('submit', async (e) => {
       setError(input, err.message);
     }
     busy(false);
+  } else if (form.matches('[data-phone-form]')) {
+    const input = form.elements.phone;
+    const phone = input.value.trim();
+    if (!/^[0-9+ ()\-]{7,20}$/.test(phone) || phone.replace(/\D/g, '').length < 8) return setError(input, 'Please enter a valid mobile number.');
+    setError(input, '');
+    busy(true);
+    try {
+      await call('/account/profile', { method: 'PATCH', body: { name: data.profile.name, phone } });
+      track('account_phone_saved');
+      await load();
+    } catch (err) {
+      busy(false);
+      setError(input, err.message);
+    }
   }
 });
 

@@ -130,6 +130,8 @@ a:hover > .link-arrow .ico, .link-arrow:hover .ico { transform: translateX(4px);
 .footer-brand { display: grid; gap: var(--s-5); align-content: start; }
 .footer-brand img { height: 44px; width: auto; }
 .footer-brand p { color: var(--on-dark-muted); max-width: 26em; font-size: .9375rem; }
+.footer-address { display: grid; gap: 6px; max-width: 26em; font-style: normal; font-size: .875rem; color: var(--on-dark-muted); }
+.footer-address a { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
 .footer-col h2 { font: 600 .8125rem var(--font-body); color: var(--on-dark-muted); margin-bottom: var(--s-4); }
 .footer-col ul { list-style: none; display: grid; gap: 4px; }
 .footer-col a { display: inline-block; padding-block: 3px; font-size: .9375rem; color: #e9e7f3; transition: color .2s; }

@@ -7,7 +7,11 @@ export default {
 
   company: {
     name: 'Walnut Data Tech',
-    legalName: 'Walnut DataTech Private Limited',
+    legalName: 'Walnut Data Tech Private Limited',
+    gstin: '09AADCW6322K1Z1',
+    // The address people write to — shown in the footer, on the contact page and in the legal pages.
+    email: 'support@walnutdatatech.com',
+    address: 'Graphix Tower - 1, A 13 A, Block A, Industrial Area, Sector 62, Noida, Uttar Pradesh 201309',
   },
 
   // Email. Enquiries and enrolment confirmations are sent by the site's own API through this
@@ -51,8 +55,14 @@ export default {
     },
   },
 
-  // { name, logo } — logo is a path inside src/assets/img. The "Our clients" section appears once this has entries.
-  clients: [],
+  // The universities Walnut works with: { name, place, logo, width, height }. `logo` is a file in
+  // src/assets/img (WebP); width and height are its size in pixels. The "Clientele" section on the
+  // home and about pages appears once this has entries. `photo` (a campus photograph, also in
+  // src/assets/img) is optional and shown above the name when set.
+  clients: [
+    { name: 'Savitribai Phule Pune University', place: 'Pune, Maharashtra', logo: 'client-sppu.webp', width: 360, height: 346 },
+    { name: 'Guru Ghasidas Vishwavidyalaya', place: 'Bilaspur, Chhattisgarh', logo: 'client-ggv.webp', width: 360, height: 353 },
+  ],
 
   // { name, detail } — e.g. { name: 'ISO 27001', detail: 'Information security management' }
   // The "Certifications" section appears once this has entries.
@@ -62,11 +72,11 @@ export default {
   // NEEDS BUSINESS / LEGAL CONFIRMATION — the pages say so plainly where a value is empty.
   legal: {
     // Date the legal pages were last reviewed, e.g. '2 October 2026'. Update it whenever the wording changes.
-    lastUpdated: '2 October 2026',
+    lastUpdated: '4 October 2026',
     // Where privacy requests, complaints and refund queries should be sent.
-    contactEmail: '',
+    contactEmail: 'support@walnutdatatech.com',
     // Registered office address of the company.
-    registeredAddress: '',
+    registeredAddress: 'Graphix Tower - 1, A 13 A, Block A, Industrial Area, Sector 62, Noida, Uttar Pradesh 201309',
     // Name of the grievance / data-protection contact, if one is appointed.
     grievanceOfficer: '',
     // Refund and cancellation terms for paid courses, in plain sentences.

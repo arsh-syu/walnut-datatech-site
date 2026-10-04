@@ -3,12 +3,12 @@ import { areas, stages } from '../data/services.mjs';
 import { audiences, externalApps } from '../data/site.mjs';
 import { courses, tracks, currency, inr, offerOf } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
-import { button, mark, splitWords, sectionHead, videoTile, enquiryForm, ctaBand, esc, accountPrompt } from './layout.mjs';
+import { button, mark, splitWords, sectionHead, videoTile, enquiryForm, ctaBand, esc, accountPrompt, clientele } from './layout.mjs';
 import { journeySteps, priceFlow, courseCard, appLauncher } from './blocks.mjs';
 
 const audience = (id) => audiences.find((a) => a.id === id);
 
-/* ---------- /partners/ — agents and partners: explore → select an application → open it ---------- */
+/* ---------- /partners/ — partners: explore → select an application → open it ---------- */
 
 export function partners({ root }) {
   const a = audience('partners');
@@ -22,9 +22,9 @@ export function partners({ root }) {
 </section>`
     : '<div class="section-gap"></div>';
   // Applying creates (or continues) a partner application on the Walnut account. Without accounts
-  // switched on there is no application form yet, so the page sends people to Agent Onboard instead.
+  // switched on there is no application form yet, so the page sends people to Partner Onboarding instead.
   const applyHref = config.accounts ? `${root}login/?type=agent` : '#apps';
-  const applyLabel = config.accounts ? 'Start your partner application' : 'Open Agent Onboarding';
+  const applyLabel = config.accounts ? 'Start your partner application' : 'Open Partner Onboarding';
 
   const benefits = [
     ['cap', 'Real programmes to offer', 'Online degree programmes from the universities Walnut works with — so every student you advise has a genuine option.'],
@@ -47,7 +47,7 @@ export function partners({ root }) {
     ['Apply', 'Create your Walnut account and fill in the partner application — about you, where you work, your experience and what you want to work on.'],
     ['We review', 'Our team reads every application. You can come back and edit yours while it is still under review.'],
     ['Get onboarded', 'Once you are approved we take you through onboarding, the programmes on offer and how referrals are handled.'],
-    ['Open your applications', 'Agent Onboard, Course Finder and Online Leads become yours to use — all three are listed below.'],
+    ['Open your applications', 'Partner Onboarding, Course Finder and Online Leads become yours to use — all three are listed below.'],
     ['Start working', 'Advise students, submit them through the programmes you have access to, and work the leads we send.'],
   ];
 
@@ -63,9 +63,9 @@ export function partners({ root }) {
   const body = `
 <section class="page-hero">
   <div class="wrap">
-    <p class="eyebrow hero-fade">For agents and partners</p>
+    <p class="eyebrow hero-fade">For partners</p>
     <h1 class="display display-md">${splitWords('Become a Walnut partner.')}</h1>
-    <p class="lede hero-fade" style="--d:.4s">Get onboarded as a Walnut agent, find the right online programme for every student you advise, and work the leads we send your way.</p>
+    <p class="lede hero-fade" style="--d:.4s">Get onboarded as a Walnut partner, find the right online programme for every student you advise, and work the leads we send your way.</p>
     <div class="actions hero-fade" style="--d:.55s">
       ${button({ href: applyHref, label: applyLabel, size: 'lg', arrow: true })}
       ${config.videos.partnerOnboarding ? `<a class="btn btn-ghost btn-lg" href="#onboarding-video">${icon('play')}<span>Watch the onboarding tutorial</span></a>` : `${button({ href: '#how', label: 'How it works', variant: 'ghost', size: 'lg' })}`}
@@ -142,7 +142,7 @@ export function partners({ root }) {
 
 <section class="section section-dark" id="apps">
   <div class="wrap">
-    ${sectionHead({ eyebrow: 'Partner applications', title: 'Three applications. Pick the one you need.', text: 'New to Walnut? Start with Agent Onboard.' })}
+    ${sectionHead({ eyebrow: 'Partner applications', title: 'Three applications. Pick the one you need.', text: 'New to Walnut? Start with Partner Onboarding.' })}
     <div data-reveal>${appLauncher(root, 'partner-app')}</div>
   </div>
 </section>
@@ -151,7 +151,7 @@ ${onboarding}
 
 ${ctaBand(root, {
   title: 'Questions before you start?',
-  text: 'Tell us about your work and we’ll help you get set up as a Walnut agent.',
+  text: 'Tell us about your work and we’ll help you get set up as a Walnut partner.',
   actions: [
     { href: `${root}contact/`, label: 'Talk to us' },
     { href: '#apply', label: 'Start your application' },
@@ -159,9 +159,9 @@ ${ctaBand(root, {
 })}
 `;
   return {
-    title: 'Partners — become a Walnut agent',
+    title: 'Partners — become a Walnut partner',
     description:
-      'Become a Walnut Data Tech partner: who can apply, what you get, how onboarding works, and the applications education agents use to grow — Agent Onboard, Course Finder and Online Leads.',
+      'Become a Walnut Data Tech partner: who can apply, what you get, how onboarding works, and the applications education partners use to grow — Partner Onboarding, Course Finder and Online Leads.',
     body,
     bodyClass: 'page-partners',
     sticky: { href: applyHref, label: applyLabel },
@@ -454,14 +454,7 @@ export function about({ root }) {
   const links = { universities: 'solutions/', learners: 'academy/', partners: 'partners/' };
 
   // Client and certification sections exist only when there is something real to show.
-  const clients = config.clients.length
-    ? `<section class="section section-mist" id="clients">
-  <div class="wrap">
-    ${sectionHead({ eyebrow: 'Our clients', title: 'The institutions we work with.' })}
-    <ul class="clients" data-reveal>${config.clients.map((c) => `<li class="client"><img src="${root}assets/img/${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></li>`).join('')}</ul>
-  </div>
-</section>`
-    : '';
+  const clients = clientele(root);
 
   const certifications = config.certifications.length
     ? `<section class="section" id="certifications">
@@ -477,7 +470,7 @@ export function about({ root }) {
   <div class="wrap">
     <p class="eyebrow hero-fade">About</p>
     <h1 class="display display-md">${splitWords('We build the technology ecosystem behind online education.')}</h1>
-    <p class="lede hero-fade" style="--d:.7s">${config.company.name} is a technology and services company. We set up and run online programmes for universities, teach career skills through short courses, and give education agents the applications they work with every day.</p>
+    <p class="lede hero-fade" style="--d:.7s">${config.company.name} is a technology and services company. We set up and run online programmes for universities, teach career skills through short courses, and give education partners the applications they work with every day.</p>
   </div>
 </section>
 
@@ -502,7 +495,7 @@ export function about({ root }) {
         <span class="audience-ico">${icon(a.icon)}</span>
         <h3>${a.title}</h3>
         <p>${a.line}</p>
-        <span class="link-arrow"><span>${a.id === 'universities' ? 'For universities' : a.id === 'learners' ? 'For learners' : 'For agents and partners'}</span>${icon('arrow')}</span>
+        <span class="link-arrow"><span>${a.id === 'universities' ? 'For universities' : a.id === 'learners' ? 'For learners' : 'For partners'}</span>${icon('arrow')}</span>
       </a>`
         )
         .join('\n      ')}
@@ -547,12 +540,14 @@ ${certifications}
   <div class="wrap about-legal" data-reveal>
     <img src="${root}assets/img/logo.svg" alt="${esc(config.company.legalName)}" width="260" height="50" loading="lazy">
     <p>${esc(config.company.legalName)}</p>
+    ${config.company.address ? `<p>${esc(config.company.address)}</p>` : ''}
+    ${config.company.gstin ? `<p>GSTIN ${esc(config.company.gstin)}</p>` : ''}
   </div>
 </section>
 
 ${ctaBand(root, {
   title: 'Find your place in the ecosystem.',
-  text: 'University, learner or agent — there’s a path built for you.',
+  text: 'University, learner or partner — there’s a path built for you.',
   actions: [
     { href: `${root}#start`, label: 'Choose your path' },
     { href: `${root}contact/`, label: 'Talk to us' },
@@ -561,7 +556,7 @@ ${ctaBand(root, {
 `;
   return {
     title: 'About',
-    description: `${config.company.name} is a technology and services company for online education — serving universities, learners and education agents.`,
+    description: `${config.company.name} is a technology and services company for online education — serving universities, learners and education partners.`,
     body,
     bodyClass: 'page-about',
   };
@@ -623,8 +618,12 @@ export function contact({ root }) {
       <ul class="contact-alt hero-fade" style="--d:.55s">
         <li><a class="link-arrow" href="${root}configure/"><span>University? Build your solution</span>${icon('arrow')}</a></li>
         <li><a class="link-arrow" href="${root}academy/"><span>Here to learn? Browse courses</span>${icon('arrow')}</a></li>
-        <li><a class="link-arrow" href="${root}partners/"><span>Agent or partner? Join Walnut</span>${icon('arrow')}</a></li>
+        <li><a class="link-arrow" href="${root}partners/"><span>Partner? Join Walnut</span>${icon('arrow')}</a></li>
       </ul>
+      <dl class="contact-details hero-fade" style="--d:.65s">
+        ${config.company.email ? `<div><dt>Email</dt><dd><a href="mailto:${esc(config.company.email)}">${esc(config.company.email)}</a></dd></div>` : ''}
+        ${config.company.address ? `<div><dt>Office</dt><dd>${esc(config.company.legalName)}<br>${esc(config.company.address)}</dd></div>` : ''}
+      </dl>
     </div>
     <div class="form-card hero-fade" style="--d:.3s">
       ${enquiryForm({ id: 'contact', topic: 'General enquiry', root, orgLabel: 'Organisation', messageLabel: 'How can we help?' })}
@@ -634,7 +633,7 @@ export function contact({ root }) {
 `;
   return {
     title: 'Contact',
-    description: `Talk to ${config.company.name} — about online programmes for your university, our short courses, or becoming an agent.`,
+    description: `Talk to ${config.company.name} — about online programmes for your university, our short courses, or becoming a partner.`,
     body,
     bodyClass: 'page-contact',
   };
@@ -698,7 +697,7 @@ export function privacy({ root }) {
       <li><strong>Video platforms</strong> — if you choose to play a video, it is loaded from the platform that hosts it.</li>
       ${ga ? '<li><strong>Google Analytics</strong> — only if you accept analytics cookies.</li>' : ''}
     </ul>
-    <p>Our partner applications (Agent Onboard, Course Finder and Online Leads) open on their own websites and handle information under their own terms. We may also disclose information where the law requires it.</p>`],
+    <p>Our partner applications (Partner Onboarding, Course Finder and Online Leads) open on their own websites and handle information under their own terms. We may also disclose information where the law requires it.</p>`],
       ['cookies', 'Cookies and similar technologies', `<p>This website itself does not set any cookies${ga ? ' unless you accept analytics' : ''}. It stores a small amount of information in your browser so the site works as you expect:</p>
     <ul>
       <li><strong>Your chosen path</strong> — the homepage remembers whether you chose universities, courses or partners.</li>
@@ -738,7 +737,7 @@ export function terms({ root }) {
     </ul>`],
       ['payments', 'Payments', `<p>Payments are processed by Razorpay. Your payment details are entered on Razorpay’s checkout and are subject to Razorpay’s terms; we do not see or store them. If a payment is deducted but your enrolment is not confirmed on screen, contact us with your payment reference and we will resolve it.</p>`],
       ['refunds', 'Refunds and cancellations', legal.refundPolicy ? `<p>${esc(legal.refundPolicy)}</p>` : `<p>To cancel an enrolment or ask for a refund, ${contactLine(root)} with your payment reference. Requests are handled in line with our refund policy and applicable consumer law.</p>`],
-      ['partners', 'Partner applications and external links', `<p>Agent Onboard, Course Finder and Online Leads are separate applications that open on their own websites and have their own terms. This website may also link to other third-party sites. We are not responsible for the content or practices of websites we do not operate.</p>`],
+      ['partners', 'Partner applications and external links', `<p>Partner Onboarding, Course Finder and Online Leads are separate applications that open on their own websites and have their own terms. This website may also link to other third-party sites. We are not responsible for the content or practices of websites we do not operate.</p>`],
       ['ip', 'Intellectual property', `<p>The content of this website — including text, design, graphics, logos and course materials — belongs to ${esc(config.company.legalName)} or its licensors. You may view it for your own use. You may not copy, republish or use it commercially without our written permission.</p>`],
       ['liability', 'Availability and liability', `<p>We work to keep this website accurate and available, but we provide it “as is” and cannot promise that it will always be available or free of errors. To the extent the law allows, we are not liable for indirect or consequential loss arising from your use of the website. Nothing in these terms limits any right you have under law that cannot be excluded.</p>`],
       ['suspension', 'Suspension', `<p>We may restrict or end access to the website or to a course for anyone who breaks these terms.</p>`],
