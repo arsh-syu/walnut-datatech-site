@@ -98,37 +98,26 @@ const transcript = (run) =>
     .map((line) => `      ${line}`)
     .join('\n');
 
-// Files go up a few at a time, and a batch the server drops is sent again. If it still will not go,
-// one file is sent on its own with the conversation recorded, so the reason is shown rather than
-// guessed. Sending a file twice is harmless: each upload replaces the whole file.
+// Each file goes up on a connection of its own. This host confirms the first file of a connection
+// and then stops answering for the ones that follow, so sending several per connection stalls;
+// one at a time is slower but goes through. A file that fails is tried again, and if it still will
+// not go the conversation with the server is shown. Sending a file twice is harmless: each upload
+// replaces the whole file.
 function upload(files, remoteDir) {
-  const BATCH = 10;
-  const send = (batch, extra = []) => {
-    const lines = ['ftp-create-dirs', 'fail-early', ...extra];
-    for (const [local, remote] of batch) lines.push(`upload-file = ${q(local)}`, `url = ${q(ftpUrl(remoteDir + remote))}`);
-    return curl(lines, { quiet: true });
-  };
-  for (let start = 0; start < files.length; start += BATCH) {
-    const batch = files.slice(start, start + BATCH);
-    const range = `${start + 1}–${start + batch.length} of ${files.length}`;
-    if (send(batch).status === 0) {
-      console.log(`  ✓ files ${range}`);
-      continue;
+  const TRIES = 3;
+  const send = (file, extra = []) => curl(['ftp-create-dirs', ...extra, `upload-file = ${q(file[0])}`, `url = ${q(ftpUrl(remoteDir + file[1]))}`], { quiet: true });
+  files.forEach((file, i) => {
+    for (let attempt = 1; attempt <= TRIES; attempt++) {
+      const run = send(file, attempt === TRIES ? ['verbose'] : []);
+      if (run.status === 0) break;
+      if (attempt === TRIES) {
+        console.log(`  ${file[1]} could not be uploaded: ${(run.stderr.match(/curl: \(\d+\)[^\n]*/) || [run.stderr.trim().split('\n').pop() || 'no answer'])[0]}\n    What the server said last:\n${transcript(run) || '      (nothing)'}`);
+        fail(`Upload stopped at file ${i + 1} of ${files.length}.${i ? ` The first ${i} are in place; run the deploy again to finish.` : ''}`);
+      }
+      spawnSync('sleep', [String(3 * attempt)]);
     }
-    console.log(`  The server stopped answering; trying files ${range} again …`);
-    spawnSync('sleep', ['5']);
-    if (send(batch).status === 0) {
-      console.log(`  ✓ files ${range}`);
-      continue;
-    }
-    const run = send([batch[0]], ['verbose']);
-    if (run.status === 0) {
-      console.log(`  ${batch[0][1]} went through on its own — the server is slow rather than refusing. Run the deploy again.`);
-    } else {
-      console.log(`  ${batch[0][1]} could not be uploaded: ${(run.stderr.match(/curl: \(\d+\)[^\n]*/) || [run.stderr.trim().split('\n').pop() || 'no answer'])[0]}\n    What the server said last:\n${transcript(run) || '      (nothing)'}`);
-    }
-    fail(`Upload stopped at files ${range}.${start ? ' The earlier files are in place.' : ' Nothing was uploaded.'}`);
-  }
+    if ((i + 1) % 10 === 0 || i + 1 === files.length) console.log(`  ✓ ${i + 1} of ${files.length}`);
+  });
 }
 
 const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]));
