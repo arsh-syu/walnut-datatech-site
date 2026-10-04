@@ -251,7 +251,9 @@ test('login and the dashboard are part of this site, and built only when account
   assert.ok(!existsSync(join(dist, 'login')) && !existsSync(join(dist, 'dashboard')), 'and the login and dashboard pages are not built');
 
   const out = mkdtempSync(join(tmpdir(), 'walnut-account-'));
-  const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, ACCOUNTS: '1', OUT_DIR: out } });
+  // A production build, whatever this run itself is (the preview mirror sets NOINDEX and its own SITE_URL).
+  const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8',
+    env: { ...process.env, ACCOUNTS: '1', OUT_DIR: out, NOINDEX: '', SITE_URL: 'https://walnutdatatech.com' } });
   assert.equal(built.status, 0, built.stderr);
   const made = (path) => readFileSync(join(out, path), 'utf8');
   assert.ok(made('index.html').includes('href="login/" data-account-link data-profile="dashboard/"') && made('index.html').includes('login/?type=student'), 'the header and the audience links lead to the site\'s own login');
