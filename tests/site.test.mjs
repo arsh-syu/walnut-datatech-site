@@ -526,6 +526,8 @@ test('form choices: the country is a searchable list, short lists stay in view, 
   assert.ok(fieldHtml(programmes, ['MBA', 'BCA'], 'cfg').includes('data-pick-count>2 selected<'));
   assert.ok(fieldHtml(programmes, [], 'cfg').includes('data-pick-count></span>'));
   assert.ok(readFileSync(join(dist, 'index.html'), 'utf8').includes('data-launcher-count'), 'so does the application selector');
+  // …and it still shows a button for every application chosen (all the panels, not just the first).
+  assert.ok(readFileSync(join(dist, 'assets/js/main.js'), 'utf8').includes("const panels = $$('.launcher-panel', root);"));
   // An option University switches off says why, and how to get it back.
   const roles = readFileSync(join(dist, 'assets/js/roles.js'), 'utf8');
   assert.ok(roles.includes('Untick University to choose this.') && roles.includes("className: 'why-off'"));

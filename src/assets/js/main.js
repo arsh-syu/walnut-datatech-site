@@ -366,7 +366,7 @@ $$('[data-tabs]').forEach((root) => {
 /* ---------- application launcher: each choice shows its own action; University cannot be combined ---------- */
 
 $$('[data-launcher]').forEach((root) => {
-  const panels = $('.launcher-panel', root);
+  const panels = $$('.launcher-panel', root);
   const count = $('[data-launcher-count]', root);
   const prompt = count?.textContent;
   const inputs = () => $$('input[type="radio"], input[type="checkbox"]', root);
