@@ -289,6 +289,21 @@ a.social:hover { background: var(--violet-600); transform: translateY(-3px); }
 .pill input:checked + span { border-color: var(--violet-600); background: var(--violet-soft); color: var(--violet-700); }
 .pill input:focus-visible + span { outline: 2px solid var(--violet-600); outline-offset: 2px; }
 .field-set.has-error .pill span { border-color: var(--danger); }
+/* how many are ticked so far */
+.pick-count:empty { display: none; }
+.pick-count { margin-left: 6px; padding: 2px 9px; border-radius: 999px; background: var(--violet-soft); color: var(--violet-700); font-size: .75rem; font-weight: 600; }
+/* a long list searched by typing; it opens upwards (.is-up) when there is no room below */
+.combo { position: relative; }
+.combo-list {
+  position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 6px); margin: 0; padding: 6px; list-style: none; overflow-y: auto; overscroll-behavior: contain;
+  border: 1.5px solid var(--line-strong); border-radius: 14px; background: #fff; box-shadow: var(--shadow-lg);
+}
+.combo-list[hidden] { display: none; }
+.combo.is-up .combo-list { top: auto; bottom: calc(100% + 6px); }
+.combo-option { padding: .62em .8em; border-radius: 10px; cursor: pointer; }
+.combo-option:hover { background: var(--mist); }
+.combo-option[aria-selected="true"] { background: var(--violet-soft); color: var(--violet-700); font-weight: 500; }
+.combo-note { padding: .62em .8em; font-size: .875rem; color: var(--muted); }
 /* the same choice drawn as tick boxes */
 .pills-boxes .pill span { display: flex; align-items: center; gap: 10px; padding: .7em 1.1em .7em .8em; border-radius: 14px; }
 .pills-boxes .pill span::before {

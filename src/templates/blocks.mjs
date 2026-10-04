@@ -56,7 +56,7 @@ export function applicationLauncher(root) {
   };
   return `<div class="launcher" data-launcher data-exclusive-group>
     <fieldset class="launcher-set">
-      <legend><span>Select your applications</span><small>Choose one or more</small></legend>
+      <legend><span>Select your applications</span><small data-launcher-count>Choose one or more</small></legend>
       <div class="launcher-options">
         ${apps
           .map(

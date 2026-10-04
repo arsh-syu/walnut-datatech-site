@@ -158,7 +158,9 @@
 .app:has(input:checked) .check-badge { background: var(--violet-600); border-color: var(--violet-600); animation: pop .45s var(--spring); }
 .app:has(input:checked) .check-badge path { stroke-dashoffset: 0; }
 /* an option that cannot be combined with the current choice */
-.app.is-disabled { opacity: .42; cursor: not-allowed; }
+.app.is-disabled { cursor: not-allowed; }
+.app.is-disabled > :not(.why-off) { opacity: .42; }
+.app .why-off { margin-top: 6px; font-size: .8125rem; font-weight: 500; color: #b3a3ff; }
 .app.is-disabled:hover { translate: 0 0; border-color: rgba(255, 255, 255, .14); }
 /* University: one wide card on its own row, set apart from the three applications */
 .launcher-or { display: flex; align-items: center; gap: 14px; margin-block: var(--s-4); font-size: .8125rem; font-weight: 500; color: var(--on-dark-muted); }

@@ -41,8 +41,9 @@
 .login-purpose:hover > span { border-color: var(--line-strong); }
 .login-purpose input:checked + span { border-color: var(--violet-600); background: #faf9ff; box-shadow: 0 0 0 4px rgba(125, 98, 255, .16); }
 .login-purpose.is-disabled { cursor: not-allowed; }
-.login-purpose.is-disabled > span { opacity: .45; }
-.login-purpose.is-disabled:hover > span { border-color: var(--line); }
+.login-purpose.is-disabled > span:not(.why-off) { opacity: .45; }
+.login-purpose > .why-off { display: block; margin: 4px 2px 0; padding: 0 16px; border: 0; background: none; font-size: .8125rem; font-weight: 500; color: var(--violet-700); }
+.login-purpose.is-disabled:hover > span:not(.why-off) { border-color: var(--line); }
 [data-exclusive-note]:empty { display: none; }
 [data-exclusive-note] { margin-top: var(--s-2); font-weight: 500; color: var(--violet-700); }
 .login-purpose input:focus-visible + span { outline: 2px solid var(--violet-600); outline-offset: 2px; }

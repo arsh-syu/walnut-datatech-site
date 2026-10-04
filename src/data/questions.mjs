@@ -4,8 +4,9 @@
 //   id        the key the answer is stored and sent under (camelCase; the Onboarding Tool shows it as a label)
 //   audience  'university' | 'student' | 'agent' — who is asked
 //   section   groups questions into a step or a block of the form
-//   type      text | email | tel | url | number | textarea | select | choice (pick one) | multi (pick several)
-//   options   for select / choice / multi (`boxes: true` draws a multi as tick boxes instead of pills)
+//   type      text | email | tel | url | number | textarea | select | combo (a long list, searched by typing) | choice (pick one) | multi (pick several)
+//             Three options or fewer: use `choice`, so they are all in view. A long list: use `combo`.
+//   options   for select / combo / choice / multi (`boxes: true` draws a multi as tick boxes instead of pills)
 //   required  true to insist on an answer (only while the question is shown); `error` / `invalid` reword the messages
 //   showIf / hideIf   { all: [...], any: [...] } of { field, op, value }
 //             op: equals | notEquals | contains | notContains | answered
@@ -17,6 +18,7 @@
 // every other answer travels in the request's `form` data, so no answer is dropped.
 
 import { mainProgrammes, otherProgrammes } from './programmes.mjs';
+import { countries } from './countries.mjs';
 
 const has = (slug) => ({ all: [{ field: 'services', op: 'contains', value: slug }] });
 const YES_NO_UNSURE = ['Yes', 'No', 'Not sure yet'];
@@ -36,7 +38,7 @@ const university = [
   { id: 'launchTimeline', section: 'requirements', group: 'Your online programmes', label: 'When would you like to start?', type: 'choice',
     options: ['Within 3 months', '3 to 6 months', '6 to 12 months', 'Not decided'] },
 
-  { id: 'lmsStatus', section: 'requirements', group: 'Infrastructure', label: 'Do you have a learning management system (LMS)?', type: 'select', showIf: has('infrastructure'),
+  { id: 'lmsStatus', section: 'requirements', group: 'Infrastructure', label: 'Do you have a learning management system (LMS)?', type: 'choice', wide: true, showIf: has('infrastructure'),
     options: ['No, we need one', 'Yes, and we want to keep it', 'Yes, but we want to replace it'] },
   { id: 'lmsName', section: 'requirements', group: 'Infrastructure', label: 'Which LMS do you use?', type: 'text',
     showIf: { all: [{ field: 'services', op: 'contains', value: 'infrastructure' }, { field: 'lmsStatus', op: 'contains', value: 'Yes' }] } },
@@ -84,7 +86,8 @@ const university = [
   { id: 'address', section: 'university', label: 'Address', type: 'text', autocomplete: 'street-address', wide: true },
   { id: 'city', section: 'university', label: 'City', type: 'text', required: true, autocomplete: 'address-level2' },
   { id: 'state', section: 'university', label: 'State', type: 'text', required: true, autocomplete: 'address-level1' },
-  { id: 'country', section: 'university', label: 'Country', type: 'text', required: true, autocomplete: 'country-name', value: 'India' },
+  { id: 'country', section: 'university', label: 'Country', type: 'combo', required: true, options: countries, value: 'India', help: 'Type the first three letters to find a country.',
+    error: 'Please choose a country from the list.', none: 'No country found. Check the spelling.' },
   { id: 'postalCode', section: 'university', label: 'PIN / postal code', type: 'text', autocomplete: 'postal-code', maxLength: 12 },
   { id: 'accreditation', section: 'university', label: 'Accreditation and approvals', type: 'textarea', wide: true, placeholder: 'e.g. NAAC A+, UGC-DEB approval for online programmes' },
 

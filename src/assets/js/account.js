@@ -4,7 +4,7 @@
 import { track } from './analytics.js';
 import { portal, siteRoot, esc, call, restore, signOut, paintHeader } from './session.js';
 import { otpStep } from './otp.js';
-import { isShown, fieldHtml, readAnswer, display } from './questions.js';
+import { isShown, fieldHtml, readAnswer, display, bindFields } from './questions.js';
 import { setError } from './forms.js';
 
 const box = document.getElementById('account');
@@ -278,6 +278,8 @@ box.addEventListener('keydown', (e) => {
   paint();
   document.getElementById(`tab-${tab}`)?.focus();
 });
+
+bindFields(box, (id) => data.agent.questions.find((q) => q.id === id));
 
 // Answers to the agent questions; an answer can bring further questions with it.
 box.addEventListener('input', (e) => {

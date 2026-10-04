@@ -4,7 +4,7 @@
 
 import { track } from './analytics.js';
 import { setError, deliver } from './forms.js';
-import { isShown, clean, problemWith, display, fieldHtml, readAnswer } from './questions.js';
+import { isShown, clean, problemWith, display, fieldHtml, readAnswer, bindFields } from './questions.js';
 
 const { data, icons } = JSON.parse(document.getElementById('cfg-data').textContent);
 const root = document.querySelector('[data-configurator]');
@@ -521,6 +521,8 @@ root.addEventListener('click', (e) => {
     });
   }
 });
+
+bindFields(root, (id) => questions.find((q) => q.id === id)); // searchable lists and "2 selected" counts
 
 // Answers to the questions. `input` covers typing as well as selects, radios and checkboxes.
 root.addEventListener('input', (e) => {

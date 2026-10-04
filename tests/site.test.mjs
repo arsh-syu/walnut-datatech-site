@@ -366,8 +366,10 @@ test('the questions are data: unique ids, known types and conditions that point 
   const slugs = areas.map((a) => a.slug);
   for (const q of questions) {
     assert.match(q.id, /^[a-z][A-Za-z0-9]{0,39}$/, q.id);
-    assert.ok(['text', 'email', 'tel', 'url', 'number', 'textarea', 'select', 'choice', 'multi'].includes(q.type), `${q.id}: ${q.type}`);
-    assert.equal(['select', 'choice', 'multi'].includes(q.type), Array.isArray(q.options), `${q.id} options`);
+    assert.ok(['text', 'email', 'tel', 'url', 'number', 'textarea', 'select', 'combo', 'choice', 'multi'].includes(q.type), `${q.id}: ${q.type}`);
+    assert.equal(['select', 'combo', 'choice', 'multi'].includes(q.type), Array.isArray(q.options), `${q.id} options`);
+    // Three options or fewer stay in view; a dropdown is for the lists in between, a searchable list for the long ones.
+    if (q.type === 'select') assert.ok(q.options.length > 3 && q.options.length <= 20, `${q.id}: ${q.options.length} options do not belong in a dropdown`);
     for (const c of [q.showIf, q.hideIf].flatMap((rule) => [...(rule?.all ?? []), ...(rule?.any ?? [])])) {
       assert.ok(['equals', 'notEquals', 'contains', 'notContains', 'answered'].includes(c.op), `${q.id}: ${c.op}`);
       if (c.field === 'services') assert.ok(slugs.includes(c.value), `${q.id} depends on an unknown service "${c.value}"`);
@@ -495,4 +497,36 @@ test('server configuration sets security headers and caching', () => {
   assert.match(api, /config\|catalog\|lib/);
   assert.match(api, /lib\|account-lib/, 'the account library is not served');
   assert.match(api, /\(emails\|agent-questions\)\\\.json/, 'email templates and the partner questions are not served');
+});
+
+test('form choices: the country is a searchable list, short lists stay in view, counts and disabled options explain themselves', async () => {
+  const { countries } = await import('../src/data/countries.mjs');
+  const { search, fieldHtml, clean, problemWith } = await import('../src/assets/js/questions.js');
+  assert.ok(countries.length > 190 && new Set(countries).size === countries.length && countries.includes('India'));
+
+  const country = questions.find((q) => q.id === 'country');
+  assert.ok(country.type === 'combo' && country.required && country.options === countries && country.value === 'India');
+  // Three letters are enough, the best match comes first, and accents or capitals do not matter.
+  assert.deepEqual(search(countries, 'ind'), ['India', 'Indonesia']);
+  assert.equal(search(countries, 'UNITED k')[0], 'United Kingdom');
+  assert.equal(search(countries, 'cote')[0], 'Côte d’Ivoire');
+  assert.equal(search(countries, 'kor')[0], 'North Korea', 'a later word can be searched for too');
+  assert.deepEqual(search(countries, 'zzz'), []);
+  // Only a country from the list is an answer.
+  assert.equal(clean(country, 'Indi'), '');
+  assert.equal(problemWith(country, ''), 'Please choose a country from the list.');
+  assert.equal(problemWith(country, 'India'), '');
+  const html = fieldHtml(country, 'India', 'cfg');
+  assert.ok(html.includes('role="combobox"') && html.includes('role="listbox"') && html.includes('aria-controls="cfg-country-list"') && html.includes('value="India"'));
+
+  // The LMS question has three answers: shown as three choices, not a dropdown.
+  assert.equal(questions.find((q) => q.id === 'lmsStatus').type, 'choice');
+  // A question that takes several answers counts them.
+  const programmes = questions.find((q) => q.id === 'programmes');
+  assert.ok(fieldHtml(programmes, ['MBA', 'BCA'], 'cfg').includes('data-pick-count>2 selected<'));
+  assert.ok(fieldHtml(programmes, [], 'cfg').includes('data-pick-count></span>'));
+  assert.ok(readFileSync(join(dist, 'index.html'), 'utf8').includes('data-launcher-count'), 'so does the application selector');
+  // An option University switches off says why, and how to get it back.
+  const roles = readFileSync(join(dist, 'assets/js/roles.js'), 'utf8');
+  assert.ok(roles.includes('Untick University to choose this.') && roles.includes("className: 'why-off'"));
 });

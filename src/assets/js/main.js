@@ -366,11 +366,14 @@ $$('[data-tabs]').forEach((root) => {
 /* ---------- application launcher: each choice shows its own action; University cannot be combined ---------- */
 
 $$('[data-launcher]').forEach((root) => {
-  const panels = $$('.launcher-panel', root);
+  const panels = $('.launcher-panel', root);
+  const count = $('[data-launcher-count]', root);
+  const prompt = count?.textContent;
   const inputs = () => $$('input[type="radio"], input[type="checkbox"]', root);
   const show = () => {
     const chosen = inputs().filter((input) => input.checked).map((input) => input.value);
     root.classList.toggle('has-selection', chosen.length > 0);
+    if (count) count.textContent = chosen.length ? `${chosen.length} selected` : prompt;
     panels.forEach((p) => p.classList.toggle('is-active', chosen.includes(p.dataset.app)));
   };
   root.addEventListener('change', show);
