@@ -340,6 +340,10 @@ test('the site speaks of partners, names its clients and carries the company det
     assert.ok(html.includes('id="clients"') && html.includes('Savitribai Phule Pune University') && html.includes('Guru Ghasidas Vishwavidyalaya'), `${path || 'home'} lists the clientele`);
     assert.ok(html.includes('assets/img/client-sppu.webp') && html.includes('assets/img/client-ggv.webp'));
   }
+  // On the home page it is the closing section: a real heading, and nothing after it but the footer.
+  const main = page('').slice(page('').indexOf('<main'), page('').indexOf('</main>'));
+  assert.equal((main.match(/id="clients"/g) || []).length, 1, 'one Clientele section, not two');
+  assert.ok(main.includes('<h2 class="title">Clientele</h2>') && !/<section[\s>]/.test(main.slice(main.indexOf('id="clients"'))), 'Clientele is the last section of the home page');
   for (const logo of ['client-sppu.webp', 'client-ggv.webp']) assert.equal(readFileSync(join(dist, 'assets/img', logo)).subarray(8, 12).toString(), 'WEBP', `${logo} is a WebP image`);
   const home = page('');
   assert.ok(home.includes('support@walnutdatatech.com') && home.includes('Sector 62, Noida') && home.includes('GSTIN 09AADCW6322K1Z1'), 'the footer carries the address, email and GSTIN');

@@ -138,8 +138,6 @@ export default function home({ root }) {
 
 ${film}
 
-${clientele(root, { mist: false })}
-
 <section class="section section-dark" id="apps">
   <div class="wrap">
     ${sectionHead({ eyebrow: 'Walnut applications', title: 'Already working with us? Open your application.', text: 'Choose the applications you need — one or several — and open each from here. University applications are handled on their own.' })}
@@ -155,6 +153,8 @@ ${ctaBand(root, {
     { href: '#start', label: 'Choose your path' },
   ],
 })}
+
+${clientele(root)}
 `;
 
   return {

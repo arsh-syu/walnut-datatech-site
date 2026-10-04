@@ -314,18 +314,25 @@
 .lifecycle ul { list-style: none; display: grid; gap: 8px; margin-top: var(--s-3); font-size: .9375rem; font-weight: 500; }
 .lifecycle ul a { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; transition: text-decoration-color .2s, color .2s; }
 .lifecycle ul a:hover { color: var(--violet-700); text-decoration-color: currentColor; }
-.clients { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: var(--s-4); max-width: 880px; margin-inline: auto; }
+/* Clientele: a compact closing section. Heading, one line, then small cards — logo beside the name. */
+/* the call-to-action before it gives up most of its bottom space, so the two read as one close */
+.cta-band:has(+ .clientele) { padding-bottom: clamp(40px, 6vw, 72px); }
+.clientele-head { display: grid; justify-items: center; gap: var(--s-2); margin-bottom: clamp(20px, 3vw, 32px); text-align: center; }
+.clients { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--s-3); max-width: 920px; margin-inline: auto; }
 .client {
-  position: relative; isolation: isolate; overflow: hidden; display: grid; justify-items: center; align-content: start; gap: var(--s-3);
-  padding: clamp(24px, 4vw, 44px); border: 1.5px solid var(--line); border-radius: var(--r-xl); background: #fff; text-align: center;
+  display: flex; align-items: center; gap: var(--s-4); min-width: 0;
+  padding: 16px 20px; border: 1.5px solid var(--line); border-radius: var(--r-lg); background: #fff;
   transition: translate .4s var(--ease), box-shadow .4s var(--ease), border-color .3s;
 }
-.client:hover { translate: 0 -4px; border-color: var(--line-strong); box-shadow: var(--shadow-lg); }
-.client-photo { width: calc(100% + 2 * clamp(24px, 4vw, 44px)); max-width: none; margin: calc(-1 * clamp(24px, 4vw, 44px)) 0 var(--s-3); aspect-ratio: 16 / 9; object-fit: cover; }
-.client-logo { width: auto; height: clamp(120px, 14vw, 160px); object-fit: contain; transition: transform .6s var(--spring); }
-.client:hover .client-logo { transform: scale(1.05); }
-.client h3 { font: 500 clamp(1.15rem, 2vw, 1.4rem)/1.2 var(--font-display); letter-spacing: -.02em; }
-.client p { font-size: .9375rem; color: var(--muted); }
+.client:hover { translate: 0 -3px; border-color: var(--line-strong); box-shadow: var(--shadow-sm); }
+.client-logo { flex: none; width: 72px; height: 72px; object-fit: contain; }
+.client > div { display: grid; gap: 2px; min-width: 0; }
+.client h3 { font: 500 1.0625rem/1.25 var(--font-display); letter-spacing: -.02em; overflow-wrap: anywhere; }
+.client p { font-size: .875rem; color: var(--muted); }
+@media (max-width: 520px) {
+  .client { padding: 14px 16px; gap: var(--s-3); }
+  .client-logo { width: 56px; height: 56px; }
+}
 .certs { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); }
 .certs li { padding: var(--s-5); border-radius: var(--r-lg); background: #fff; }
 .about-legal { display: grid; justify-items: center; gap: var(--s-3); color: var(--muted); font-size: .9375rem; }

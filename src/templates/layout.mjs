@@ -41,21 +41,23 @@ export function splitWords(text, from = 0) {
     .join(' ');
 }
 
-// The universities Walnut works with, as cards: logo, name and where it is. Used on the home and
-// about pages; renders nothing until `clients` in site.config.mjs has entries.
-export function clientele(root, { mist = true } = {}) {
+// The universities Walnut works with: a compact closing section — the heading, one line under it and
+// a row of cards (logo beside the name). Used as the last section of the home page and on the about
+// page; renders nothing until `clients` in site.config.mjs has entries.
+export function clientele(root) {
   if (!config.clients.length) return '';
-  return `<section class="section${mist ? ' section-mist' : ''}" id="clients">
+  return `<section class="section-tight section-mist clientele" id="clients">
   <div class="wrap">
-    ${sectionHead({ eyebrow: 'Clientele', title: 'The universities we work with.', center: true })}
+    <header class="clientele-head" data-reveal>
+      <h2 class="title">Clientele</h2>
+      <p class="lede">The universities we work with.</p>
+    </header>
     <ul class="clients">
       ${config.clients
         .map(
-          (c, i) => `<li class="client spot" data-reveal style="--d:${i * 0.1}s">
-        ${c.photo ? `<img class="client-photo" src="${root}assets/img/${esc(c.photo)}" alt="${esc(c.name)} campus" loading="lazy">` : ''}
+          (c, i) => `<li class="client" data-reveal style="--d:${i * 0.08}s">
         <img class="client-logo" src="${root}assets/img/${esc(c.logo)}" alt="${esc(c.name)} logo" width="${c.width}" height="${c.height}" loading="lazy">
-        <h3>${esc(c.name)}</h3>
-        ${c.place ? `<p>${esc(c.place)}</p>` : ''}
+        <div><h3>${esc(c.name)}</h3>${c.place ? `<p>${esc(c.place)}</p>` : ''}</div>
       </li>`
         )
         .join('\n      ')}

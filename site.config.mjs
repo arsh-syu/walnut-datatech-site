@@ -56,9 +56,8 @@ export default {
   },
 
   // The universities Walnut works with: { name, place, logo, width, height }. `logo` is a file in
-  // src/assets/img (WebP); width and height are its size in pixels. The "Clientele" section on the
-  // home and about pages appears once this has entries. `photo` (a campus photograph, also in
-  // src/assets/img) is optional and shown above the name when set.
+  // src/assets/img (WebP); width and height are its size in pixels. The "Clientele" section — the
+  // last section of the home page, and on the about page — appears once this has entries.
   clients: [
     { name: 'Savitribai Phule Pune University', place: 'Pune, Maharashtra', logo: 'client-sppu.webp', width: 360, height: 346 },
     { name: 'Guru Ghasidas Vishwavidyalaya', place: 'Bilaspur, Chhattisgarh', logo: 'client-ggv.webp', width: 360, height: 353 },
