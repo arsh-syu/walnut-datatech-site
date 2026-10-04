@@ -5,7 +5,7 @@
 //   audience  'university' | 'student' | 'agent' — who is asked
 //   section   groups questions into a step or a block of the form
 //   type      text | email | tel | url | number | textarea | select | choice (pick one) | multi (pick several)
-//   options   for select / choice / multi
+//   options   for select / choice / multi (`boxes: true` draws a multi as tick boxes instead of pills)
 //   required  true to insist on an answer (only while the question is shown); `error` / `invalid` reword the messages
 //   showIf / hideIf   { all: [...], any: [...] } of { field, op, value }
 //             op: equals | notEquals | contains | notContains | answered
@@ -16,16 +16,23 @@
 // (organisation → universityName, institutionType → universityType, name → contactName, email, phone);
 // every other answer travels in the request's `form` data, so no answer is dropped.
 
+import { mainProgrammes, otherProgrammes } from './programmes.mjs';
+
 const has = (slug) => ({ all: [{ field: 'services', op: 'contains', value: slug }] });
 const YES_NO_UNSURE = ['Yes', 'No', 'Not sure yet'];
 
 const university = [
-  /* ---- requirements: asked after the services are chosen ---- */
+  /* ---- requirements & builds: asked after the services are chosen ---- */
+  // Programme selection: tick boxes, with the longer list behind "Other" (src/data/programmes.mjs).
+  { id: 'programmes', section: 'requirements', group: 'Programme selection', label: 'Which programme do you want to apply for?', type: 'multi', boxes: true, wide: true, required: true,
+    options: [...mainProgrammes, 'Other'], error: 'Please choose at least one programme.' },
+  { id: 'programmeOther', section: 'requirements', group: 'Programme selection', label: 'Other programme', type: 'select', required: true, options: otherProgrammes,
+    error: 'Please choose the programme from the list.', showIf: { all: [{ field: 'programmes', op: 'contains', value: 'Other' }] } },
+
   { id: 'onlineStatus', section: 'requirements', group: 'Your online programmes', label: 'Where are you with online programmes today?', type: 'select', required: true,
     options: ['We already run online programmes', 'We have approval and are preparing to launch', 'We are applying for approval', 'We are exploring the idea'] },
   { id: 'expectedStudents', section: 'requirements', group: 'Your online programmes', label: 'Expected students in the first year', type: 'select', required: true,
     options: ['Fewer than 500', '500 to 2,000', '2,000 to 10,000', 'More than 10,000', 'Not sure yet'] },
-  { id: 'programmesPlanned', section: 'requirements', group: 'Your online programmes', label: 'Programmes you plan to offer online', type: 'text', wide: true, placeholder: 'e.g. MBA, BBA, MCA' },
   { id: 'launchTimeline', section: 'requirements', group: 'Your online programmes', label: 'When would you like to start?', type: 'choice',
     options: ['Within 3 months', '3 to 6 months', '6 to 12 months', 'Not decided'] },
 

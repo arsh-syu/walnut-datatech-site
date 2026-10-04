@@ -48,6 +48,7 @@ const enrolment = {
   rows: [['Course', 'Online Programme Course'], ['Amount paid', '₹499'], ['Coupon', 'SYUSANDEEP'], ['Payment reference', 'pay_TESTsample0001']],
 };
 const samples = [
+  ['otp', 'Login code → visitor', { code: '482913', purpose: 'sign in to your Walnut account', minutes: '5' }, []],
   ['enquiry_notify', 'Enquiry → team', enquiry.vars, [...enquiry.rows, ['Sent from', '/configure/']]],
   ['enquiry_ack', 'Enquiry → visitor', enquiry.vars, enquiry.rows],
   ['enrol_confirm', 'Enrolment → learner', enrolment.vars, enrolment.rows],

@@ -3,6 +3,7 @@
 import { initForms } from './forms.js';
 import { initAnalytics, track } from './analytics.js';
 import { paintHeader } from './session.js';
+import { keepExclusive } from './roles.js';
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -362,20 +363,25 @@ $$('[data-tabs]').forEach((root) => {
   if (fromHash() >= 0) root.scrollIntoView({ block: 'start' });
 });
 
-/* ---------- application launcher: one choice → its action button ---------- */
+/* ---------- application launcher: each choice shows its own action; University cannot be combined ---------- */
 
 $$('[data-launcher]').forEach((root) => {
   const panels = $$('.launcher-panel', root);
-  const show = (id) => {
-    root.classList.add('has-selection');
-    panels.forEach((p) => p.classList.toggle('is-active', p.dataset.app === id));
+  const inputs = () => $$('input[type="radio"], input[type="checkbox"]', root);
+  const show = () => {
+    const chosen = inputs().filter((input) => input.checked).map((input) => input.value);
+    root.classList.toggle('has-selection', chosen.length > 0);
+    panels.forEach((p) => p.classList.toggle('is-active', chosen.includes(p.dataset.app)));
   };
-  root.addEventListener('change', (e) => {
-    if (e.target.type === 'radio') show(e.target.value);
-  });
-  // the browser may restore a previous choice when navigating back
-  const restored = $('input[type="radio"]:checked', root);
-  if (restored) show(restored.value);
+  root.addEventListener('change', show);
+  if (root.hasAttribute('data-exclusive-group')) {
+    const note = $('[data-launcher-note]', root);
+    keepExclusive(root, () => $$('input[type="checkbox"]', root), (message) => {
+      note.textContent = message;
+      show(); // choosing University clears the others, which fires no event of its own
+    });
+  }
+  show(); // the browser may restore earlier choices when navigating back
 });
 
 initForms();

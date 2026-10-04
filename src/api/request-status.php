@@ -5,6 +5,7 @@
 // Onboarding Tool, server to server, and carries nothing internal.
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
+require __DIR__ . '/account-lib.php';
 
 $in = read_post();
 $reference = strtoupper(trim(is_string($in['reference'] ?? null) ? $in['reference'] : ''));
@@ -18,6 +19,19 @@ if (strlen($email) > 254 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)
 }
 
 $config = load_config();
+// Requests are kept in this site's own database, which also follows their status in the Onboarding Tool.
+if (accounts_configured($config)) {
+    rate_limit('request-status', 15, 600);
+    $db = account_db($config);
+    if (!$db) {
+        respond(502, ['error' => 'We could not check your request right now. Please try again later.']);
+    }
+    $found = account_request_status($config, $db, $reference, $email);
+    if (!$found) {
+        respond(404, ['error' => 'We could not find a request with that Request ID and email address.']);
+    }
+    respond(200, ['ok' => true] + $found);
+}
 if (!onboarding_configured($config) || !function_exists('curl_init')) {
     respond(503, ['error' => 'Request status is not available right now. Please try again later.']);
 }

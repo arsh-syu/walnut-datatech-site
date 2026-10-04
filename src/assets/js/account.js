@@ -21,6 +21,19 @@ const greeting = () => {
 const TYPE = { UNIVERSITY: 'University', STUDENT: 'Learner', AGENT: 'Agent / Partner' };
 const tick = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
+// What the account is used for: one or several of UNIVERSITY, STUDENT, AGENT (the first is the main one).
+const typesOf = (p) => (p.accountTypes?.length ? p.accountTypes : p.accountType ? [p.accountType] : []);
+
+// An account kept only for university onboarding. The other journeys' apps and invitations are not
+// theirs, so they are not shown. An account that is also AGENT or STUDENT keeps everything it had.
+const universityOnly = () => {
+  const types = typesOf(data.profile);
+  return types.includes('UNIVERSITY') && !types.includes('AGENT') && !types.includes('STUDENT');
+};
+// Which journey each Walnut app belongs to. An app nobody has claimed stays visible to everyone.
+const APP_JOURNEY = { onboarding: 'UNIVERSITY', 'course-finder': 'AGENT', leads: 'AGENT' };
+const appsForAccount = () => (data.apps ?? []).filter((a) => !universityOnly() || APP_JOURNEY[a.id] !== 'AGENT');
+
 let data; // the dashboard as the service last sent it
 let tab; // the open tab
 let applying = false; // an agent application being written or edited
@@ -129,11 +142,11 @@ function profilePanel() {
     </form>
     <div class="acct-verify">
       <div class="acct-row"><div><strong>Email</strong><span>${esc(p.email)}</span></div>${p.emailVerified ? `<span class="status-badge is-ok">Verified</span>` : '<button class="btn btn-ghost btn-sm" type="button" data-verify="email"><span>Verify email</span></button>'}</div>
-      <div class="acct-row"><div><strong>Mobile</strong><span>${p.mobile ? esc(p.mobile) : 'Add a mobile number to login with'}</span></div>${p.mobileVerified ? `<span class="status-badge is-ok">Verified</span>` : ''}</div>
-      <form class="acct-mobile" data-mobile-form novalidate>
+      <div class="acct-row"><div><strong>Mobile</strong><span>${p.mobile ? esc(p.mobile) : p.mobileCodes === false ? 'Not added' : 'Add a mobile number to login with'}</span></div>${p.mobileVerified ? `<span class="status-badge is-ok">Verified</span>` : ''}</div>
+      ${p.mobileCodes === false ? '' : `<form class="acct-mobile" data-mobile-form novalidate>
         <div class="field"><label for="profile-mobile">${p.mobile ? 'Change mobile number' : 'Mobile number'}</label><input id="profile-mobile" name="mobile" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+91 98765 43210"></div>
         <button class="btn btn-ghost" type="submit"><span>Send OTP</span></button>
-      </form>
+      </form>`}
       <div data-verify-box></div>
     </div>
     ${more().length ? `<h3 class="acct-more-title">More from Walnut</h3><ul class="acct-more">${more().map((m) => `<li><div><strong>${m.label}</strong><span>${m.line}</span></div>${m.href ? `<a class="btn btn-ghost btn-sm" href="${m.href}"><span>Open</span></a>` : `<button class="btn btn-ghost btn-sm" type="button" data-start="${m.start}"><span>Start</span></button>`}</li>`).join('')}</ul>` : ''}`;
@@ -141,24 +154,28 @@ function profilePanel() {
 
 // The same account can take up another Walnut service — nothing below needs a second sign-up.
 function more() {
-  const type = data.profile.accountType;
+  const types = typesOf(data.profile);
+  // An account kept only for university onboarding is not invited into the other journeys, and
+  // a partner or learner account is not invited into the university one: that flow stays separate.
+  if (universityOnly()) return [];
   return [
-    type !== 'AGENT' && !data.agent.application && !applying && { label: 'Become an agent or partner', line: 'Apply with this account.', start: 'agent' },
-    type !== 'UNIVERSITY' && !data.university.requests.length && !data.university.onboarding && { label: 'Request university empanelment', line: 'Send a request with this email.', href: `${siteRoot}configure/` },
-    type !== 'STUDENT' && !data.student.enrolments.length && { label: 'Take a short course', line: 'Courses bought with this email appear here.', href: `${siteRoot}academy/` },
+    !types.includes('AGENT') && !data.agent.application && !applying && { label: 'Become an agent or partner', line: 'Apply with this account.', start: 'agent' },
+    !types.includes('STUDENT') && !data.student.enrolments.length && { label: 'Take a short course', line: 'Courses bought with this email appear here.', href: `${siteRoot}academy/` },
   ].filter(Boolean);
 }
 
 /* ---------- page ---------- */
 
-// The tab the account was created for comes first; the others appear once they hold something.
+// A tab for everything the person chose for their account, the main one first; the others appear once they hold something.
 function tabs() {
   const type = data.profile.accountType;
+  const types = typesOf(data.profile);
   const hasRequests = data.university.requests.length > 0 || Boolean(data.university.onboarding);
+  const others = !universityOnly(); // a university account has the university flow and nothing else
   return [
-    (type === 'UNIVERSITY' || hasRequests) && ['requests', `My requests (${data.university.requests.length})`, requestsPanel],
-    (type === 'STUDENT' || data.student.enrolments.length > 0) && ['courses', `My courses (${data.student.enrolments.length})`, coursesPanel],
-    (type === 'AGENT' || data.agent.application || applying) && ['agent', 'Partner application', agentPanel],
+    (types.includes('UNIVERSITY') || hasRequests) && ['requests', `My requests (${data.university.requests.length})`, requestsPanel],
+    others && (types.includes('STUDENT') || data.student.enrolments.length > 0) && ['courses', `My courses (${data.student.enrolments.length})`, coursesPanel],
+    others && (types.includes('AGENT') || data.agent.application || applying) && ['agent', 'Partner application', agentPanel],
     ['profile', 'Profile', profilePanel],
   ]
     .filter(Boolean)
@@ -168,13 +185,14 @@ function tabs() {
 function paint() {
   const p = data.profile;
   const list = tabs();
+  const apps = appsForAccount();
   if (!list.some(([id]) => id === tab)) tab = list[0][0];
   const [, , panel] = list.find(([id]) => id === tab);
   box.innerHTML = `<div class="acct-grid">
     <aside class="acct-card" aria-label="Your profile">
       <div class="acct-avatar" aria-hidden="true">${esc(initials(p.name))}</div>
       <h2 class="acct-name">${esc(p.name)}</h2>
-      ${p.accountType ? `<p class="chip">${TYPE[p.accountType]}</p>` : ''}
+      ${typesOf(p).length ? `<p class="acct-chips">${typesOf(p).map((t) => `<span class="chip">${TYPE[t]}</span>`).join('')}</p>` : ''}
       <dl class="acct-facts">
         <div><dt>Email</dt><dd>${esc(p.email)}${p.emailVerified ? ` <span class="acct-ok" title="Verified">${tick}<span class="sr-only">verified</span></span>` : ''}</dd></div>
         <div><dt>Mobile</dt><dd>${p.mobile ? `${esc(p.mobile)} <span class="acct-ok" title="Verified">${tick}<span class="sr-only">verified</span></span>` : '—'}</dd></div>
@@ -184,6 +202,7 @@ function paint() {
     </aside>
     <div class="acct-main">
       <div class="acct-hello"><p>${greeting()},</p><h2>${esc(p.name)}</h2></div>
+      ${apps.length ? `<nav class="acct-apps" aria-label="Walnut apps"><p>Open with this account</p><ul>${apps.map((a) => `<li><a class="btn btn-ghost btn-sm" href="${esc(a.href)}" data-track="app_open" data-track-item="${esc(a.id)}"><span>${esc(a.name)}</span></a></li>`).join('')}</ul></nav>` : ''}
       ${p.emailVerified ? '' : `<div class="acct-notice"><div><strong>Verify your email to see your activity</strong><span>Requests and course purchases made with ${esc(p.email)} appear once you confirm the address is yours.</span></div><button class="btn btn-primary btn-sm" type="button" data-verify="email"><span>Verify email</span></button></div>`}
       <div class="acct-panel">
         <div class="acct-tabs" role="tablist" aria-label="Your account">${list.map(([id, label]) => `<button type="button" role="tab" id="tab-${id}" aria-selected="${id === tab}" aria-controls="acct-view" data-tab="${id}"${id === tab ? '' : ' tabindex="-1"'}>${label}</button>`).join('')}</div>
@@ -224,7 +243,7 @@ box.addEventListener('click', async (e) => {
     track('account_sign_out');
     return location.assign(`${siteRoot}login/`);
   }
-  if (e.target.closest('[data-start="agent"]')) return (applying = true), (tab = 'agent'), paint();
+  if (e.target.closest('[data-start="agent"]') && !universityOnly()) return (applying = true), (tab = 'agent'), paint();
   if (e.target.closest('[data-edit-application]')) return (applying = true), paint();
   if (e.target.closest('[data-cancel-application]')) return (applying = false), (agentAnswers = { ...(data.agent.application?.answers ?? {}) }), paint();
   const verify = e.target.closest('[data-verify]');

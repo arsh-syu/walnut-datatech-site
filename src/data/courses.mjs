@@ -8,6 +8,23 @@
 
 export const currency = 'INR';
 
+// The categories the courses are grouped under on /academy/. A course names its track by `id`;
+// a track with no courses is simply not shown.
+export const tracks = [
+  {
+    id: 'counselling',
+    icon: 'counselling',
+    name: 'Counselling & admissions',
+    line: 'For anyone who advises students — understand online degree programmes and guide an applicant through to admission.',
+  },
+  {
+    id: 'technology',
+    icon: 'automation',
+    name: 'Technology & AI',
+    line: 'For anyone upgrading their technical skills — practical courses on the technology behind modern products.',
+  },
+];
+
 export const courses = [
   {
     slug: 'online-programme-course',
@@ -16,10 +33,12 @@ export const courses = [
     tagline: 'Understand online programmes — and guide learners to the right one.',
     summary:
       'A short certification course on how online degree programmes work, and how to counsel prospective students through to admission.',
+    track: 'counselling',
     price: 999,
     coupons: [{ code: 'SYUSANDEEP', finalPrice: 499 }],
     format: 'Online',
     duration: null, // e.g. '4 weeks' — shown on the course page once set
+    eligibility: 'Open to everyone — no prior qualification needed.',
     certificate: true,
     audience: ['Education counsellors', 'Students', 'Working professionals'],
     outcomes: [
@@ -35,10 +54,12 @@ export const courses = [
     tagline: 'Build with AI agents and retrieval-augmented generation.',
     summary:
       'A short, practical introduction to agentic AI — how AI agents work, and how retrieval-augmented generation (RAG) grounds them in real information.',
+    track: 'technology',
     price: 1999,
     coupons: [],
     format: 'Online',
     duration: null,
+    eligibility: 'Open to everyone. Basic computer skills help; no coding experience is assumed.',
     certificate: false,
     audience: ['Students', 'Working professionals', 'Anyone upgrading their technology skills'],
     outcomes: [

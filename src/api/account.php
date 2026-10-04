@@ -1,15 +1,15 @@
 <?php
 // GET | POST | PATCH /api/account.php?p=/auth/otp/send
-// Relays the login and dashboard calls of this site's own pages to the account service, so the
-// browser only ever talks to this domain. Only the sign-in and "my account" endpoints can be
-// reached through it — never the service's admin or university endpoints.
+// The login and dashboard calls of this site's own pages. They are answered from this server's own
+// account database (account-lib.php) or, when there is none and a separate account service is
+// configured, relayed to it — so the browser only ever talks to this domain. Only the sign-in and "my account" endpoints
+// can be reached through the relay — never the service's admin or university endpoints.
 //
 // The session cookie the service issues is handed to the browser as this site's own cookie
 // (HttpOnly; the page scripts cannot read it) and sent back to the service on later calls.
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
-
-const SESSION_COOKIE = 'walnut_rt';
+require __DIR__ . '/account-lib.php';
 
 $method = $_SERVER['REQUEST_METHOD'] ?? '';
 if (!in_array($method, ['GET', 'POST', 'PATCH'], true)) {
@@ -37,6 +37,10 @@ if ($method !== 'GET') {
 }
 
 $config = load_config();
+if (accounts_configured($config)) {
+    rate_limit('account', 240, 600);
+    account_handle($config, $method, $path, $body);
+}
 if (!onboarding_configured($config) || !function_exists('curl_init')) {
     respond(503, ['error' => ['message' => 'Login is not available right now. Please try again later.']]);
 }

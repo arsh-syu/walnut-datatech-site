@@ -4,7 +4,8 @@
 //   node scripts/deploy.mjs --yes    — skip the "overwrite existing site?" question
 //
 // Reads .env (see .env.example): FTP_HOST, FTP_USER, FTP_PASS, FTP_DIR, SITE_URL,
-// RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, TWILIO_API_KEY, TWILIO_API_SECRET, EMAIL_FROM, EMAIL_FROM_NAME, EMAIL_NOTIFY.
+// RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, TWILIO_API_KEY, TWILIO_API_SECRET, EMAIL_FROM, EMAIL_FROM_NAME, EMAIL_NOTIFY,
+// DB_HOST, DB_NAME, DB_USER, DB_PASS, ACCOUNT_SECRET, TWILIO_ACCOUNT_SID, SMS_FROM.
 //
 // Order matters for safety: the site and the payment API are uploaded first, the API is checked
 // to be executing as PHP, and only then is the file holding the Razorpay secret uploaded.
@@ -33,6 +34,11 @@ const hasEmail = Boolean(env.TWILIO_API_KEY && env.TWILIO_API_SECRET && env.EMAI
 const onboardingUrl = (env.ONBOARDING_API_URL || '').replace(/\/+$/, '');
 const onboardingPublic = /^https:\/\/(?!localhost\b|127\.|\[::1\])/i.test(onboardingUrl);
 const hasOnboarding = Boolean(onboardingPublic && env.ONBOARDING_API_KEY);
+// Walnut accounts kept in the web host's own MySQL database (used when there is no Onboarding Tool).
+// One-time codes go out by email, so accounts need the email settings too.
+const hasAccounts = Boolean(env.DB_NAME && env.DB_USER && env.ACCOUNT_SECRET && hasEmail);
+const hasSms = Boolean(hasAccounts && env.TWILIO_ACCOUNT_SID && env.SMS_FROM);
+const hasLogin = hasOnboarding || hasAccounts;
 
 // Real money must not be taken before the refund terms are published.
 if (hasKeys && env.RAZORPAY_KEY_ID.startsWith('rzp_live_') && !config.legal.refundPolicy) {
@@ -63,9 +69,12 @@ const list = (dir) => curl([`url = ${q(ftpUrl(dir))}`, 'list-only'], { quiet: tr
 
 function connect() {
   // Prefer verified TLS, then TLS without certificate verification (common when connecting by IP), then plain FTP.
+  // Windows' curl (Schannel) breaks FTP uploads larger than one TLS 1.3 record, leaving an empty file
+  // on the server; TLS 1.2 works.
+  const tls = process.platform === 'win32' ? ['ssl-reqd', 'tls-max = "1.2"'] : ['ssl-reqd'];
   const modes = [
-    ['verified TLS', ['ssl-reqd']],
-    ['TLS (certificate not verified)', ['ssl-reqd', 'insecure']],
+    ['verified TLS', tls],
+    ['TLS (certificate not verified)', [...tls, 'insecure']],
     ['plain FTP — not encrypted', []],
   ];
   for (const [label, flags] of modes) {
@@ -80,12 +89,46 @@ function connect() {
   fail(`Could not connect to ${env.FTP_HOST} over FTP.`);
 }
 
+// What the server said last, for a failed transfer — with the sign-in lines removed.
+const transcript = (run) =>
+  (run.stderr || '')
+    .split(/\r?\n/)
+    .filter((line) => /^[<>*] /.test(line) && !/^> (USER|PASS)\b/i.test(line) && !/^\* (Connected|Trying|TLS|SSL|ALPN|CAfile|CApath|Server certificate|subject|issuer|start date|expire date)/i.test(line))
+    .slice(-8)
+    .map((line) => `      ${line}`)
+    .join('\n');
+
+// Files go up a few at a time, and a batch the server drops is sent again. If it still will not go,
+// one file is sent on its own with the conversation recorded, so the reason is shown rather than
+// guessed. Sending a file twice is harmless: each upload replaces the whole file.
 function upload(files, remoteDir) {
-  const lines = ['ftp-create-dirs', 'fail-early'];
-  for (const [local, remote] of files) {
-    lines.push(`upload-file = ${q(local)}`, `url = ${q(ftpUrl(remoteDir + remote))}`);
+  const BATCH = 10;
+  const send = (batch, extra = []) => {
+    const lines = ['ftp-create-dirs', 'fail-early', ...extra];
+    for (const [local, remote] of batch) lines.push(`upload-file = ${q(local)}`, `url = ${q(ftpUrl(remoteDir + remote))}`);
+    return curl(lines, { quiet: true });
+  };
+  for (let start = 0; start < files.length; start += BATCH) {
+    const batch = files.slice(start, start + BATCH);
+    const range = `${start + 1}–${start + batch.length} of ${files.length}`;
+    if (send(batch).status === 0) {
+      console.log(`  ✓ files ${range}`);
+      continue;
+    }
+    console.log(`  The server stopped answering; trying files ${range} again …`);
+    spawnSync('sleep', ['5']);
+    if (send(batch).status === 0) {
+      console.log(`  ✓ files ${range}`);
+      continue;
+    }
+    const run = send([batch[0]], ['verbose']);
+    if (run.status === 0) {
+      console.log(`  ${batch[0][1]} went through on its own — the server is slow rather than refusing. Run the deploy again.`);
+    } else {
+      console.log(`  ${batch[0][1]} could not be uploaded: ${(run.stderr.match(/curl: \(\d+\)[^\n]*/) || [run.stderr.trim().split('\n').pop() || 'no answer'])[0]}\n    What the server said last:\n${transcript(run) || '      (nothing)'}`);
+    }
+    fail(`Upload stopped at files ${range}.${start ? ' The earlier files are in place.' : ' Nothing was uploaded.'}`);
   }
-  if (curl(lines).status !== 0) fail('Upload failed — see the message above.');
 }
 
 const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]));
@@ -107,9 +150,9 @@ async function health() {
 /* ---------- deploy ---------- */
 
 console.log(`Building for ${siteUrl} …`);
-// Login and the dashboard are published exactly when the account service they rely on is configured.
-if (config.accounts && !hasOnboarding) console.log('! `accounts` is on in site.config.mjs but ONBOARDING_API_URL / ONBOARDING_API_KEY are not set — login and the dashboard are left out of this deploy.');
-const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasOnboarding ? '1' : '', ACCOUNTS_OFF: hasOnboarding ? '' : '1' } });
+// Login and the dashboard are published exactly when the accounts they rely on are configured.
+if (config.accounts && !hasLogin) console.log('! `accounts` is on in site.config.mjs but neither the account database (DB_NAME, DB_USER, ACCOUNT_SECRET) nor ONBOARDING_API_URL / ONBOARDING_API_KEY is set — login and the dashboard are left out of this deploy.');
+const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasLogin ? '1' : '', ACCOUNTS_OFF: hasLogin ? '' : '1' } });
 if (build.status !== 0) fail('The build failed.');
 const check = spawnSync(process.execPath, ['check.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl } });
 if (check.status !== 0) fail('Link check failed — nothing was uploaded.');
@@ -153,16 +196,24 @@ if (!hasOnboarding) {
   console.log(
     onboardingUrl && !onboardingPublic
       ? '! ONBOARDING_API_URL is not a public https address — University requests will not be filed in the Onboarding Tool.'
-      : '! ONBOARDING_API_URL / ONBOARDING_API_KEY are not set in .env — University requests reach the team by email only.'
+      : hasAccounts
+        ? '  No Onboarding Tool is set — University requests are kept in the site\'s own account database.'
+        : '! ONBOARDING_API_URL / ONBOARDING_API_KEY are not set in .env — University requests reach the team by email only.'
   );
 }
+if (!hasAccounts && !hasOnboarding) console.log('! DB_NAME / DB_USER / ACCOUNT_SECRET (and the email settings) are not all set in .env — login and the dashboard are not published.');
+if (hasAccounts && !hasSms) console.log('  TWILIO_ACCOUNT_SID / SMS_FROM are not set in .env — login offers the email code only (no SMS).');
 
-if (hasKeys || hasEmail || hasOnboarding) {
+if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
   const phpStr = (v) => `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
   const settings = {
     ...(hasKeys ? { key_id: env.RAZORPAY_KEY_ID, key_secret: env.RAZORPAY_KEY_SECRET } : {}),
     ...(hasEmail ? { twilio_key: env.TWILIO_API_KEY, twilio_secret: env.TWILIO_API_SECRET, email_from: env.EMAIL_FROM, email_from_name: env.EMAIL_FROM_NAME || 'Walnut Data Tech', email_notify: env.EMAIL_NOTIFY } : {}),
     ...(hasOnboarding ? { onboarding_url: onboardingUrl, onboarding_key: env.ONBOARDING_API_KEY } : {}),
+    ...(hasAccounts ? { db_host: env.DB_HOST || 'localhost', db_name: env.DB_NAME, db_user: env.DB_USER, db_pass: env.DB_PASS || '', account_secret: env.ACCOUNT_SECRET } : {}),
+    ...(hasSms ? { twilio_sid: env.TWILIO_ACCOUNT_SID, sms_from: env.SMS_FROM } : {}),
+    // one sign-in for the other Walnut apps: each app's own secret, set only once that app can receive it
+    ...(hasAccounts ? Object.fromEntries(['ONBOARDING', 'COURSE_FINDER', 'LEADS'].filter((k) => env[`WALNUT_SSO_SECRET_${k}`]).map((k) => [`sso_${k.toLowerCase()}`, env[`WALNUT_SSO_SECRET_${k}`]])) : {}),
   };
   const configFile = join(tmp, 'config.php');
   writeFileSync(
@@ -174,19 +225,21 @@ if (hasKeys || hasEmail || hasOnboarding) {
 
   // The secrets must never be readable over the web.
   const probe = await fetch(`${siteUrl}/api/config.php?t=${Date.now()}`).then((r) => r.text()).catch(() => '');
-  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY].filter(Boolean).some((needle) => probe.includes(needle));
+  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', 'db_pass', 'account_secret', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY, env.DB_PASS, env.ACCOUNT_SECRET].filter(Boolean).some((needle) => probe.includes(needle));
   if (leaked) {
     curl([`url = ${q(ftpUrl(remoteDir))}`, `quote = ${q(`DELE ${remoteDir}api/config.php`)}`, 'list-only'], { quiet: true });
-    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay, Twilio and Onboarding Tool secrets and contact the host about PHP handling.');
+    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay, Twilio, database and Onboarding Tool secrets and contact the host about PHP handling.');
   }
 
   state = await health();
   if (hasKeys && !state.data?.configured) fail('The keys were uploaded but the payment API does not see them.');
   if (hasEmail && !state.data?.email) fail('The email settings were uploaded but the API does not see them.');
   if (hasOnboarding && !state.data?.onboarding) fail('The Onboarding Tool settings were uploaded but the API does not see them.');
+  if (hasAccounts && !state.data?.accounts) fail('The account database settings were uploaded, but the server could not connect to the database. Check DB_HOST, DB_NAME, DB_USER and DB_PASS in .env, and that PHP has the pdo_mysql extension.');
   if (hasKeys) console.log(`✓ Razorpay connected in ${state.data.mode.toUpperCase()} mode`);
   if (hasEmail) console.log(`✓ Email connected — sending from ${env.EMAIL_FROM}, notifications to ${env.EMAIL_NOTIFY}`);
   if (hasOnboarding) console.log(`✓ University requests will be filed in the Onboarding Tool at ${onboardingUrl}`);
+  if (hasAccounts) console.log(`✓ Walnut accounts connected — database ${env.DB_NAME}, one-time codes by email${hasSms ? ' and SMS' : ''}`);
 }
 
 const home200 = await fetch(`${siteUrl}/?t=${Date.now()}`).then((r) => r.status).catch(() => 0);

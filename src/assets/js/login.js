@@ -4,9 +4,13 @@
 import { track } from './analytics.js';
 import { accountApi, portal, siteRoot, esc, call, adopt, restore, AccountError } from './session.js';
 import { otpStep } from './otp.js';
+import { UNIVERSITY, UNIVERSITY_ONLY, canCombine, keepExclusive } from './roles.js';
 
 const box = document.getElementById('login');
-const profile = `${siteRoot}dashboard/`;
+// Where to go once signed in: the dashboard, or — when sign-in was needed to open another Walnut app —
+// back to the hand-off that sends the person on to it (only that one address is accepted).
+const resume = new URLSearchParams(location.search).get('continue') || '';
+const profile = /^\/api\/sso\.php\?app=[a-z-]{2,30}(&next=[A-Za-z0-9%._~\-]{0,600})?$/.test(resume) ? resume : `${siteRoot}dashboard/`;
 const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 // Dialling codes offered beside the mobile field; the service's default is selected.
 const COUNTRIES = [['+91', 'India'], ['+971', 'UAE'], ['+1', 'US / Canada'], ['+44', 'UK'], ['+65', 'Singapore'], ['+61', 'Australia'], ['+977', 'Nepal'], ['+880', 'Bangladesh'], ['+94', 'Sri Lanka']];
@@ -15,9 +19,12 @@ const PURPOSES = [
   ['STUDENT', 'Learn / Upgrade Career', 'Take our short courses.'],
   ['AGENT', 'Become an Agent / Partner', 'Partner with Walnut.'],
 ];
-const wanted = new URLSearchParams(location.search).get('type')?.toUpperCase();
+// ?type=university,student — what the person chose before signing in; each becomes a tab of their dashboard.
+// University is a flow of its own: asked for together with anything else, it is the only one kept.
+const asked = (new URLSearchParams(location.search).get('type') || '').toUpperCase().split(',').filter((t) => PURPOSES.some(([id]) => id === t));
+const wanted = canCombine(asked) ? asked : [UNIVERSITY];
 
-const state = { method: null, email: '', dial: '+91', mobile: '', length: 6, sending: false };
+const state = { method: null, email: '', dial: '+91', mobile: '', length: 6, sending: false, mobileCodes: true, password: true };
 const send = (channel, destination) => call('/auth/otp/send', { body: { channel, destination, purpose: 'LOGIN' }, auth: false });
 const fieldError = (name, message) => {
   const note = box.querySelector(`[data-error="${name}"]`);
@@ -29,7 +36,7 @@ const fieldError = (name, message) => {
 
 function start() {
   box.innerHTML = `<h2 class="login-title">Login to your Walnut account</h2>
-    <div class="login-methods" role="group" aria-label="How would you like to login?">
+    <div class="login-methods" role="group" aria-label="How would you like to login?"${state.mobileCodes ? '' : ' hidden'}>
       ${[['email', 'Email OTP', 'Get a code on your email'], ['mobile', 'Mobile OTP', 'Get a code by SMS']]
         .map(([id, label, line]) => `<button class="login-method" type="button" data-method="${id}" aria-pressed="${state.method === id}"><strong>${label}</strong><span>${line}</span></button>`)
         .join('')}
@@ -50,7 +57,7 @@ function start() {
       <button class="btn btn-primary btn-lg" type="submit"><span>Send OTP</span></button>
       <p class="login-note">New to Walnut? The same code creates your account.</p>
     </form>
-    <p class="login-alt">Prefer a password? <button class="text-btn" type="button" data-password>Continue with password</button></p>`;
+    ${state.password ? '<p class="login-alt">Prefer a password? <button class="text-btn" type="button" data-password>Continue with password</button></p>' : ''}`;
   box.querySelector(state.method === 'mobile' ? '#login-mobile' : '#login-email')?.focus({ preventScroll: true });
 }
 
@@ -115,8 +122,10 @@ function codeStep(challenge, destination) {
   });
 }
 
-function enter(how) {
+async function enter(how) {
   track('login_success', { how });
+  // Someone who already has an account: what they chose on the way in is added to it.
+  if (wanted.length) await call('/account/services', { body: { types: wanted } }).catch(() => null);
   location.assign(profile);
 }
 
@@ -124,12 +133,12 @@ function enter(how) {
 
 function setup(proof) {
   const byMobile = proof.channel === 'mobile';
-  const chosen = PURPOSES.some(([id]) => id === wanted) ? wanted : '';
   box.innerHTML = `<h2 class="login-title">How can we help you?</h2>
     <p class="login-sub">You are verified. Tell us a little about yourself to create your Walnut account.</p>
     <form class="login-setup" novalidate>
-      <fieldset class="field field-set"><legend class="sr-only">How can we help you?</legend>
-        <div class="login-purposes">${PURPOSES.map(([id, label, line]) => `<label class="login-purpose"><input class="sr-only" type="radio" name="accountType" value="${id}"${id === chosen ? ' checked' : ''}><span><strong>${label}</strong><small>${line}</small></span></label>`).join('')}</div>
+      <fieldset class="field field-set"><legend class="login-legend">Choose what you need. A university account is used for the university only.</legend>
+        <div class="login-purposes">${PURPOSES.map(([id, label, line]) => `<label class="login-purpose"><input class="sr-only" type="checkbox" name="accountType" value="${id}"${wanted.includes(id) ? ' checked' : ''}><span><strong>${label}</strong><small>${line}</small></span></label>`).join('')}</div>
+        <p class="login-note" data-exclusive-note role="status"></p>
         <p class="field-error" data-error="accountType" role="alert"></p>
       </fieldset>
       <div class="field"><label for="setup-name">Full name</label><input id="setup-name" name="name" type="text" autocomplete="name" maxlength="120"><p class="field-error" data-error="name" role="alert"></p></div>
@@ -144,8 +153,9 @@ function setup(proof) {
     const button = form.querySelector('[type="submit"]');
     if (button.disabled) return;
     const data = Object.fromEntries(new FormData(form));
+    const types = [...form.querySelectorAll('[name="accountType"]:checked')].map((input) => input.value);
     const problems = {
-      accountType: data.accountType ? '' : 'Please choose one.',
+      accountType: !types.length ? 'Please choose at least one.' : canCombine(types) ? '' : UNIVERSITY_ONLY,
       name: (data.name || '').trim().length >= 2 ? '' : 'Please enter your name.',
       ...(byMobile ? { email: EMAIL.test((data.email || '').trim()) ? '' : 'Please enter a valid email address.' } : {}),
     };
@@ -154,8 +164,8 @@ function setup(proof) {
     button.disabled = true;
     button.classList.add('is-loading');
     try {
-      adopt(await call('/auth/otp/register', { body: { registrationToken: proof.registrationToken, name: data.name.trim(), accountType: data.accountType, email: byMobile ? data.email.trim() : undefined }, auth: false }));
-      track('account_created', { type: data.accountType.toLowerCase(), channel: proof.channel });
+      adopt(await call('/auth/otp/register', { body: { registrationToken: proof.registrationToken, name: data.name.trim(), accountType: types[0], accountTypes: types, email: byMobile ? data.email.trim() : undefined }, auth: false }));
+      track('account_created', { type: types.join('+').toLowerCase(), channel: proof.channel });
       location.assign(profile);
     } catch (err) {
       if (err.status === 409 && byMobile) fieldError('email', err.message);
@@ -163,6 +173,11 @@ function setup(proof) {
       button.disabled = false;
       button.classList.remove('is-loading');
     }
+  });
+  // University cannot be ticked together with the others.
+  keepExclusive(form, () => [...form.querySelectorAll('[name="accountType"]')], (message) => {
+    form.querySelector('[data-exclusive-note]').textContent = message;
+    if (message) fieldError('accountType', '');
   });
   form.querySelector('#setup-name').focus({ preventScroll: true });
 }
@@ -206,12 +221,18 @@ function password() {
 if (!accountApi) {
   box.innerHTML = '<p class="form-status is-error">Login is not available right now. Please try again later.</p>';
 } else if (await restore()) {
-  location.replace(profile); // already signed in
+  // already signed in: what was chosen on the way here is still added to the account
+  if (wanted.length) await call('/account/services', { body: { types: wanted } }).catch(() => null);
+  location.replace(profile);
 } else {
   call('/auth/otp/options', { auth: false })
     .then((o) => {
       state.length = o.length || 6;
       if (o.defaultCountryCode) state.dial = o.defaultCountryCode;
+      // Without an SMS sender, or without passwords, the page offers the email code only.
+      state.mobileCodes = o.mobile !== false;
+      state.password = o.password !== false;
+      if (!state.mobileCodes) state.method = 'email';
     })
     .catch(() => null)
     .finally(start);

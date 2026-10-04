@@ -73,7 +73,7 @@ export function fieldHtml(q, value, prefix = 'q') {
     const input = q.type === 'multi' ? 'checkbox' : 'radio';
     return `<fieldset class="${cls} field-set">
       <legend>${esc(q.label)}${optional(q)}</legend>
-      <div class="pills">${q.options
+      <div class="pills${q.boxes ? ' pills-boxes' : ''}">${q.options
         .map((o, i) => `<label class="pill"><input class="sr-only" type="${input}" name="${q.id}" data-q="${q.id}" value="${esc(o)}"${i === 0 ? ` id="${id}"` : ''}${picked.includes(o) ? ' checked' : ''}><span>${esc(o)}</span></label>`)
         .join('')}</div>${help}
     </fieldset>`;

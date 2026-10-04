@@ -25,7 +25,7 @@ const fail = (file, msg) => {
 };
 
 for (const [file, html] of cache) {
-  const system = /\/(404|500)\.html$/.test(file);
+  const system = /[\\/](404|500)\.html$/.test(file);
 
   /* ---- document outline ---- */
   const levels = [...html.matchAll(/<h([1-6])[\s>]/g)].map((m) => Number(m[1]));

@@ -287,6 +287,16 @@ a.social:hover { background: var(--violet-600); transform: translateY(-3px); }
 .pill input:checked + span { border-color: var(--violet-600); background: var(--violet-soft); color: var(--violet-700); }
 .pill input:focus-visible + span { outline: 2px solid var(--violet-600); outline-offset: 2px; }
 .field-set.has-error .pill span { border-color: var(--danger); }
+/* the same choice drawn as tick boxes */
+.pills-boxes .pill span { display: flex; align-items: center; gap: 10px; padding: .7em 1.1em .7em .8em; border-radius: 14px; }
+.pills-boxes .pill span::before {
+  content: ""; flex: none; width: 20px; height: 20px; border: 1.5px solid var(--line-strong); border-radius: 6px; background: #fff center / 14px no-repeat;
+  transition: background-color .2s, border-color .2s;
+}
+.pills-boxes .pill input:checked + span::before {
+  border-color: var(--violet-600); background-color: var(--violet-600);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
 .field-error { font-size: .8125rem; color: var(--danger); animation: rise .3s var(--ease); }
 .hp { position: absolute; left: -9999px; opacity: 0; }
 .form-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4) var(--s-5); margin-top: var(--s-2); }
@@ -341,6 +351,8 @@ a.social:hover { background: var(--violet-600); transform: translateY(-3px); }
 /* ---------- closing CTA band ---------- */
 
 .cta-band { padding-block: 0 var(--section); }
+/* After a dark section the dark card would run into it: give it air. */
+.section-dark + .cta-band { padding-top: var(--section); }
 .cta-card {
   isolation: isolate; display: grid; justify-items: center; gap: var(--s-5);
   padding: clamp(56px, 9vw, 120px) var(--s-5); border-radius: var(--r-xl);

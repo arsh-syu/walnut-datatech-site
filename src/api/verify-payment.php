@@ -4,6 +4,7 @@
 // Once verified, the learner gets a confirmation email and the team a notification.
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
+require __DIR__ . '/account-lib.php';
 
 $in = read_post();
 $orderId = is_string($in['razorpay_order_id'] ?? null) ? $in['razorpay_order_id'] : '';
@@ -26,7 +27,7 @@ if (!hash_equals($expected, $signature)) {
 
 // The payment is genuine. What follows is a courtesy on top: nothing below may fail the response.
 // Learner details come from the order stored at Razorpay, never from the browser.
-if ((email_configured($config) || onboarding_configured($config)) && first_time('enrolment-' . $paymentId)) {
+if ((email_configured($config) || onboarding_configured($config) || accounts_configured($config)) && first_time('enrolment-' . $paymentId)) {
     $order = razorpay('GET', '/orders/' . $orderId, null, $config, false);
     $notes = isset($order['notes']) && is_array($order['notes']) ? $order['notes'] : [];
     $email = (string) ($notes['email'] ?? '');
@@ -34,7 +35,19 @@ if ((email_configured($config) || onboarding_configured($config)) && first_time(
         $name = (string) ($notes['name'] ?? '');
         $coupon = (string) ($notes['coupon'] ?? 'none');
         // Recorded against the learner's email, so the course shows in their Walnut account.
-        if (onboarding_configured($config) && function_exists('curl_init')) {
+        if (accounts_configured($config)) {
+            account_record_enrolment($config, [
+                'email' => $email,
+                'name' => $name,
+                'phone' => (string) ($notes['phone'] ?? ''),
+                'courseSlug' => (string) ($notes['slug'] ?? ''),
+                'courseName' => (string) ($notes['course'] ?? ''),
+                'amount' => intdiv((int) ($order['amount'] ?? 0), 100),
+                'coupon' => $coupon === 'none' ? null : $coupon,
+                'paymentId' => $paymentId,
+                'orderId' => $orderId,
+            ]);
+        } elseif (onboarding_configured($config) && function_exists('curl_init')) {
             [$status] = onboarding_post($config, '/api/v1/public/enrolments', [
                 'email' => $email,
                 'name' => $name,

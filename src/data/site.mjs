@@ -37,9 +37,13 @@ export const audiences = [
 ];
 
 // Walnut's connected applications. Exactly one can be selected at a time; the action opens `url`.
+// `sso` is this app's id in api/sso.php, for the apps that accept a Walnut sign-in. An app without one
+// is opened at its own address; Agent Onboard has no SSO receiver yet.
 export const externalApps = [
   {
     id: 'agent-onboard',
+    launch: 'Partner Onboarding', // what it is called in "Open your application"
+    launchDesc: 'Become a Walnut partner and get onboarded.',
     icon: 'handshake',
     name: 'Agent Onboard',
     desc: 'Register as a Walnut agent and complete your onboarding.',
@@ -51,6 +55,7 @@ export const externalApps = [
     icon: 'cap',
     name: 'Course Finder',
     desc: 'Search and compare online programmes for the students you advise.',
+    sso: 'course-finder',
     action: 'Open Course Finder',
     url: 'https://syu-course-finder.vercel.app',
   },
@@ -59,6 +64,7 @@ export const externalApps = [
     icon: 'marketing',
     name: 'Online Leads',
     desc: 'Access leads from students who are looking for online programmes.',
+    sso: 'leads',
     action: 'Open Online Leads',
     url: 'https://syu-leads.vercel.app',
   },

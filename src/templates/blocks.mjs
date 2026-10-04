@@ -1,5 +1,6 @@
 // Data-driven blocks shared across pages: journey steps, course pricing and cards, the application launcher.
 
+import config from '../../site.config.mjs';
 import { externalApps } from '../data/site.mjs';
 import { inr, offerOf } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
@@ -42,8 +43,76 @@ export function courseCard(root, course, i = 0, level = 3, reveal = true) {
   </article>`;
 }
 
+// "Open your application" on the home page. Online Leads, Partner Onboarding and Course Finder can be
+// chosen singly or together; each chosen one gets its own button. University is the exception: it is a
+// separate flow, so choosing it clears and disables the three (assets/js/roles.js holds the rule, and
+// the account server enforces the same one).
+export function applicationLauncher(root) {
+  const order = ['online-leads', 'agent-onboard', 'course-finder'];
+  const apps = order.map((id) => externalApps.find((app) => app.id === id));
+  const university = {
+    href: config.accounts ? `${root}login/?type=university` : `${root}configure/`,
+    action: config.accounts ? 'Continue as a university' : 'Start your university request',
+  };
+  return `<div class="launcher" data-launcher data-exclusive-group>
+    <fieldset class="launcher-set">
+      <legend><span>Select your applications</span><small>Choose one or more</small></legend>
+      <div class="launcher-options">
+        ${apps
+          .map(
+            (app) => `<label class="app">
+          <input class="sr-only" type="checkbox" name="application" value="${app.id}">
+          <span class="app-top"><span class="app-ico">${icon(app.icon)}</span><span class="check-badge" aria-hidden="true">${icon('check')}</span></span>
+          <span class="app-name">${app.launch ?? app.name}</span>
+          <span class="app-desc">${app.launchDesc ?? app.desc}</span>
+        </label>`
+          )
+          .join('\n        ')}
+      </div>
+      <p class="launcher-or"><span>or, for universities</span></p>
+      <label class="app app-row">
+        <input class="sr-only" type="checkbox" name="application" value="university" data-exclusive>
+        <span class="app-ico">${icon('building')}</span>
+        <span class="app-row-text"><span class="app-name">University</span><span class="app-desc">Apply for empanelment or continue your university application. Handled on its own — it cannot be combined with the applications above.</span></span>
+        <span class="check-badge" aria-hidden="true">${icon('check')}</span>
+      </label>
+      <p class="launcher-note" role="status" data-launcher-note></p>
+    </fieldset>
+    <div class="launcher-stage" aria-live="polite">
+      <p class="launcher-hint">Select one or more applications to continue.</p>
+      ${apps
+        .map((app) => {
+          const { href, away } = appLink(root, app);
+          return `<div class="launcher-panel" data-app="${app.id}">
+        <div>
+          <p class="launcher-kicker">Selected</p>
+          <p class="launcher-name">${app.launch ?? app.name}</p>
+          <p class="launcher-url">${app.launch ? `${app.name} · ` : ''}${new URL(app.url).host}</p>
+        </div>
+        <a class="btn btn-light btn-lg" href="${href}" target="_blank" rel="noopener" data-track="app_open" data-track-item="${app.id}"><span>${app.action}</span>${icon(away ? 'external' : 'arrow')}<span class="sr-only"> (opens in a new tab)</span></a>
+      </div>`;
+        })
+        .join('\n      ')}
+      <div class="launcher-panel" data-app="university">
+        <div>
+          <p class="launcher-kicker">Selected</p>
+          <p class="launcher-name">University</p>
+          <p class="launcher-url">Questions, programme selection, requirements and builds, then onboarding.</p>
+        </div>
+        <a class="btn btn-light btn-lg" href="${university.href}" data-track="journey_open" data-track-item="university"><span>${university.action}</span>${icon('arrow')}</a>
+      </div>
+    </div>
+  </div>`;
+}
+
 // Single-choice selector for Walnut's connected applications. `name` must be unique per page.
-export function appLauncher(name) {
+// An app that accepts a Walnut sign-in is opened through api/sso.php, which sends anyone not signed in to
+// the Walnut login first and then on to the app, so there is no second account anywhere. An app without an
+// `sso` id — and every app when accounts are off — stays a plain link to its own address, in a new tab.
+const appLink = (root, app) =>
+  config.accounts && app.sso ? { href: `${root}api/sso.php?app=${app.sso}`, away: false } : { href: esc(app.url), away: true };
+
+export function appLauncher(root, name) {
   return `<div class="launcher" data-launcher>
     <fieldset class="launcher-set">
       <legend><span>Select an application</span><small>Choose one</small></legend>
@@ -64,14 +133,17 @@ export function appLauncher(name) {
       <p class="launcher-hint">Select an application to continue.</p>
       ${externalApps
         .map(
-          (app) => `<div class="launcher-panel" data-app="${app.id}">
+          (app) => {
+            const { href, away } = appLink(root, app);
+            return `<div class="launcher-panel" data-app="${app.id}">
         <div>
           <p class="launcher-kicker">Selected</p>
           <p class="launcher-name">${app.name}</p>
           <p class="launcher-url">${new URL(app.url).host}</p>
         </div>
-        <a class="btn btn-light btn-lg" href="${esc(app.url)}" target="_blank" rel="noopener" data-track="app_open" data-track-item="${app.id}"><span>${app.action}</span>${icon('external')}<span class="sr-only"> (opens in a new tab)</span></a>
-      </div>`
+        <a class="btn btn-light btn-lg" href="${href}"${away ? ' target="_blank" rel="noopener"' : ''} data-track="app_open" data-track-item="${app.id}"><span>${app.action}</span>${icon(away ? 'external' : 'arrow')}${away ? '<span class="sr-only"> (opens in a new tab)</span>' : ''}</a>
+      </div>`;
+          }
         )
         .join('\n      ')}
     </div>

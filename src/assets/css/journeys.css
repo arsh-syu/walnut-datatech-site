@@ -115,7 +115,24 @@
   .course-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ---------- application launcher (single choice) ---------- */
+/* ---------- course tracks (the catalogue, grouped by category) ---------- */
+
+.tracks { display: grid; gap: clamp(36px, 5vw, 64px); }
+.track {
+  display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: clamp(24px, 5vw, 64px);
+  align-items: start; padding-top: clamp(28px, 4vw, 44px); border-top: 2px solid var(--ink);
+}
+.track-head { display: grid; justify-items: start; gap: var(--s-3); }
+.track-head h3 { font: 500 clamp(1.4rem, 2.4vw, 1.9rem)/1.12 var(--font-display); letter-spacing: -.035em; }
+.track-head p { color: var(--muted); }
+.track-count { font-size: .875rem; font-weight: 500; color: var(--violet-700); }
+/* one course fills the row; more share it */
+.track .course-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+@media (max-width: 900px) {
+  .track { grid-template-columns: minmax(0, 1fr); gap: var(--s-5); }
+}
+
+/* ---------- application launcher ---------- */
 
 .launcher-set { min-width: 0; margin: 0; padding: 0; border: 0; }
 .launcher-set legend { display: flex; align-items: center; gap: 12px; margin-bottom: var(--s-4); padding: 0; font: 500 1.125rem var(--font-display); letter-spacing: -.02em; }
@@ -140,6 +157,18 @@
 .app .check-badge { border-color: rgba(255, 255, 255, .3); }
 .app:has(input:checked) .check-badge { background: var(--violet-600); border-color: var(--violet-600); animation: pop .45s var(--spring); }
 .app:has(input:checked) .check-badge path { stroke-dashoffset: 0; }
+/* an option that cannot be combined with the current choice */
+.app.is-disabled { opacity: .42; cursor: not-allowed; }
+.app.is-disabled:hover { translate: 0 0; border-color: rgba(255, 255, 255, .14); }
+/* University: one wide card on its own row, set apart from the three applications */
+.launcher-or { display: flex; align-items: center; gap: 14px; margin-block: var(--s-4); font-size: .8125rem; font-weight: 500; color: var(--on-dark-muted); }
+.launcher-or::before, .launcher-or::after { content: ""; flex: 1; height: 1px; background: rgba(255, 255, 255, .16); }
+.app-row { flex-direction: row; align-items: center; gap: var(--s-4); }
+.app-row-text { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.launcher-note { min-height: 1.5em; margin-top: var(--s-3); font-size: .9375rem; font-weight: 500; color: #b3a3ff; }
+.launcher-note:empty { min-height: 0; margin-top: 0; }
+.launcher-stage { align-items: stretch; }
+.launcher-panel.is-active ~ .launcher-panel.is-active { padding-top: var(--s-4); border-top: 1px solid rgba(255, 255, 255, .12); }
 
 .launcher-stage { display: grid; gap: var(--s-4); align-items: center; min-height: 108px; margin-top: var(--s-3); padding: clamp(18px, 2.6vw, 28px); border-radius: var(--r-lg); background: rgba(255, 255, 255, .06); }
 .launcher-hint { display: none; color: var(--on-dark-muted); }

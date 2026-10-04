@@ -286,6 +286,46 @@ test('the account relay only reaches sign-in and "my account", and needs the acc
   assert.ok(php.includes("'#^/(auth|account)(/[A-Za-z0-9_-]{1,60}){1,4}$#'") && php.includes("'X-Walnut-Key: '"), 'the PHP twin has the same allow-list');
 });
 
+test('University is a flow of its own; partner and learner can be held together', async () => {
+  const { canCombine, canAdd, UNIVERSITY_ONLY } = await import('../src/assets/js/roles.js');
+  for (const ok of [['UNIVERSITY'], ['AGENT'], ['STUDENT'], ['AGENT', 'STUDENT']]) assert.ok(canCombine(ok), ok.join('+'));
+  for (const bad of [['UNIVERSITY', 'AGENT'], ['UNIVERSITY', 'STUDENT'], ['UNIVERSITY', 'AGENT', 'STUDENT']]) assert.ok(!canCombine(bad), bad.join('+'));
+  assert.ok(canAdd(['STUDENT'], 'AGENT') && canAdd(['AGENT'], 'STUDENT'), 'a learner can become a partner, and a partner can take courses');
+  assert.ok(!canAdd(['UNIVERSITY'], 'AGENT') && !canAdd(['UNIVERSITY'], 'STUDENT') && !canAdd(['AGENT'], 'UNIVERSITY'), 'nothing is added to, or turned into, a university account');
+  // The server holds the same rule, in every place an account's types can change or be used.
+  const php = readFileSync(join(projectRoot, 'src/api/account-lib.php'), 'utf8');
+  assert.ok(php.includes(`const UNIVERSITY_ONLY = '${UNIVERSITY_ONLY}';`), 'one message, the same on both sides');
+  assert.ok(php.includes("return !in_array('UNIVERSITY', $types, true) || count($types) === 1;"));
+  assert.match(php, /case 'POST \/auth\/otp\/register':[\s\S]*?if \(!allowed_types\(\$types\)\)[\s\S]*?UNIVERSITY_EXCLUSIVE/, 'sign-up refuses University with anything else');
+  assert.match(php, /case 'POST \/account\/services':[\s\S]*?in_array\('UNIVERSITY', \$current, true\) \? \[\]/, 'a university account cannot add the other journeys');
+  assert.match(php, /case 'POST \/account\/agent-application':[\s\S]*?if \(university_only\(\$user\)\)[\s\S]*?403/, 'a university account cannot apply as a partner');
+  assert.ok(readFileSync(join(projectRoot, 'src/api/sso.php'), 'utf8').includes("if (university_only($user) && $appId !== 'onboarding')"), 'nor open the partner apps');
+});
+
+test('"Open your application" offers the three applications together and University on its own', () => {
+  const home = readFileSync(join(dist, 'index.html'), 'utf8');
+  const launcher = home.slice(home.indexOf('data-exclusive-group'), home.indexOf('launcher-stage'));
+  const values = [...launcher.matchAll(/type="checkbox" name="application" value="([^"]+)"( data-exclusive)?/g)].map((m) => m[1] + (m[2] ? '!' : ''));
+  assert.deepEqual(values, ['online-leads', 'agent-onboard', 'course-finder', 'university!'], 'three applications that combine, then University marked exclusive');
+  for (const name of ['Online Leads', 'Partner Onboarding', 'Course Finder']) assert.ok(launcher.includes(`<span class="app-name">${name}</span>`), name);
+  assert.ok(!home.includes('What are you already working on'), 'the journey picker is gone');
+  for (const app of ['online-leads', 'agent-onboard', 'course-finder', 'university']) assert.ok(home.includes(`class="launcher-panel" data-app="${app}"`), `${app} has its own action`);
+});
+
+test('programme selection: four tick boxes and Other, which opens a list', () => {
+  const qs = questionsFor('university');
+  const programmes = qs.find((q) => q.id === 'programmes');
+  assert.deepEqual(programmes.options, ['MBA', 'MCA', 'BBA', 'BCA', 'Other']);
+  assert.ok(programmes.type === 'multi' && programmes.boxes && programmes.required && programmes.label === 'Which programme do you want to apply for?');
+  const other = qs.find((q) => q.id === 'programmeOther');
+  assert.ok(other.type === 'select' && other.required && other.options.length > 3 && !other.options.some((o) => programmes.options.includes(o)), 'Other is a list to choose from, not free text');
+  assert.deepEqual(other.showIf, { all: [{ field: 'programmes', op: 'contains', value: 'Other' }] });
+  assert.ok(qs.indexOf(programmes) === 0 && qs.indexOf(other) === 1, 'asked first in Requirements & builds');
+  assert.ok(!qs.some((q) => q.id === 'programmesPlanned'), 'the old free-text field is replaced');
+  const { labels } = JSON.parse(readFileSync(join(dist, 'api/emails.json'), 'utf8'));
+  assert.equal(labels.programmes, 'Which programme do you want to apply for?', 'the answer is named in the emails');
+});
+
 test('the questions are data: unique ids, known types and conditions that point somewhere', () => {
   const ids = questions.map((q) => q.id);
   assert.equal(new Set(ids).size, ids.length, 'question ids are unique');
@@ -381,11 +421,13 @@ test('request status needs the Request ID and the registered email, and returns 
 
 test('every email template is complete and on-brand', () => {
   const { row, emails } = JSON.parse(readFileSync(join(dist, 'api/emails.json'), 'utf8'));
-  assert.deepEqual(Object.keys(emails).sort(), ['enquiry_ack', 'enquiry_notify', 'enrol_confirm', 'enrol_notify', 'request_ack']);
+  assert.deepEqual(Object.keys(emails).sort(), ['enquiry_ack', 'enquiry_notify', 'enrol_confirm', 'enrol_notify', 'otp', 'request_ack']);
   assert.ok(row.includes('{{label}}') && row.includes('{{{value}}}'));
   for (const [name, email] of Object.entries(emails)) {
     assert.ok(email.subject && email.html && email.text, name);
-    assert.ok(email.html.includes('{{{rows}}}') && email.text.includes('{{{rows}}}'), `${name} lists the details`);
+    // The one-time code email carries a code instead of a list of details.
+    if (name === 'otp') assert.ok(email.html.includes('{{code}}') && email.text.includes('{{code}}'), 'otp carries the code');
+    else assert.ok(email.html.includes('{{{rows}}}') && email.text.includes('{{{rows}}}'), `${name} lists the details`);
     assert.ok(email.html.includes('/assets/img/logo-email.png') && email.html.includes('#0d0c14'), `${name} carries the logo and brand ink`);
   }
 });
@@ -417,5 +459,6 @@ test('server configuration sets security headers and caching', () => {
   }
   const api = readFileSync(join(dist, 'api/.htaccess'), 'utf8');
   assert.match(api, /config\|catalog\|lib/);
-  assert.match(api, /emails\\\.json/, 'email templates are not served');
+  assert.match(api, /lib\|account-lib/, 'the account library is not served');
+  assert.match(api, /\(emails\|agent-questions\)\\\.json/, 'email templates and the partner questions are not served');
 });

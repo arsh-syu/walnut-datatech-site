@@ -5,7 +5,7 @@ import { courses } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
 import { vignette } from './vignettes.mjs';
 import { button, mark, splitWords, sectionHead, videoTile, ctaBand, esc, accountPrompt } from './layout.mjs';
-import { journeySteps, courseCard, appLauncher } from './blocks.mjs';
+import { journeySteps, courseCard, applicationLauncher } from './blocks.mjs';
 
 // Interactive service showcase: a tab list of all service areas, grouped by lifecycle stage.
 export function showcase(root) {
@@ -69,7 +69,7 @@ function audienceBody(root, id) {
       ${externalApps.map((app) => `<div class="app-preview-item"><span class="app-ico">${icon(app.icon)}</span><div><h4 class="app-name">${app.name}</h4><p class="app-desc">${app.desc}</p></div></div>`).join('')}
     </div>
     <div class="actions center">
-      ${button({ href: '#apps', label: 'Open an application', size: 'lg', arrow: true })}
+      ${button({ href: `${root}partners/#apps`, label: 'Open an application', size: 'lg', arrow: true })}
       ${button({ href: `${root}partners/`, label: 'How the partnership works', variant: 'ghost', size: 'lg' })}
     </div>`;
 }
@@ -140,8 +140,8 @@ ${film}
 
 <section class="section section-dark" id="apps">
   <div class="wrap">
-    ${sectionHead({ eyebrow: 'Walnut applications', title: 'Already working with us? Open your application.', text: 'Pick the tool you need and jump straight in.' })}
-    <div data-reveal>${appLauncher('home-app')}</div>
+    ${sectionHead({ eyebrow: 'Walnut applications', title: 'Already working with us? Open your application.', text: 'Choose the applications you need — one or several — and open each from here. University applications are handled on their own.' })}
+    <div data-reveal>${applicationLauncher(root)}</div>
   </div>
 </section>
 

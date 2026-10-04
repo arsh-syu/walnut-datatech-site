@@ -24,13 +24,14 @@
 .login-method span { font-size: .875rem; color: var(--muted); }
 
 .login-form, .login-setup, .login-password, .otp { display: grid; gap: var(--s-4); margin-top: var(--s-5); }
-.login-form[hidden] { display: none; }
+.login-form[hidden], .login-methods[hidden] { display: none; }
 .login-form .btn, .login-setup .btn, .login-password .btn, .otp .btn { width: 100%; }
 .login-phone { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 8px; }
 .login-note { font-size: .8125rem; color: var(--muted); }
 .login-alt { margin-top: var(--s-5); font-size: .9375rem; color: var(--muted); }
 .login .field-error:empty { display: none; }
 
+.login-legend { margin-bottom: var(--s-2); padding: 0; font-size: .875rem; color: var(--muted); }
 .login-purposes { display: grid; gap: var(--s-2); }
 .login-purpose { position: relative; cursor: pointer; }
 .field .login-purpose input { width: 1px; padding: 0; border: 0; }
@@ -39,6 +40,11 @@
 .login-purpose small { font-size: .875rem; color: var(--muted); }
 .login-purpose:hover > span { border-color: var(--line-strong); }
 .login-purpose input:checked + span { border-color: var(--violet-600); background: #faf9ff; box-shadow: 0 0 0 4px rgba(125, 98, 255, .16); }
+.login-purpose.is-disabled { cursor: not-allowed; }
+.login-purpose.is-disabled > span { opacity: .45; }
+.login-purpose.is-disabled:hover > span { border-color: var(--line); }
+[data-exclusive-note]:empty { display: none; }
+[data-exclusive-note] { margin-top: var(--s-2); font-weight: 500; color: var(--violet-700); }
 .login-purpose input:focus-visible + span { outline: 2px solid var(--violet-600); outline-offset: 2px; }
 
 /* ---------- one-time code ---------- */
@@ -59,6 +65,7 @@
 .acct { padding-block: clamp(24px, 4vw, 56px) var(--section); background: var(--mist); min-height: 70vh; }
 .acct-grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: clamp(20px, 3vw, 40px); align-items: start; }
 .acct-card, .acct-panel, .acct-hello, .acct-notice { border-radius: var(--r-xl); background: #fff; }
+.acct-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .acct-card { position: sticky; top: calc(var(--header-h) + 24px); display: grid; justify-items: center; gap: var(--s-3); padding: clamp(22px, 3vw, 32px); text-align: center; }
 .acct-avatar { display: grid; place-items: center; width: 96px; height: 96px; border: 3px solid var(--violet-600); border-radius: 50%; background: var(--violet-soft); color: var(--violet-700); font: 500 2rem var(--font-display); letter-spacing: -.02em; }
 .acct-name { font: 500 1.4rem/1.2 var(--font-display); letter-spacing: -.03em; overflow-wrap: anywhere; }
@@ -68,9 +75,12 @@
 .acct-ok { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; border-radius: 50%; background: rgba(23, 178, 106, .14); color: #0d7a47; font-size: .7rem; vertical-align: -.15em; }
 .acct-card > .btn { justify-self: stretch; }
 
-.acct-main { display: grid; gap: var(--s-4); min-width: 0; }
+.acct-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); min-width: 0; }
 .acct-hello { padding: clamp(22px, 3vw, 36px); background: linear-gradient(120deg, #fff 30%, var(--violet-soft)); }
 .acct-hello p { color: var(--muted); }
+.acct-apps { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); padding: 14px clamp(18px, 3vw, 28px); border-radius: var(--r-xl); background: #fff; }
+.acct-apps p { font-size: .875rem; font-weight: 600; color: var(--muted); }
+.acct-apps ul { display: flex; flex-wrap: wrap; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
 .acct-hello h2 { font: 500 clamp(1.6rem, 3.4vw, 2.4rem)/1.1 var(--font-display); letter-spacing: -.035em; overflow-wrap: anywhere; }
 .acct-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3) var(--s-5); padding: 18px clamp(18px, 2.6vw, 28px); border: 1.5px dashed var(--violet); background: var(--violet-soft); }
 .acct-notice div { display: grid; gap: 2px; }
@@ -82,7 +92,7 @@
 .acct-tabs button { flex: none; padding: 12px 2px; margin-bottom: -1px; border: 0; border-bottom: 3px solid transparent; background: none; cursor: pointer; font: 500 1rem var(--font-body); color: var(--muted); white-space: nowrap; transition: color .2s, border-color .3s var(--ease); }
 .acct-tabs button:hover { color: var(--ink); }
 .acct-tabs button[aria-selected="true"] { border-color: var(--violet-600); color: var(--ink); font-weight: 600; }
-.acct-view { display: grid; gap: var(--s-4); animation: rise .4s var(--ease) both; }
+.acct-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); animation: rise .4s var(--ease) both; }
 .acct-view:focus { outline: none; }
 .acct-view > .form { margin: 0; }
 

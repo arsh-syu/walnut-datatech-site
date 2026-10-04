@@ -12,3 +12,6 @@ node_modules/
 
 # packaged copies of the site
 *.zip
+
+# an unpacked copy of the separate account service (its own project)
+walnut-account-service/

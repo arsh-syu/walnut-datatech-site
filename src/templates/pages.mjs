@@ -1,7 +1,7 @@
 import config from '../../site.config.mjs';
 import { areas, stages } from '../data/services.mjs';
 import { audiences, externalApps } from '../data/site.mjs';
-import { courses, currency, inr, offerOf } from '../data/courses.mjs';
+import { courses, tracks, currency, inr, offerOf } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
 import { button, mark, splitWords, sectionHead, videoTile, enquiryForm, ctaBand, esc, accountPrompt } from './layout.mjs';
 import { journeySteps, priceFlow, courseCard, appLauncher } from './blocks.mjs';
@@ -21,24 +21,129 @@ export function partners({ root }) {
   </div>
 </section>`
     : '<div class="section-gap"></div>';
+  // Applying creates (or continues) a partner application on the Walnut account. Without accounts
+  // switched on there is no application form yet, so the page sends people to Agent Onboard instead.
+  const applyHref = config.accounts ? `${root}login/?type=agent` : '#apps';
+  const applyLabel = config.accounts ? 'Start your partner application' : 'Open Agent Onboarding';
+
+  const benefits = [
+    ['cap', 'Real programmes to offer', 'Online degree programmes from the universities Walnut works with — so every student you advise has a genuine option.'],
+    ['counselling', 'Course Finder', 'Search and compare programmes by subject, fee and university, and give a student a straight answer in one sitting.'],
+    ['marketing', 'Leads sent to you', 'Students who come to Walnut looking for an online programme are passed to partners through Online Leads.'],
+    ['handshake', 'Onboarding and support', 'You are taken through onboarding step by step, and our team stays reachable once you are working.'],
+    ['user', 'One account for everything', 'Your application, your status and your applications all sit behind a single Walnut sign-in.'],
+    ['compliance', 'A transparent process', 'You can see exactly where your application stands at every point, with no chasing required.'],
+  ];
+
+  const who = [
+    ['Independent counsellors', 'You advise students on where and what to study, on your own or as a small practice.'],
+    ['Education consultancies', 'You already place students with institutions and want online programmes in your portfolio.'],
+    ['Coaching and training institutes', 'You teach students who go on to look for a degree, and want something to offer them next.'],
+    ['Schools and colleges', 'You guide your own students and alumni towards further study.'],
+    ['Recruitment and staffing firms', 'You work with people whose next step is a qualification they can take while working.'],
+  ];
+
+  const how = [
+    ['Apply', 'Create your Walnut account and fill in the partner application — about you, where you work, your experience and what you want to work on.'],
+    ['We review', 'Our team reads every application. You can come back and edit yours while it is still under review.'],
+    ['Get onboarded', 'Once you are approved we take you through onboarding, the programmes on offer and how referrals are handled.'],
+    ['Open your applications', 'Agent Onboard, Course Finder and Online Leads become yours to use — all three are listed below.'],
+    ['Start working', 'Advise students, submit them through the programmes you have access to, and work the leads we send.'],
+  ];
+
+  const needs = [
+    'Your name, email address and mobile number',
+    'The city and state you work in, and the areas you cover',
+    'Your organisation’s name and type, if you are applying as an organisation',
+    'How long you have worked in counselling or admissions',
+    'Roughly how many students you can reach in a year',
+    'What you want to work on — degree programmes, short courses or referring universities',
+  ];
+
   const body = `
 <section class="page-hero">
   <div class="wrap">
     <p class="eyebrow hero-fade">For agents and partners</p>
-    <h1 class="display display-md">${splitWords('Join Walnut.')}</h1>
-    <p class="lede hero-fade" style="--d:.4s">Become a Walnut agent. Get onboarded, find the right online programme for every student you advise, and work the leads we send your way.</p>
+    <h1 class="display display-md">${splitWords('Become a Walnut partner.')}</h1>
+    <p class="lede hero-fade" style="--d:.4s">Get onboarded as a Walnut agent, find the right online programme for every student you advise, and work the leads we send your way.</p>
     <div class="actions hero-fade" style="--d:.55s">
-      ${button({ href: '#apps', label: 'Open an application', size: 'lg', arrow: true })}
-      ${config.videos.partnerOnboarding ? `<a class="btn btn-ghost btn-lg" href="#onboarding-video">${icon('play')}<span>Watch the onboarding tutorial</span></a>` : ''}
+      ${button({ href: applyHref, label: applyLabel, size: 'lg', arrow: true })}
+      ${config.videos.partnerOnboarding ? `<a class="btn btn-ghost btn-lg" href="#onboarding-video">${icon('play')}<span>Watch the onboarding tutorial</span></a>` : `${button({ href: '#how', label: 'How it works', variant: 'ghost', size: 'lg' })}`}
     </div>
     <div class="hero-fade" style="--d:.7s">${journeySteps(a.steps)}</div>
+  </div>
+</section>
+
+<section class="section" id="why">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Why Walnut', title: 'What you get as a partner.', text: 'Programmes to offer, tools to work with and a team behind you — not just a listing.' })}
+    <div class="facts">
+      ${benefits
+        .map(
+          ([ico, label, text], i) => `<div class="fact" data-reveal style="--d:${i * 0.06}s">
+        <span class="area-ico">${icon(ico)}</span>
+        <h3>${label}</h3>
+        <p>${text}</p>
+      </div>`
+        )
+        .join('\n      ')}
+    </div>
+  </div>
+</section>
+
+<section class="section section-mist" id="who">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Who can apply', title: 'Who becomes a Walnut partner.', text: 'You can apply as an individual or as an organisation. Experience helps, but it is not a requirement.' })}
+    <div class="models models-compact">
+      ${who
+        .map(
+          ([name, text], i) => `<article class="model-card spot" data-reveal style="--d:${i * 0.06}s">
+        <h3>${name}</h3>
+        <p>${text}</p>
+      </article>`
+        )
+        .join('\n      ')}
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'How it works', title: 'From applying to your first student.', text: 'Five steps. You can see where you stand at every one of them.' })}
+    <ol class="caps">
+      ${how
+        .map(
+          ([title, text], i) => `<li class="cap" data-reveal style="--d:${(i % 2) * 0.08}s">
+        <span class="cap-n">${String(i + 1).padStart(2, '0')}</span>
+        <div><h3>${title}</h3><p>${text}</p></div>
+      </li>`
+        )
+        .join('\n      ')}
+    </ol>
+  </div>
+</section>
+
+<section class="section section-mist" id="apply">
+  <div class="wrap course-details">
+    <div data-reveal>
+      <p class="eyebrow">The application</p>
+      <h2 class="title">What you’ll need to hand.</h2>
+      <p class="lede">The partner application takes a few minutes. It saves as you go, so you can finish it later and edit it while it is still under review.</p>
+      <div class="actions">
+        ${button({ href: applyHref, label: applyLabel, variant: 'accent', size: 'lg', arrow: true })}
+      </div>
+      ${accountPrompt(root, 'agent', 'Your application lives in your Walnut account — that is where you come back to check its status and continue it.')}
+    </div>
+    <ul class="who-list" data-reveal style="--d:.1s">
+      ${needs.map((n) => `<li>${icon('check')}${n}</li>`).join('\n      ')}
+    </ul>
   </div>
 </section>
 
 <section class="section section-dark" id="apps">
   <div class="wrap">
     ${sectionHead({ eyebrow: 'Partner applications', title: 'Three applications. Pick the one you need.', text: 'New to Walnut? Start with Agent Onboard.' })}
-    <div data-reveal>${appLauncher('partner-app')}</div>
+    <div data-reveal>${appLauncher(root, 'partner-app')}</div>
   </div>
 </section>
 
@@ -49,15 +154,17 @@ ${ctaBand(root, {
   text: 'Tell us about your work and we’ll help you get set up as a Walnut agent.',
   actions: [
     { href: `${root}contact/`, label: 'Talk to us' },
-    { href: '#apps', label: 'Open an application' },
+    { href: '#apply', label: 'Start your application' },
   ],
 })}
 `;
   return {
-    title: 'Partners — join Walnut as an agent',
-    description: 'Join Walnut Data Tech as an agent or partner: Agent Onboard, Course Finder and Online Leads — the applications education agents use to grow.',
+    title: 'Partners — become a Walnut agent',
+    description:
+      'Become a Walnut Data Tech partner: who can apply, what you get, how onboarding works, and the applications education agents use to grow — Agent Onboard, Course Finder and Online Leads.',
     body,
     bodyClass: 'page-partners',
+    sticky: { href: applyHref, label: applyLabel },
   };
 }
 
@@ -65,27 +172,113 @@ ${ctaBand(root, {
 
 export function academy({ root }) {
   const a = audience('learners');
+  const cheapest = courses.reduce((low, c) => Math.min(low, offerOf(c)?.finalPrice ?? c.price), Infinity);
+
+  // Courses grouped by track, so the catalogue reads as categories rather than one flat list.
+  const trackSections = tracks
+    .map((t) => {
+      const inTrack = courses.filter((c) => c.track === t.id);
+      if (!inTrack.length) return '';
+      return `<div class="track" data-reveal>
+        <header class="track-head">
+          <span class="area-ico">${icon(t.icon)}</span>
+          <h3>${t.name}</h3>
+          <p>${t.line}</p>
+          <p class="track-count">${inTrack.length} ${inTrack.length === 1 ? 'course' : 'courses'}</p>
+        </header>
+        <div class="course-grid">${inTrack.map((c, i) => courseCard(root, c, i, 4)).join('')}</div>
+      </div>`;
+    })
+    .join('\n      ');
+
+  const included = [
+    ['screen', 'Online, on your own time', 'Every course is delivered online. Start when you like and work through it at your own pace, on a laptop or a phone.'],
+    ['clock', 'Short and focused', 'These are short courses, not degrees. They are built to be finished alongside a job or your studies.'],
+    ['certificate', 'Certification where offered', `A certificate is issued on completion of ${courses.filter((c) => c.certificate).map((c) => c.name).join(' and ')}.`],
+    ['cap', 'Open to everyone', 'No entrance test and no prior qualification. Each course page states anything you should know before you start.'],
+    ['lock', 'Secure online payment', 'Pay by card, UPI or netbanking through Razorpay. Your receipt and access details are emailed to you straight away.'],
+    ['user', 'Your courses in one place', 'Enrol with the same email each time and every course you have bought sits together in your Walnut account.'],
+  ];
+
+  const steps = [
+    ['Choose your course', 'Pick a track above and open the course to see what it covers, who it is for and what it costs.'],
+    ['Check the details', 'Each course page lists the format, the duration, what you will learn and the certificate — before you pay anything.'],
+    ['Enrol and pay securely', 'Enter your name, email and phone, apply a coupon if you have one, and pay online through Razorpay.'],
+    ['Start learning', 'Your access details are emailed to you. Sign in to your Walnut account any time to see the courses you own.'],
+  ];
+
   const body = `
 <section class="page-hero">
   <div class="wrap">
     <p class="eyebrow hero-fade">For counsellors, students and professionals</p>
     <h1 class="display display-md">${splitWords('Upgrade your skills.')}</h1>
     <p class="lede hero-fade" style="--d:.4s">Short online courses from Walnut Data Tech. Choose a course to see what it covers, who it’s for and what it costs — then enrol when you’re ready.</p>
-    <div class="hero-fade" style="--d:.55s">${journeySteps(a.steps)}</div>
+    <div class="actions hero-fade" style="--d:.55s">
+      ${button({ href: '#courses', label: 'Explore courses', size: 'lg', arrow: true })}
+      ${button({ href: '#how', label: 'How enrolling works', variant: 'ghost', size: 'lg' })}
+    </div>
+    <div class="hero-fade" style="--d:.7s">${journeySteps(a.steps)}</div>
   </div>
 </section>
 
-<section class="section section-tight" id="courses">
+<section class="section" id="courses">
   <div class="wrap">
-    <h2 class="sr-only">Courses</h2>
-    <div class="course-grid">${courses.map((c, i) => courseCard(root, c, i)).join('')}</div>
+    ${sectionHead({
+      eyebrow: 'The catalogue',
+      title: 'Choose your course.',
+      text: `${courses.length} short online ${courses.length === 1 ? 'course' : 'courses'} across ${tracks.filter((t) => courses.some((c) => c.track === t.id)).length} tracks, from ${inr(cheapest)}. Open a course for the full details, then enrol from the same page.`,
+    })}
+    <div class="tracks">
+      ${trackSections}
+    </div>
+  </div>
+</section>
+
+<section class="section section-mist" id="included">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'What you get', title: 'What every Walnut course includes.', text: 'The same format, the same clear pricing and the same account across the catalogue.' })}
+    <div class="facts">
+      ${included
+        .map(
+          ([ico, label, text], i) => `<div class="fact" data-reveal style="--d:${i * 0.06}s">
+        <span class="area-ico">${icon(ico)}</span>
+        <h3>${label}</h3>
+        <p>${text}</p>
+      </div>`
+        )
+        .join('\n      ')}
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how">
+  <div class="wrap">
+    ${sectionHead({ eyebrow: 'Enrolment', title: 'From choosing a course to starting it.', text: 'Four steps, all on this site. Nothing is charged until you confirm the payment.' })}
+    <ol class="caps">
+      ${steps
+        .map(
+          ([title, text], i) => `<li class="cap" data-reveal style="--d:${(i % 2) * 0.08}s">
+        <span class="cap-n">${String(i + 1).padStart(2, '0')}</span>
+        <div><h3>${title}</h3><p>${text}</p></div>
+      </li>`
+        )
+        .join('\n      ')}
+    </ol>
+    <div class="actions" data-reveal>
+      ${button({ href: '#courses', label: 'Explore courses', size: 'lg', arrow: true })}
+      ${button({ href: `${root}contact/`, label: 'Ask a question', variant: 'ghost', size: 'lg' })}
+    </div>
+    ${accountPrompt(root, 'student', 'Every course you buy with the same email sits together in your Walnut account.')}
   </div>
 </section>
 
 ${ctaBand(root, {
   title: 'Not sure which course fits?',
   text: 'Tell us where you are in your career and we’ll help you choose.',
-  actions: [{ href: `${root}contact/`, label: 'Talk to us' }],
+  actions: [
+    { href: `${root}contact/`, label: 'Talk to us' },
+    { href: '#courses', label: 'See the courses' },
+  ],
 })}
 `;
   return {
@@ -93,6 +286,7 @@ ${ctaBand(root, {
     description: `Short online courses from Walnut Data Tech: ${courses.map((c) => c.name).join(' and ')}. See the details and enrol online.`,
     body,
     bodyClass: 'page-academy',
+    sticky: { href: '#courses', label: 'Explore courses' },
   };
 }
 
@@ -155,6 +349,7 @@ export function coursePage({ root }, course) {
     </div>
     <dl class="detail-list" data-reveal style="--d:.1s">
       ${details.map(([ico, label, value]) => `<div><dt>${icon(ico)}${label}</dt><dd>${value}</dd></div>`).join('')}
+      ${course.eligibility ? `<div><dt>${icon('cap')}Eligibility</dt><dd>${course.eligibility}</dd></div>` : ''}
       <div><dt>${icon('tag')}Fee</dt><dd>${inr(course.price)}${offer ? ` · ${inr(offer.finalPrice)} with coupon ${offer.code}` : ' · no discount currently'}</dd></div>
     </dl>
   </div>

@@ -143,8 +143,8 @@ const steps = [
   },
   {
     name: 'requirements',
-    title: 'Tell us what you need.',
-    sub: 'A few questions about the services you chose. Answer what you can — most are optional.',
+    title: 'Requirements & builds.',
+    sub: 'Tell us which programmes you are applying for and what you need built. Most of the rest is optional.',
     sections: ['requirements'],
     render: () => renderQuestions(['requirements']),
     problem: () => (firstInvalid(['requirements']) ? 'Please complete the highlighted answers.' : ''),

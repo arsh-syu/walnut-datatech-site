@@ -103,6 +103,22 @@ export const emails = {
     text: `Thank you, {{name}}.\n\nWe’ve received the empanelment request for {{from}}.\n\nOur team will review it and communicate with you on this email address.{{keep}}\n\nHere’s a copy of what you sent:\n\n{{{rows}}}\n${config.company.name}\n${config.siteUrl}/\n`,
   },
 
+  // → someone signing in to (or verifying) their Walnut account
+  otp: {
+    subject: 'Your Walnut Data Tech login OTP',
+    html: shell({
+      preheader: 'Your one-time code. It expires in {{minutes}} minutes.',
+      heading: 'Your one-time code',
+      body:
+        p('Use this code to {{purpose}}:') +
+        `<p style="margin:0 0 16px;font-family:${displayFont};font-size:34px;line-height:1.2;font-weight:600;letter-spacing:8px;color:${ink};">{{code}}</p>` +
+        p('It expires in {{minutes}} minutes and works once.') +
+        `<p style="margin:0;font-size:13px;color:${muted};">Walnut will never ask you for this code. Do not share it with anyone. If you did not request it, you can ignore this email.</p>`,
+      footer: 'You’re receiving this because this address was entered on our login page.',
+    }),
+    text: `Your one-time code to {{purpose}} is {{code}}.\n\nIt expires in {{minutes}} minutes and works once. Walnut will never ask you for this code — do not share it with anyone. If you did not request it, you can ignore this email.\n\n${config.company.name}\n${config.siteUrl}/\n`,
+  },
+
   // → the learner, after a verified payment
   enrol_confirm: {
     subject: 'You’re enrolled: {{course}}',

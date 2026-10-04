@@ -6,6 +6,7 @@
 //   { ok, reference?, duplicate? }. No other form or journey does this.
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
+require __DIR__ . '/account-lib.php';
 
 $in = read_post();
 
@@ -69,7 +70,26 @@ rate_limit('enquiry', 8, 600);
 // University journey only. Filed before the team's email so that email can say whether it worked.
 $onboarding = [];
 $filed = null;
-if ($university && onboarding_configured($config)) {
+if ($university && accounts_configured($config)) {
+    // Kept in this site's own database (it shows in the university's dashboard) and, when the
+    // Onboarding Tool is configured, filed there through its API — the tool then gives the Request ID.
+    $filed = account_file_request($config, [
+        'universityName' => $organisation,
+        'universityType' => $institutionType,
+        'contactName' => $name,
+        'email' => $email,
+        'phone' => $phone,
+        'message' => $message,
+        'configuration' => $configuration,
+        'form' => $answers ?: null,
+        'page' => $page,
+    ]);
+    if (onboarding_configured($config)) {
+        $onboarding = [['Onboarding Tool', !empty($filed['filed'])
+            ? 'Filed as request ' . $filed['reference'] . ($filed['duplicate'] ? ' (an open request from this email was updated)' : '') . ' — review it in the Onboarding Tool.'
+            : 'Not filed yet — the Onboarding Tool could not be reached. The website keeps the request and files it automatically when the tool is back.']];
+    }
+} elseif ($university && onboarding_configured($config)) {
     $filed = forward_university_request($config, [
         'universityName' => $organisation,
         'universityType' => $institutionType,
@@ -106,8 +126,8 @@ $first = array_merge($reference !== '' ? [['Request ID', $reference]] : [], [['T
 
 // The enquiry only counts as sent if the team's copy went out.
 if (!send_email($config, 'enquiry_notify', $config['email_notify'], 'Walnut Data Tech', $vars, array_merge($first, $rows, [['Sent from', $page]], $onboarding))) {
-    // A filed request is safe in the Onboarding Tool even if the team's email could not go out.
-    if ($reference === '') {
+    // A stored request is safe (here or in the Onboarding Tool) even if the team's email could not go out.
+    if ($filed === null) {
         respond(502, ['error' => 'Sorry — your enquiry could not be sent. Please try again in a moment.']);
     }
 }

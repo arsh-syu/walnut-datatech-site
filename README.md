@@ -34,7 +34,7 @@ Requires Node 20+. There is nothing to install — no dependencies.
 | Deploy script, local dev server | `scripts/` |
 | Tests | `tests/` |
 | Brand kit for re-theming other tools (tokens, component styles, logos, icons, guidelines) | `brand/` — start with `brand/brand-book.html` |
-| Secrets (FTP login, Razorpay keys, Twilio API key, Onboarding Tool key) — never committed | `.env` (see `.env.example`) |
+| Secrets (FTP login, Razorpay keys, Twilio API key, account database login, Onboarding Tool key) — never committed | `.env` (see `.env.example`) |
 
 ## Common edits
 
@@ -62,7 +62,7 @@ To go live: fill `legal.refundPolicy` in `site.config.mjs`, replace the test key
 
 ## Email
 
-The site sends four emails through Twilio, all from the address in `EMAIL_FROM`:
+The site sends five emails through Twilio, all from the address in `EMAIL_FROM`:
 
 | When | Who receives it |
 |---|---|
@@ -70,6 +70,7 @@ The site sends four emails through Twilio, all from the address in `EMAIL_FROM`:
 | The same | The sender, as an acknowledgement with a copy of what they sent |
 | A course payment is verified | The learner, as an enrolment confirmation with the payment reference |
 | The same | The team, with the learner's contact details and both references |
+| Someone signs in, or verifies their email, with a one-time code | That person, with the code |
 
 - The browser posts an enquiry to `api/enquiry.php`; the server validates it, rate-limits it and sends the emails. The Twilio key never reaches the browser.
 - An enquiry only shows "Thank you" if the team's copy was accepted by Twilio. Otherwise the visitor is asked to try again.
@@ -105,7 +106,23 @@ Leave `ONBOARDING_API_URL` / `ONBOARDING_API_KEY` empty and nothing is filed —
 
 ## Walnut accounts (login and dashboard)
 
-Login and the dashboard are pages of this website — `walnutdatatech.com/login/` and `/dashboard/` — in the site's own design. Nothing happens on another domain or subdomain: the pages call this site's own API, and that relays to the account service (the Onboarding Tool) behind the scenes.
+Login and the dashboard are pages of this website — `walnutdatatech.com/login/` and `/dashboard/` — in the site's own design. Nothing happens on another domain or subdomain: the pages call this site's own API (`api/account.php`), which answers in one of two ways.
+
+**From the web host's own MySQL database — what production uses.** `api/account-lib.php` keeps accounts, sessions, one-time codes, empanelment requests, course purchases and partner applications in tables named `wa_*`, which it creates on first use. Set `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` and `ACCOUNT_SECRET` in `.env` (plus the email settings — codes go out by email) and deploy.
+
+- Sign-in is by a one-time code sent by email (the `otp` template). Codes by SMS switch on once `TWILIO_ACCOUNT_SID` and `SMS_FROM` (a Twilio number or Messaging Service) are set; until then the pages offer email only.
+- A University request gets its Request ID (`UR-000123`) from the `wa_requests` table and shows under *My requests*; `/request-status/` reads the same table. There is no review screen: the team is emailed each request, and a request's `status` is changed in the database (`PENDING_REVIEW`, `UNDER_REVIEW`, `CHANGES_REQUIRED`, `COUNTER_PROPOSAL`, `APPROVED`, `REJECTED`).
+- A partner application is emailed to the team and kept in `wa_agent_applications`; its `status` and `decision_note` are likewise set in the database. Its questions are data: `src/data/agent-questions.mjs`.
+- `api/health.php` reports `accounts: true` when the database is configured and reachable.
+- The local dev server does not mirror this mode; test it against a PHP server.
+
+**With the Onboarding Tool as well.** When `ONBOARDING_API_URL` and `ONBOARDING_API_KEY` are also set, login and the dashboard stay on this site's database, and University requests are additionally filed in the tool through its API (`POST /api/v1/public/university-requests`, header `X-Walnut-Key`; the key is the tool's `UNIVERSITY_REQUEST_API_KEY`):
+
+- The tool numbers requests. The Request ID a university sees is the one the tool answers with; a request sent again from the same email updates the open one on both sides.
+- If the tool cannot be reached, the request is kept here without a Request ID and filed automatically later (on the next request, dashboard visit or status lookup). The team's email says which happened.
+- Review status comes back through `POST /api/v1/public/university-requests/status` (`{ reference, email }` → `{ status, updatedAt, … }`), asked at most once a minute per request; the tool's `NEW` is shown as *Submitted*. A tool without that call simply leaves the status as it is.
+
+**By relaying to the Onboarding Tool only.** Without the `DB_*` settings, the login and dashboard calls are passed to the tool instead, as described below.
 
 ```
 browser → walnutdatatech.com/login, /dashboard
@@ -121,6 +138,20 @@ browser → walnutdatatech.com/login, /dashboard
 - **Purchases.** After a payment is verified, `api/verify-payment.php` records the purchase in the service against the email used at checkout, so it appears under *My courses*.
 - **`links.portal`** (optional) is the Onboarding Tool's own address, used for two links only: an approved university's "Continue onboarding" and "Forgot password?".
 - Local testing: run the Onboarding Tool on `http://localhost:4000`, set the two `.env` values, then `ACCOUNTS=1 node build.mjs` and `npm run dev`.
+
+## Roles and what each may use
+
+One account can be used for more than one thing, with one exception.
+
+| Account | May use | May not |
+|---|---|---|
+| **University** | The university flow only: questions, programme selection, requirements & builds, onboarding | Be combined with Partner or Learner, apply as a partner, open the partner apps |
+| **Partner** | Partner Onboarding, Online Leads, Course Finder — and short courses | Become a university account |
+| **Learner** | Short courses — and may become a partner later, on the same account | Become a university account |
+
+- The rule lives in `src/assets/js/roles.js` for the pages (the sign-up step, the dashboard and "Open your application") and in `api/account-lib.php` (`allowed_types`, `university_only`) for the server, which refuses a forbidden combination at sign-up, when services are added, on a partner application and at the app hand-off (`api/sso.php`). Hiding a button is never the only guard.
+- **"Open your application"** on the home page (`applicationLauncher` in `src/templates/blocks.mjs`): Online Leads, Partner Onboarding and Course Finder can be chosen singly or together, each with its own button. Choosing University clears and disables the three and explains why.
+- **Programme selection** is the first question of the request's *Requirements & builds* step: tick boxes for MBA, MCA, BBA and BCA, and *Other*, which opens a list. The programmes are data — `src/data/programmes.mjs`.
 
 ## Security
 
