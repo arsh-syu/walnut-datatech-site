@@ -140,7 +140,7 @@ ${film}
 
 <section class="section section-dark" id="apps">
   <div class="wrap">
-    ${sectionHead({ eyebrow: 'Walnut applications', title: 'Already working with us? Open your application.', text: 'Choose the applications you need — one or several — and open each from here. University applications are handled on their own.' })}
+    ${sectionHead({ eyebrow: 'Walnut applications', title: 'Already working with us? Open your application.', text: 'Open the Walnut Education Suite — choose one application or several — or continue your university application. The two are handled separately.' })}
     <div data-reveal>${applicationLauncher(root)}</div>
   </div>
 </section>

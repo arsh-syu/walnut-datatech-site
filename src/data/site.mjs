@@ -39,6 +39,16 @@ export const audiences = [
 // Walnut's connected applications. Exactly one can be selected at a time; the action opens `url`.
 // `sso` is this app's id in api/sso.php, for the apps that accept a Walnut sign-in. An app without one
 // is opened at its own address; Partner Onboarding has no SSO receiver yet.
+// Walnut Education Suite: the one place the three applications above open from. It signs in with the
+// Walnut account where accounts are on (api/sso.php), like Course Finder, since it is the same address.
+export const educationSuite = {
+  id: 'suite',
+  name: 'Walnut Education Suite',
+  sso: 'course-finder',
+  action: 'Open Walnut Education Suite',
+  url: 'https://syu-course-finder.vercel.app',
+};
+
 export const externalApps = [
   {
     id: 'agent-onboard',

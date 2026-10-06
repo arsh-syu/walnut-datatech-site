@@ -369,21 +369,103 @@ $$('[data-launcher]').forEach((root) => {
   const panels = $$('.launcher-panel', root);
   const count = $('[data-launcher-count]', root);
   const prompt = count?.textContent;
-  const inputs = () => $$('input[type="radio"], input[type="checkbox"]', root);
+  const picked = $('[data-launcher-picked]', root);
+  // The home page launcher has two sides (the Education Suite and University); the others have one.
+  const sides = $$('.launcher-side', root);
+  const scopes = sides.length ? sides : [root];
+  const inputs = (scope = root) => $$('input[type="radio"], input[type="checkbox"]', scope);
+  const nameOf = (input) => input.closest('label')?.querySelector('.app-name')?.textContent ?? input.value;
+
   const show = () => {
-    const chosen = inputs().filter((input) => input.checked).map((input) => input.value);
-    root.classList.toggle('has-selection', chosen.length > 0);
+    const chosen = inputs().filter((input) => input.checked);
+    const ids = chosen.map((input) => input.value);
+    scopes.forEach((scope) => scope.classList.toggle('has-selection', inputs(scope).some((input) => input.checked)));
+    // A panel is for one application, or (data-any) for whatever is chosen on its side.
+    panels.forEach((p) => p.classList.toggle('is-active', 'any' in p.dataset ? inputs(p.closest('.launcher-side') ?? root).some((input) => input.checked) : ids.includes(p.dataset.app)));
     if (count) count.textContent = chosen.length ? `${chosen.length} selected` : prompt;
-    panels.forEach((p) => p.classList.toggle('is-active', chosen.includes(p.dataset.app)));
+    if (picked) {
+      const names = chosen.map(nameOf);
+      const had = [...picked.children].map((c) => c.textContent);
+      picked.innerHTML = names.map((name) => `<span${had.includes(name) ? ' class="is-old"' : ''}>${name}</span>`).join('');
+    }
   };
   root.addEventListener('change', show);
   if (root.hasAttribute('data-exclusive-group')) {
-    const note = $('[data-launcher-note]', root);
-    keepExclusive(root, () => $$('input[type="checkbox"]', root), (message) => {
-      note.textContent = message;
-      show(); // choosing University clears the others, which fires no event of its own
-    });
+    keepExclusive(root, () => $$('input[type="checkbox"]', root), () => show()); // choosing University clears the others, which fires no event of its own
   }
+
+  /* the switch between the two sides: a sliding thumb, and the sides slide across while the box glides to the new height */
+  const tabs = $$('.launcher-tab', root);
+  const thumb = $('.launcher-thumb', root);
+  const wrap = sides[0]?.parentElement;
+  let busy = false;
+
+  const placeThumb = () => {
+    const tab = tabs.find((t) => t.getAttribute('aria-selected') === 'true');
+    if (!tab || !thumb) return;
+    thumb.style.transform = `translateX(${tab.offsetLeft - tab.parentElement.clientLeft}px)`;
+    thumb.style.width = `${tab.offsetWidth}px`;
+  };
+
+  const switchTo = (index) => {
+    const from = sides.findIndex((side) => !side.hidden);
+    if (index === from || busy) return;
+    tabs.forEach((t, i) => {
+      t.setAttribute('aria-selected', String(i === index));
+      t.tabIndex = i === index ? 0 : -1;
+    });
+    tabs[index].focus({ preventScroll: true });
+    placeThumb();
+    // Whatever was chosen on the side being left is let go, so the two sides never mix.
+    inputs(sides[from]).filter((input) => input.checked).forEach((input) => {
+      input.checked = false;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const leaving = sides[from];
+    const entering = sides[index];
+    if (reduceMotion) {
+      leaving.hidden = true;
+      entering.hidden = false;
+      return;
+    }
+    busy = true;
+    const dir = index > from ? 1 : -1;
+    const h0 = wrap.offsetHeight;
+    wrap.style.height = `${h0}px`;
+    wrap.classList.add('is-switching');
+    leaving.animate([{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: `translateX(${-28 * dir}px)` }], { duration: 180, easing: 'ease-in', fill: 'forwards' }).finished.then(() => {
+      leaving.hidden = true;
+      entering.hidden = false;
+      entering.getAnimations().forEach((a) => a.cancel()); // an earlier exit left it faded out
+      wrap.style.height = 'auto';
+      const h1 = wrap.offsetHeight;
+      wrap.style.height = `${h0}px`;
+      const ease = 'cubic-bezier(.2, .7, .2, 1)';
+      entering.animate([{ opacity: 0, transform: `translateX(${36 * dir}px)` }, { opacity: 1, transform: 'translateX(0)' }], { duration: 480, easing: ease });
+      wrap.animate([{ height: `${h0}px` }, { height: `${h1}px` }], { duration: 480, easing: ease }).finished.then(() => {
+        wrap.style.height = '';
+        wrap.classList.remove('is-switching');
+        busy = false;
+      });
+    });
+  };
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => switchTo(i));
+    tab.addEventListener('keydown', (e) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1, Home: -i, End: tabs.length - 1 - i }[e.key];
+      if (step === undefined) return;
+      e.preventDefault();
+      switchTo((i + step + tabs.length) % tabs.length);
+    });
+  });
+  if (thumb) {
+    placeThumb();
+    document.fonts?.ready.then(placeThumb);
+    addEventListener('resize', placeThumb);
+    requestAnimationFrame(() => thumb.classList.add('is-ready')); // slides from now on, not into place
+  }
+
   show(); // the browser may restore earlier choices when navigating back
 });
 

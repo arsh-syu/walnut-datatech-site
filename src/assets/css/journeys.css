@@ -167,6 +167,30 @@
 .launcher-or::before, .launcher-or::after { content: ""; flex: 1; height: 1px; background: rgba(255, 255, 255, .16); }
 .app-row { flex-direction: row; align-items: center; gap: var(--s-4); }
 .app-row-text { display: grid; gap: 4px; flex: 1; min-width: 0; }
+/* the switch between the Education Suite and University */
+.launcher-switch { position: relative; display: inline-flex; gap: 4px; margin-bottom: var(--s-5); padding: 5px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; background: rgba(255, 255, 255, .06); }
+.launcher-thumb { position: absolute; top: 5px; bottom: 5px; left: 5px; width: 0; border-radius: 999px; background: var(--violet-600); box-shadow: 0 8px 24px -8px rgba(125, 98, 255, .9); }
+.launcher-thumb.is-ready { transition: transform .5s var(--ease), width .5s var(--ease); }
+.launcher-tab {
+  position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 9px; padding: 11px 22px; border: 0; border-radius: 999px; background: none;
+  color: var(--on-dark-muted); font: 500 .9375rem var(--font-body); cursor: pointer; transition: color .3s; -webkit-tap-highlight-color: transparent;
+}
+.launcher-tab .ico { width: 18px; height: 18px; }
+.launcher-tab:hover { color: #fff; }
+.launcher-tab[aria-selected="true"] { color: #fff; }
+.launcher-tab:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.launcher-sides { position: relative; }
+.launcher-sides.is-switching { overflow: hidden; }
+.launcher-side[hidden] { display: none; }
+/* what is chosen for the suite, and the steps of the university flow */
+.launcher-picked { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; }
+.launcher-picked:empty { display: none; }
+.launcher-picked span { padding: 4px 11px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 999px; background: rgba(255, 255, 255, .08); font-size: .8125rem; font-weight: 500; animation: pop .4s var(--spring); }
+.launcher-picked span.is-old { animation: none; }
+.launcher-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); margin: var(--s-4) 0 0; padding: 0; list-style: none; counter-reset: launcher-step; }
+.launcher-steps li { display: flex; gap: 10px; align-items: flex-start; font-size: .875rem; color: var(--on-dark-muted); counter-increment: launcher-step; }
+.launcher-step-n { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 999px; background: rgba(255, 255, 255, .1); color: #fff; font-size: .75rem; font-weight: 600; }
+.launcher-step-n::before { content: counter(launcher-step); }
 .launcher-note { min-height: 1.5em; margin-top: var(--s-3); font-size: .9375rem; font-weight: 500; color: #b3a3ff; }
 .launcher-note:empty { min-height: 0; margin-top: 0; }
 .launcher-stage { align-items: stretch; }
@@ -175,7 +199,7 @@
 .launcher-stage { display: grid; gap: var(--s-4); align-items: center; min-height: 108px; margin-top: var(--s-3); padding: clamp(18px, 2.6vw, 28px); border-radius: var(--r-lg); background: rgba(255, 255, 255, .06); }
 .launcher-hint { display: none; color: var(--on-dark-muted); }
 .js .launcher-hint { display: block; }
-.js .launcher.has-selection .launcher-hint { display: none; }
+.js .has-selection > .launcher-stage > .launcher-hint, .js .launcher.has-selection .launcher-hint { display: none; }
 .launcher-panel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-4); }
 .js .launcher-panel { display: none; }
 .js .launcher-panel.is-active { display: flex; animation: rise .45s var(--ease); }
@@ -191,6 +215,10 @@
   .app-name { grid-column: 2; grid-row: 1; font-size: 1.1rem; }
   .app-desc { grid-column: 2; grid-row: 2; font-size: .875rem; }
   .launcher-panel .btn { width: 100%; }
+  .launcher-switch { display: flex; width: 100%; }
+  .launcher-tab { flex: 1; justify-content: center; gap: 7px; padding: 10px 8px; font-size: .8125rem; white-space: nowrap; }
+  .launcher-tab .ico { width: 16px; height: 16px; }
+  .launcher-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* preview of the applications on a light surface (homepage, partner path) */

@@ -304,14 +304,22 @@ test('University is a flow of its own; partner and learner can be held together'
   assert.ok(readFileSync(join(projectRoot, 'src/api/sso.php'), 'utf8').includes("if (university_only($user) && $appId !== 'onboarding')"), 'nor open the partner apps');
 });
 
-test('"Open your application" offers the three applications together and University on its own', () => {
+test('"Open your application" is a switch: the Education Suite with its three applications and one button, or University on its own', () => {
   const home = readFileSync(join(dist, 'index.html'), 'utf8');
-  const launcher = home.slice(home.indexOf('data-exclusive-group'), home.indexOf('launcher-stage'));
-  const values = [...launcher.matchAll(/type="checkbox" name="application" value="([^"]+)"( data-exclusive)?/g)].map((m) => m[1] + (m[2] ? '!' : ''));
-  assert.deepEqual(values, ['online-leads', 'agent-onboard', 'course-finder', 'university!'], 'three applications that combine, then University marked exclusive');
-  for (const name of ['Online Leads', 'Partner Onboarding', 'Course Finder']) assert.ok(launcher.includes(`<span class="app-name">${name}</span>`), name);
+  const launcher = home.slice(home.indexOf('data-exclusive-group'), home.indexOf('</section>', home.indexOf('data-exclusive-group')));
+  const tabs = [...launcher.matchAll(/<button class="launcher-tab"[^>]*role="tab"[^>]*aria-selected="(true|false)"[^>]*>(?:<svg[\s\S]*?<\/svg>)?<span>([^<]+)<\/span>/g)].map((m) => `${m[2]}:${m[1]}`);
+  assert.deepEqual(tabs, ['Walnut Education Suite:true', 'University:false'], 'two sides, the suite first');
+  const [suite, university] = launcher.split('id="launcher-side-university"');
+  const values = (side) => [...side.matchAll(/type="checkbox" name="application" value="([^"]+)"( data-exclusive)?/g)].map((m) => m[1] + (m[2] ? '!' : ''));
+  assert.deepEqual(values(suite), ['online-leads', 'agent-onboard', 'course-finder'], 'the three applications combine on the suite side');
+  assert.deepEqual(values(university), ['university!'], 'University is on its own side, still marked exclusive');
+  for (const name of ['Online Leads', 'Partner Onboarding', 'Course Finder']) assert.ok(suite.includes(`<span class="app-name">${name}</span>`), name);
+  // One button opens the suite, at the suite's own address, whatever was chosen.
+  assert.equal((suite.match(/class="launcher-panel"/g) || []).length, 1, 'one action on the suite side');
+  assert.ok(suite.includes('class="launcher-panel" data-app="suite" data-any') && suite.includes('<span>Open Walnut Education Suite</span>'));
+  assert.ok(suite.includes('href="https://syu-course-finder.vercel.app"'), 'the suite is the Course Finder address (through the Walnut sign-in once accounts are on)');
+  assert.ok(university.includes('class="launcher-panel" data-app="university"') && university.includes('launcher-step-n'), 'University keeps its action, with the steps of its flow');
   assert.ok(!home.includes('What are you already working on'), 'the journey picker is gone');
-  for (const app of ['online-leads', 'agent-onboard', 'course-finder', 'university']) assert.ok(home.includes(`class="launcher-panel" data-app="${app}"`), `${app} has its own action`);
 });
 
 test('programme selection: four tick boxes and Other, which opens a list', () => {
