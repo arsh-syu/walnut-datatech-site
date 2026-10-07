@@ -1,8 +1,8 @@
 import config from '../../site.config.mjs';
 import { areas, stages } from '../data/services.mjs';
 import { audiences, externalApps } from '../data/site.mjs';
-import { featuredCourses, lmsOptions, learnerSteps } from '../data/lms.mjs';
-import { renderCard } from '../assets/js/lms-catalogue.js';
+import { featuredCourses, lmsOptions, learnerSteps, lmsUrl, lmsSso, lmsIconsJson } from '../data/lms.mjs';
+import { renderCard, catalogueKey } from '../assets/js/lms-catalogue.js';
 import { icon } from './icons.mjs';
 import { vignette } from './vignettes.mjs';
 import { button, mark, splitWords, sectionHead, videoTile, ctaBand, esc, accountPrompt, clientele } from './layout.mjs';
@@ -61,8 +61,11 @@ function audienceBody(root, id) {
       </div>`;
   }
   if (id === 'learners') {
-    // Featured courses from Walnut LMS; the cards are the same as on /academy/.
-    return `<div class="course-grid">${featuredCourses(3).map((c) => renderCard(c, { ...lmsOptions(root), level: 4, reveal: false })).join('')}</div>
+    // Featured courses from Walnut LMS; the cards are the same as on /academy/. Like the catalogue there, the
+    // browser redraws them from the live feed when they differ, so a price changed on the LMS shows here too.
+    const picks = featuredCourses(3);
+    return `<div class="course-grid" data-lms-featured data-count="3" data-level="4" data-lms-url="${esc(lmsUrl)}" data-lms-sso="${lmsSso ? 1 : 0}" data-root="${esc(root)}" data-lms-key="${catalogueKey(picks)}">${picks.map((c) => renderCard(c, { ...lmsOptions(root), level: 4, reveal: false })).join('')}</div>
+      <script type="application/json" id="lms-icons">${lmsIconsJson()}</script>
       <div class="actions center">
         ${button({ href: `${root}academy/`, label: 'See all courses', variant: 'ghost', size: 'lg', arrow: true })}
       </div>`;

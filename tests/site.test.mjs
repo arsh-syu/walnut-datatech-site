@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { projectRoot } from '../scripts/env.mjs';
 import { legacyCourses } from '../src/data/courses.mjs';
-import { validCourse, parseFeed, renderCard, renderCatalogue, esc } from '../src/assets/js/lms-catalogue.js';
+import { validCourse, parseFeed, renderCard, renderCatalogue, esc, featured, catalogueKey } from '../src/assets/js/lms-catalogue.js';
 import { externalApps, audiences } from '../src/data/site.mjs';
 import { areas } from '../src/data/services.mjs';
 import { questions, questionsFor } from '../src/data/questions.mjs';
@@ -158,10 +158,29 @@ test('each catalogue group says who it is for, and course cards keep their price
 
 test('the live catalogue refresh keeps courses already on screen in view', () => {
   const main = readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8');
-  const refresh = main.slice(main.indexOf('async function refreshCatalogue'), main.indexOf('\n}', main.indexOf('async function refreshCatalogue')));
+  const refresh = main.slice(main.indexOf('async function refreshCourses'), main.indexOf('\n}', main.indexOf('async function refreshCourses')));
   const shown = refresh.indexOf("const shown = box.querySelector('[data-reveal].in') !== null;");
-  assert.ok(shown > 0 && shown < refresh.indexOf('box.innerHTML = html;'), 'what was revealed is noted before the swap');
+  assert.ok(shown > 0 && shown < refresh.indexOf('box.innerHTML = '), 'what was revealed is noted before the swap');
   assert.ok(refresh.includes("$$('[data-reveal]', box).forEach((el) => (shown ? el.classList.add('in') : revealer.observe(el)));"));
+});
+
+test('prices stay the same as on Walnut LMS wherever courses are shown', () => {
+  // The home page's featured courses are picked by the same rule as in the browser, carry the fingerprint of
+  // exactly those cards, and have the icons to redraw them — so the browser can bring a changed price in.
+  const { courses } = parseFeed(JSON.parse(readFileSync(join(projectRoot, 'src/data/lms-catalogue.json'), 'utf8')));
+  const picks = featured(courses, 3);
+  const home = readFileSync(join(dist, 'index.html'), 'utf8');
+  const grid = home.match(/<div class="course-grid" data-lms-featured[^>]*>/)[0];
+  assert.ok(grid.includes('data-count="3"') && grid.includes(`data-lms-key="${catalogueKey(picks)}"`) && grid.includes('data-lms-url="https://walnut-lms.vercel.app"'));
+  assert.ok(/<script type="application\/json" id="lms-icons">\{/.test(home), 'the home page has the icons to redraw its cards');
+  for (const c of picks) assert.ok(home.includes(`data-track-item="${c.slug}"`) && home.includes(esc(c.priceLabel)), `${c.slug} shown at its LMS price`);
+  // featured(): featured courses first, else the first courses.
+  assert.deepEqual(featured([{ slug: 'a' }, { slug: 'b', isFeatured: true }, { slug: 'c' }], 2).map((c) => c.slug), ['b']);
+  assert.deepEqual(featured([{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }], 2).map((c) => c.slug), ['a', 'b']);
+  // One fetch of the live feed refreshes both lists; neither throws out of main.js.
+  const main = readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8');
+  assert.ok(main.includes("$$('[data-lms-catalogue], [data-lms-featured]')") && main.includes("featured(courses, Number(box.dataset.count) || 3)"));
+  assert.ok(main.includes('if (boxes.length) refreshCourses(boxes).catch(() => {});'));
 });
 
 test('the course catalogue trusts nothing in the feed', () => {

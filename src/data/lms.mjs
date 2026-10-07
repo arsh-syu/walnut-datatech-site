@@ -4,7 +4,7 @@
 
 import { readFileSync } from 'node:fs';
 import config from '../../site.config.mjs';
-import { parseFeed, catalogueKey, catalogueIcons } from '../assets/js/lms-catalogue.js';
+import { parseFeed, catalogueKey, catalogueIcons, featured } from '../assets/js/lms-catalogue.js';
 import { legacyCourses } from './courses.mjs';
 import { icon } from '../templates/icons.mjs';
 
@@ -29,10 +29,7 @@ export const lmsCategories = [...new Set(lmsCourses.map((c) => c.category))];
 export const lmsOptions = (root) => ({ icon, lmsUrl, root, sso: lmsSso });
 
 // Up to `n` featured courses for the home page and the footer (the first courses, if none is featured).
-export function featuredCourses(n = 3) {
-  const featured = lmsCourses.filter((c) => c.isFeatured);
-  return (featured.length ? featured : lmsCourses).slice(0, n);
-}
+export const featuredCourses = (n = 3) => featured(lmsCourses, n);
 
 // The learner's journey, as the steps under "Upgrade your skills".
 export const learnerSteps = lmsSso

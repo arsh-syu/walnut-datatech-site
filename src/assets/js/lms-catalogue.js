@@ -91,6 +91,13 @@ export function parseFeed(feed) {
   return { courses: unique, updatedAt, rejected: list.length - unique.length };
 }
 
+// The first `n` featured courses (the first courses, if none is featured). The build and the browser both
+// pick with this, so the home page's featured courses are the same whichever of them drew the cards.
+export function featured(courses, n = 3) {
+  const picks = courses.filter((c) => c.isFeatured);
+  return (picks.length ? picks : courses).slice(0, n);
+}
+
 // A short fingerprint of a course list, so the browser can tell whether the live feed differs from the
 // snapshot the page was built with (the feed's updated_at changes on every request, so it cannot).
 export function catalogueKey(courses) {
