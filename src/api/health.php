@@ -22,4 +22,7 @@ respond(200, [
     'lms' => lms_configured($config),
     'lms_sso' => !empty($config['sso_lms']),
     'mode' => $configured ? (strpos($config['key_id'], 'rzp_live_') === 0 ? 'live' : 'test') : null,
+    // A random value the deploy writes into each new config.php (not a secret). The host loads a new
+    // config.php only minutes after it is uploaded, so the deploy waits until this shows its value.
+    'config_id' => is_string($config['config_id'] ?? null) ? $config['config_id'] : null,
 ]);

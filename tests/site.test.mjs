@@ -11,6 +11,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { projectRoot } from '../scripts/env.mjs';
+import { waitForConfig, describeState } from '../scripts/wait-config.mjs';
 import { legacyCourses } from '../src/data/courses.mjs';
 import { validCourse, parseFeed, renderCard, renderCatalogue, esc, featured, catalogueKey } from '../src/assets/js/lms-catalogue.js';
 import { externalApps, audiences } from '../src/data/site.mjs';
@@ -408,7 +409,8 @@ test('with accounts and the LMS sign-in on, Enrol signs the person in to Walnut 
   // The sign-in accepts these as where to go next (the rule in api/sso.php).
   const next = readFileSync(join(projectRoot, 'src/api/sso.php'), 'utf8').match(/preg_match\('#(\^\/\(\?!\/\)[^#]+)#'/);
   assert.ok(next, 'sso.php checks next');
-  for (const course of snapshot.courses) assert.match(`/courses/${course.slug}`, new RegExp(next[1]));
+  // PHP's \z (end of input) is JavaScript's $ without the m flag.
+  for (const course of snapshot.courses) assert.match(`/courses/${course.slug}`, new RegExp(next[1].replace(/\\z$/, '$')));
   // Old addresses and the sitemap are the same with or without the sign-in.
   assert.ok(!sso.read('sitemap.xml').includes('/academy/agentic-ai') && !sso.read('sitemap.xml').includes('/academy/online-programme-course') && sso.read('sitemap.xml').includes('/academy/</loc>'));
   assert.ok(sso.read('.htaccess').includes('RedirectMatch 301 ^/academy/agentic-ai/?$ https://walnutdatatech.com/academy/'));
@@ -757,7 +759,8 @@ test('the server registers Walnut LMS, makes learners of those who open it, and 
   assert.ok(lib.includes('lms_backfill($config, $db);') && lib.includes('ADD COLUMN IF NOT EXISTS lms_synced_at DATETIME NULL'));
   // Only a 400 is final (the LMS's contract): a 401, 422 or 5xx is tried again, so no paid buyer is written off.
   assert.ok(backfill.includes('} elseif ($status === 400) {'), 'only a 400 marks a purchase as refused');
-  assert.ok(!/in_array\(\$status, \[40/.test(backfill), 'no list of other 4xx codes that would write a purchase off');  assert.ok(readFileSync(join(projectRoot, 'src/api/health.php'), 'utf8').includes("'lms' => lms_configured($config),"));
+  assert.ok(!/in_array\(\$status, \[40/.test(backfill), 'no list of other 4xx codes that would write a purchase off');
+  assert.ok(readFileSync(join(projectRoot, 'src/api/health.php'), 'utf8').includes("'lms' => lms_configured($config),"));
 
   // sso.php: a university account is still refused first; anyone else opening the LMS becomes a learner before the token is made.
   const sso = readFileSync(join(projectRoot, 'src/api/sso.php'), 'utf8');
@@ -766,6 +769,70 @@ test('the server registers Walnut LMS, makes learners of those who open it, and 
   const token = sso.indexOf('$token = sso_token($db, $app, $appId, $user);');
   assert.ok(refused > 0 && refused < learner && learner < token);
   assert.ok(sso.slice(learner, token).includes("clean_types(array_merge(user_types($user), ['STUDENT']))") && sso.slice(learner, token).includes('UPDATE wa_users SET account_types = ?'));
+});
+
+test('a sign-in to another Walnut app is never a dead end, and a deploy waits for its settings to load', () => {
+  // When this site cannot sign the person in (not set up, settings not loaded yet, database down), sso.php
+  // sends them to the app itself at the same page instead of an error. A deploy publishes the pages at once
+  // but the host loads a new config.php minutes later, so Enrol must work in between.
+  const sso = readFileSync(join(projectRoot, 'src/api/sso.php'), 'utf8');
+  assert.ok(!sso.includes("$stop(503"), 'no "not available" error page');
+  const vetted = sso.indexOf("if ($next !== '' && (!preg_match(");
+  const fallback = sso.indexOf("if (!accounts_configured($config) || empty($app['secret']) || !($db = account_db($config))) {");
+  const session = sso.indexOf('$hash = session_token_hash();');
+  assert.ok(vetted > 0 && vetted < fallback && fallback < session, 'only a checked path follows the fallback, before any sign-in');
+  // next: \z rather than $ (a trailing newline), and no '//' or '..' segment anywhere.
+  const rule = sso.slice(vetted, sso.indexOf('\n', vetted));
+  assert.ok(rule.includes("{0,300}\\z#'") && rule.includes("strpos($next, '//') !== false") && rule.includes("preg_match('#(^|/)\\.\\.(/|\\?|\\z)#', $next)"));
+  // The LMS's course pages are public, so Enrol lands there; any other LMS page goes to its sign-in, which says why.
+  const redirect = sso.slice(fallback, session);
+  assert.ok(redirect.includes("$lmsLogin = $appId === 'walnut-lms' && strpos($next, '/courses/') !== 0;") && redirect.includes("'/login?sso_error=unavailable'"));
+  // health.php reports which config.php the server has loaded; the deploy writes a fresh ID for it.
+  assert.ok(readFileSync(join(projectRoot, 'src/api/health.php'), 'utf8').includes("'config_id' => is_string($config['config_id'] ?? null) ? $config['config_id'] : null,"));
+  const deploy = readFileSync(join(projectRoot, 'scripts/deploy.mjs'), 'utf8');
+  assert.ok(deploy.includes("const configId = randomBytes(8).toString('hex');") && deploy.includes('    config_id: configId,'));
+  // Where PHP already runs: the API first, then config.php, then the wait, then every settings check, and
+  // only then the pages — so a page never points at something the server cannot do yet.
+  const at = (s) => { const i = deploy.indexOf(s); assert.ok(i > 0, s); return i; };
+  const steps = ['const warm = Boolean(state.data?.ok);', 'upload(api, remoteDir);', "upload([[configFile, 'api/config.php']], remoteDir);", 'await waitForConfig({ configId, health, limit: CONFIG_WAIT,', "if (hasKeys && !state.data?.configured) fail(", 'upload(pages, remoteDir);', 'const home200 = '].map(at);
+  assert.deepEqual(steps, [...steps].sort((a, b) => a - b), 'in that order');
+  assert.ok(deploy.includes("const api = files.filter(([, path]) => path.startsWith('api/'));") && deploy.includes("const pages = files.filter(([, path]) => !path.startsWith('api/'));"));
+  // Every health call has a time limit, so one hung request cannot stretch the wait.
+  assert.ok(deploy.includes("{ headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(20_000) }"));
+});
+
+test('the deploy waits for the server to load its settings, and no longer than it should', async () => {
+  // A fake clock: each poll costs `every` seconds, so no real waiting happens.
+  const run = async (answers, limit = 900) => {
+    let t = 0;
+    const lines = [];
+    const queue = [...answers];
+    const result = await waitForConfig({
+      configId: 'new', limit, every: 15, now: () => t * 1000, sleep: async (s) => { t += s; },
+      health: async () => (queue.length > 1 ? queue.shift() : queue[0]), log: (l) => lines.push(l),
+    });
+    return { ...result, lines };
+  };
+  const old = { status: 200, data: { ok: true, config_id: 'old' } };
+  const fresh = { status: 200, data: { ok: true, config_id: 'new' } };
+  // Already loaded: no waiting.
+  let r = await run([fresh]);
+  assert.ok(r.loaded && r.seconds === 0 && r.lines.length === 0);
+  // Loaded on the 37th poll (9 minutes): waits exactly that long and says so once a minute.
+  r = await run([...Array(36).fill(old), fresh]);
+  assert.ok(r.loaded && r.seconds === 540 && r.lines.length === 8, JSON.stringify(r.lines));
+  assert.ok(r.lines[0].includes('(1 min; it answers with config old)'));
+  // The network down, a non-JSON error, the old health.php without config_id: all keep it waiting...
+  for (const odd of [{ status: 0, raw: 'fetch failed' }, { status: 500, raw: '<html>Error</html>' }, { status: 200, data: { ok: true } }]) {
+    r = await run([odd, odd, fresh]);
+    assert.ok(r.loaded && r.seconds === 30, JSON.stringify(odd));
+  }
+  // ...and it gives up at the limit, never before and never long after, saying what it saw last.
+  r = await run([{ status: 0, raw: 'fetch failed' }]);
+  assert.ok(!r.loaded && r.seconds >= 900 && r.seconds < 915, String(r.seconds));
+  assert.equal(describeState(r.state), 'health.php gave HTTP 0: fetch failed');
+  assert.equal(describeState(old), 'it answers with config old');
+  assert.equal(describeState({ status: 200, data: { ok: true } }), 'it answers with config from before config_id existed');
 });
 
 test('the dashboard shows courses on Walnut LMS with their progress, and past purchases as a history', () => {

@@ -31,12 +31,21 @@ $stop = function (int $status, string $title, string $text) {
 if (!$app) {
     $stop(404, 'Unknown app', 'That Walnut app does not exist.');
 }
-if (!accounts_configured($config) || empty($app['secret']) || !($db = account_db($config))) {
-    $stop(503, 'Not available yet', 'Signing in to ' . $app['name'] . ' from here is not switched on yet. Please try again later.');
-}
-// Only a path inside that app may follow the sign-in — never another site.
-if ($next !== '' && !preg_match('#^/(?!/)[A-Za-z0-9/_\-.?=&%]{0,300}$#', $next)) {
+// Only a path inside that app may follow the sign-in — never another site. \z (not $, which would let a
+// trailing newline through), and no '//' or '..' anywhere, since a browser resolves those into another path.
+if ($next !== '' && (!preg_match('#^/(?!/)[A-Za-z0-9/_\-.?=&%]{0,300}\z#', $next) || strpos($next, '//') !== false || preg_match('#(^|/)\.\.(/|\?|\z)#', $next))) {
     $next = '';
+}
+// Never a dead end: when this site cannot hand the person over signed in (sign-in to that app not set up,
+// or not loaded yet — the host picks up new settings minutes after a deploy — or the database down), they
+// are sent to the app itself, at the same page, and sign in there. Walnut LMS course pages are public, so
+// Enrol lands on the course; any other LMS page needs its sign-in, which then says why the Walnut one is
+// unavailable. (Nothing is written here, so an account is given STUDENT on its next pass through below.)
+if (!accounts_configured($config) || empty($app['secret']) || !($db = account_db($config))) {
+    header('Cache-Control: no-store');
+    $lmsLogin = $appId === 'walnut-lms' && strpos($next, '/courses/') !== 0;
+    header('Location: ' . $app['url'] . ($lmsLogin ? '/login?sso_error=unavailable' . ($next !== '' ? '&next=' . rawurlencode($next) : '') : ($next !== '' ? $next : '/')), true, 302);
+    exit;
 }
 
 $hash = session_token_hash();

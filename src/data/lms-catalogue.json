@@ -6,7 +6,7 @@
       "subtitle": "A short certification for counsellors: guide a learner from first enquiry to an informed admission decision, using verified facts and needs-based counselling instead of a sales script.",
       "category": "Counselling and admissions",
       "level": "BEGINNER",
-      "duration_hours": 2,
+      "duration_hours": 29,
       "modules": 23,
       "lessons": 111,
       "price_paise": 0,
@@ -127,5 +127,5 @@
       "enrol_url": "https://walnutdatatech.com/api/sso.php?app=walnut-lms&next=%2Fcourses%2Fcybersecurity-essentials-for-teams"
     }
   ],
-  "updated_at": "2026-10-07T11:28:58.293Z"
+  "updated_at": "2026-10-07T14:20:22.454Z"
 }
