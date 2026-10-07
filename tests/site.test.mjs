@@ -733,7 +733,7 @@ test('the server registers Walnut LMS, makes learners of those who open it, and 
   assert.ok(lib.includes("if (!lms_configured($config) || lms_resting() || !function_exists('curl_init')"));
   assert.match(lib, /if \(\$status === 0 \|\| \$status >= 500\) \{\s+@touch\(lms_rest_file\(\)\);/);
   assert.ok(lib.includes('return is_file($file) && filemtime($file) > time() - 60;'));
-  for (const fn of ['lms_configured(array $config): bool', 'lms_call(array $config, string $method, string $pathAndQuery, ?array $body): array', 'lms_progress(array $config, array $user): array', 'lms_backfill(array $config, PDO $db): void']) assert.ok(lib.includes(`function ${fn}`), fn);
+  for (const fn of ['lms_configured(array $config): bool', 'lms_call(array $config, string $method, string $pathAndQuery, ?array $body): array', 'lms_progress(array $config, array $user): array', 'lms_backfill(array $config, PDO $db, bool $now = false): void', 'lms_backfill_counts(PDO $db): array']) assert.ok(lib.includes(`function ${fn}`), fn);
   // Signed over exactly what is sent: "<ts>.<path and query>" for a GET, "<ts>.<raw body>" for a POST.
   assert.ok(lib.includes("$signed = $method === 'POST' ? (string) $raw : $pathAndQuery;") && lib.includes("hash_hmac('sha256', $ts . '.' . $signed, (string) $config['lms_secret'])"));
   assert.ok(lib.includes("'X-Walnut-Timestamp: ' . $ts") && lib.includes("'X-Walnut-Signature: sha256=' . hash_hmac("));
@@ -746,7 +746,8 @@ test('the server registers Walnut LMS, makes learners of those who open it, and 
   assert.ok(lib.includes("'open' => $sso ? '/api/sso.php?app=walnut-lms&next=' . rawurlencode('/learn/' . $slug) : $lms . '/courses/' . rawurlencode($slug)"), 'Continue is never a dead link');
   assert.ok(!/\$c\['open_url'\]|\['verify_url'\]/.test(lib), 'links from the LMS are never passed on');
   // The backfill: off unless switched on, to the proposed path, amounts in paise.
-  assert.ok(lib.includes("if (!lms_configured($config) || empty($config['lms_backfill']) || lms_resting() || !due('lms-backfill', 120))"));
+  // Paced to once per two minutes for the dashboard; only the site's own tooling asks for a sweep now.
+  assert.ok(lib.includes("if (!lms_configured($config) || empty($config['lms_backfill']) || lms_resting() || (!$now && !due('lms-backfill', 120)))"));
   // A purchase goes with the account ID only of an account that proved the email; the time budget is checked before each call.
   assert.ok(lib.includes('LEFT JOIN wa_users u ON u.email = e.email AND u.email_verified_at IS NOT NULL WHERE e.lms_synced_at IS NULL'));
   const backfill = lib.slice(lib.indexOf('function lms_backfill('), lib.indexOf('/* ---------- the calls of the login page'));
@@ -799,6 +800,26 @@ test('a sign-in to another Walnut app is never a dead end, and a deploy waits fo
   assert.ok(deploy.includes("const api = files.filter(([, path]) => path.startsWith('api/'));") && deploy.includes("const pages = files.filter(([, path]) => !path.startsWith('api/'));"));
   // Every health call has a time limit, so one hung request cannot stretch the wait.
   assert.ok(deploy.includes("{ headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(20_000) }"));
+});
+
+test('the backfill can be checked and run from here, by the site itself only', () => {
+  // api/lms-sync.php answers only a request signed with the site's own account secret — not the one shared
+  // with Walnut LMS — within five minutes, over the raw body; anything else gets the same 404 as no page.
+  const sync = readFileSync(join(projectRoot, 'src/api/lms-sync.php'), 'utf8');
+  assert.ok(sync.includes("$secret = (string) ($config['account_secret'] ?? '');") && !sync.includes("$config['lms_secret']"));
+  assert.ok(sync.includes("if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !accounts_configured($config) || $secret === '') {"));
+  const verify = sync.indexOf("!hash_equals('sha256=' . hash_hmac('sha256', $ts . '.' . $raw, $secret), $signature)");
+  assert.ok(verify > 0 && sync.includes('abs(time() - (int) $ts) > 300') && sync.includes("$raw = (string) file_get_contents('php://input');"));
+  assert.equal((sync.match(/respond\(404, \['error' => 'Not found\.'\]\);/g) || []).length, 2, 'the same 404 for a wrong method and a bad signature');
+  assert.ok(verify < sync.indexOf('$db = account_db($config);') && verify < sync.indexOf('lms_backfill($config, $db, true);'), 'nothing runs before the signature is checked');
+  assert.ok(sync.includes("($in['run'] ?? false) === true") && sync.includes('rate_limit('), 'a sweep only when asked for, and rate-limited');
+  // The counts carry no buyer details.
+  const lib = readFileSync(join(projectRoot, 'src/api/account-lib.php'), 'utf8');
+  const counts = lib.slice(lib.indexOf('function lms_backfill_counts('), lib.indexOf('/* ---------- the calls of the login page'));
+  assert.ok(!/email|name'|phone|payment_id/.test(counts.replace(/no buyer details/, '')), 'counts and reasons only');
+  // The tool signs exactly what the endpoint checks.
+  const tool = readFileSync(join(projectRoot, 'scripts/lms-backfill.mjs'), 'utf8');
+  assert.ok(tool.includes("createHmac('sha256', env.ACCOUNT_SECRET).update(`${ts}.${body}`).digest('hex')") && tool.includes("'X-Walnut-Timestamp': ts, 'X-Walnut-Signature': signature"));
 });
 
 test('the deploy waits for the server to load its settings, and no longer than it should', async () => {

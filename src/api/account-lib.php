@@ -900,9 +900,11 @@ const LMS_BACKFILL_PATH = '/api/integrations/walnut/enrolments';
 //                       row cannot block the rest. To try it again: UPDATE wa_enrolments SET lms_error = NULL.
 //   401, 403, 404, 408, 429, 5xx or no answer → about the connection, not the purchase: this run stops
 //                       and the purchase waits for the next one.
-function lms_backfill(array $config, PDO $db): void
+// `$now` is for the site's own tooling (api/lms-sync.php): it runs a sweep straight away instead of at most
+// every two minutes; everything else about it is the same.
+function lms_backfill(array $config, PDO $db, bool $now = false): void
 {
-    if (!lms_configured($config) || empty($config['lms_backfill']) || lms_resting() || !due('lms-backfill', 120)) {
+    if (!lms_configured($config) || empty($config['lms_backfill']) || lms_resting() || (!$now && !due('lms-backfill', 120))) {
         return;
     }
     try {
@@ -940,6 +942,23 @@ function lms_backfill(array $config, PDO $db): void
     } catch (Throwable $err) {
         error_log('Purchases were not handed to Walnut LMS: ' . $err->getMessage());
     }
+}
+
+// Where the backfill stands, per course: purchases waiting to be sent, sent (acknowledged by the LMS), and
+// refused (a 400, never sent again, with the LMS's reason). Counts only, plus the reasons — no buyer details.
+function lms_backfill_counts(PDO $db): array
+{
+    $courses = array_map(function (array $r): array {
+        return ['courseSlug' => $r['course_slug'], 'total' => (int) $r['total'], 'waiting' => (int) $r['waiting'], 'sent' => (int) $r['sent'], 'refused' => (int) $r['refused']];
+    }, db_run($db, 'SELECT course_slug, COUNT(*) AS total,'
+        . ' SUM(CASE WHEN lms_synced_at IS NULL AND lms_error IS NULL THEN 1 ELSE 0 END) AS waiting,'
+        . ' SUM(CASE WHEN lms_synced_at IS NOT NULL THEN 1 ELSE 0 END) AS sent,'
+        . ' SUM(CASE WHEN lms_error IS NOT NULL THEN 1 ELSE 0 END) AS refused'
+        . ' FROM wa_enrolments GROUP BY course_slug ORDER BY course_slug')->fetchAll());
+    $refusals = array_map(function (array $r): array {
+        return ['id' => (int) $r['id'], 'courseSlug' => $r['course_slug'], 'reason' => $r['lms_error']];
+    }, db_run($db, 'SELECT id, course_slug, lms_error FROM wa_enrolments WHERE lms_error IS NOT NULL ORDER BY id')->fetchAll());
+    return ['courses' => $courses, 'refusals' => $refusals];
 }
 
 /* ---------- the calls of the login page and the dashboard ---------- */
