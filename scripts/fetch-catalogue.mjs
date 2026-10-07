@@ -30,9 +30,20 @@ try {
   if (!courses.length) {
     keepSnapshot(`no valid courses in the feed from ${lmsUrl}`);
   } else {
-    // The feed is stored as it came, so the build and the browser check it with the same rules.
-    writeFileSync(snapshot, `${JSON.stringify({ courses: feed.courses, updated_at: feed.updated_at ?? null }, null, 2)}\n`);
-    console.log(`✓ Walnut LMS catalogue: ${courses.length} ${courses.length === 1 ? 'course' : 'courses'} (updated ${updatedAt || 'date not given'})${rejected ? ` — ${rejected} left out as invalid` : ''}`);
+    const line = `${courses.length} ${courses.length === 1 ? 'course' : 'courses'}${rejected ? ` — ${rejected} left out as invalid` : ''}`;
+    // The LMS stamps updated_at with the time of each request, so the snapshot is rewritten only when the
+    // courses themselves changed; otherwise every deploy would leave a timestamp-only change behind.
+    let same = false;
+    try {
+      same = JSON.stringify(JSON.parse(readFileSync(snapshot, 'utf8')).courses) === JSON.stringify(feed.courses);
+    } catch {}
+    if (same) {
+      console.log(`✓ Walnut LMS catalogue: ${line}, unchanged`);
+    } else {
+      // The feed is stored as it came, so the build and the browser check it with the same rules.
+      writeFileSync(snapshot, `${JSON.stringify({ courses: feed.courses, updated_at: feed.updated_at ?? null }, null, 2)}\n`);
+      console.log(`✓ Walnut LMS catalogue: ${line} (updated ${updatedAt || 'date not given'})`);
+    }
   }
 } catch (err) {
   keepSnapshot(err.name === 'TimeoutError' ? `no answer from ${lmsUrl} within 10 seconds` : err.message);
