@@ -71,6 +71,8 @@ export function validCourse(c) {
     level: c.level,
     durationHours: c.duration_hours,
     lessons: c.lessons,
+    // Added to the feed later, so it is optional: a missing or malformed count is left out, not the course.
+    modules: Number.isInteger(c.modules) && c.modules >= 0 ? c.modules : null,
     priceLabel,
     isFree: c.is_free === true,
     isFeatured: c.is_featured === true,
@@ -119,7 +121,9 @@ export function renderCard(course, { icon, lmsUrl, root = '', sso = false, level
   const meta = [
     eyebrow === 'level' ? null : ['cap', sentence(course.level)],
     course.durationHours > 0 ? ['clock', plural(course.durationHours, 'hour')] : null,
-    course.lessons > 0 ? ['screen', plural(course.lessons, 'lesson')] : null,
+    // Modules are what a learner works through; the LMS's lesson count includes every reading, PDF and
+    // self-check, so it is shown only when the feed gives no module count.
+    course.modules > 0 ? ['screen', plural(course.modules, 'module')] : course.lessons > 0 ? ['screen', plural(course.lessons, 'lesson')] : null,
   ].filter(Boolean);
   const title = esc(course.title);
   return `<article class="course-card spot"${reveal ? ` data-reveal style="--d:${(i * 0.1).toFixed(1)}s"` : ''}>

@@ -175,6 +175,15 @@ test('the course catalogue trusts nothing in the feed', () => {
     [{ is_free: 'yes' }, 'is_free not a boolean'], [{ lessons: -1 }, 'negative lessons'], [{ duration_hours: '2' }, 'hours as text'], [{ price_label: '' }, 'no price'],
   ]) assert.equal(validCourse({ ...good, ...patch }), null, why);
   for (const bad of [null, 'course', [], 7]) assert.equal(validCourse(bad), null, String(bad));
+  // modules came later, so it is optional: a malformed count is dropped, never the course. Cards show modules
+  // (the LMS's lesson count includes every reading and self-check) and fall back to lessons without them.
+  const meta = (c) => renderCard(validCourse(c), { icon: () => '', lmsUrl: 'https://walnut-lms.vercel.app' }).match(/<ul class="course-meta">.*?<\/ul>/s)[0];
+  assert.ok(meta({ ...good, modules: 23 }).includes('23 modules') && !meta({ ...good, modules: 23 }).includes('lesson'), 'modules replace the lesson count');
+  assert.ok(meta({ ...good, modules: 1 }).includes('1 module<'), 'one module, singular');
+  for (const odd of [undefined, null, -3, 2.5, '23', 0]) {
+    assert.ok(validCourse({ ...good, modules: odd }), `modules ${String(odd)} keeps the course`);
+    assert.ok(meta({ ...good, modules: odd }).includes('4 lessons'), `modules ${String(odd)} falls back to lessons`);
+  }
   // Duplicates are dropped and featured courses lead.
   const feed = parseFeed({ courses: [good, { ...good, slug: 'top', is_featured: true }, { ...good, title: 'Copy' }, { ...good, slug: 'Nope!' }], updated_at: '2026-10-07T10:00:00Z' });
   assert.deepEqual(feed.courses.map((c) => c.slug), ['top', 'safe-course']);
