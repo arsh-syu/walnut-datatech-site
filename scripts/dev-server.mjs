@@ -1,5 +1,6 @@
-// Local development server: serves dist/ and mirrors the PHP API (src/api) in Node, so the checkout
-// and the enquiry forms can be exercised on localhost. Production runs the PHP files; keep the two
+// Local development server: serves dist/ and mirrors the PHP API (src/api) in Node, so the enquiry
+// forms and the confirmation of payments already made can be exercised on localhost (courses are sold
+// on Walnut LMS now). Production runs the PHP files; keep the two
 // in step when changing payment or email rules.
 //
 //   node scripts/dev-server.mjs [port]                 — emails are captured, never sent
@@ -8,11 +9,10 @@
 // Captured emails can be read back at GET /api/_outbox (this route exists only here, not in production).
 
 import { createServer } from 'node:http';
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { loadEnv, projectRoot } from './env.mjs';
-import { courses, currency } from '../src/data/courses.mjs';
 import { securityHeaders } from '../src/security.mjs';
 import { loadTemplates, buildEmail, sendEmail, emailConfigured } from './email.mjs';
 
@@ -225,38 +225,9 @@ const api = {
     json(res, 200, { ok: true, reference: String(reply.reference ?? reference), status: reply.status, universityName: String(reply.universityName ?? ''), submittedAt: String(reply.submittedAt ?? ''), updatedAt: String(reply.updatedAt ?? '') });
   },
 
-  'POST /api/create-order.php': async (req, res) => {
-    const input = await readBody(req);
-    if (!input) return json(res, 400, { error: 'Invalid request.' });
-    const course = courses.find((c) => c.slug === input.course);
-    if (!course) return json(res, 404, { error: 'This course is not available.' });
-
-    const name = String(input.name ?? '').trim();
-    const email = String(input.email ?? '').trim();
-    const phone = String(input.phone ?? '').trim();
-    const digits = phone.replace(/\D+/g, '');
-    if (name.length < 2 || name.length > 120) return json(res, 422, { error: 'Please enter your name.', field: 'name' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return json(res, 422, { error: 'Please enter a valid email address.', field: 'email' });
-    if (digits.length < 7 || digits.length > 15) return json(res, 422, { error: 'Please enter a valid phone number.', field: 'phone' });
-
-    let amount = course.price;
-    const code = String(input.coupon ?? '').trim().toUpperCase();
-    if (code) {
-      const coupon = course.coupons.find((c) => c.code.toUpperCase() === code);
-      if (!coupon) return json(res, 422, { error: 'This coupon is not valid for this course.', field: 'coupon' });
-      amount = coupon.finalPrice;
-    }
-    if (!configured) return json(res, 503, { error: 'Online payment is not set up yet. Please try again later.' });
-    if (rateLimited(req, res, 'create-order', 20, 600)) return;
-
-    const order = await razorpay('POST', '/orders', {
-      amount: amount * 100,
-      currency,
-      receipt: `${course.slug.slice(0, 24)}-${randomBytes(6).toString('hex')}`,
-      notes: { course: course.name, slug: course.slug, coupon: code || 'none', name, email, phone },
-    });
-    json(res, 200, { order_id: order.id, amount: order.amount, currency: order.currency, key_id: keyId, course: course.name });
-  },
+  // mirrors src/api/create-order.php: courses are sold on Walnut LMS now
+  'POST /api/create-order.php': async (req, res) =>
+    json(res, 410, { ok: false, error: 'Courses are now sold on Walnut LMS. Please enrol from https://walnutdatatech.com/academy/.' }),
 
   'POST /api/verify-payment.php': async (req, res) => {
     const input = await readBody(req);

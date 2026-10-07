@@ -3,7 +3,8 @@
 import config from '../../site.config.mjs';
 import { nav, externalApps } from '../data/site.mjs';
 import { areas } from '../data/services.mjs';
-import { courses } from '../data/courses.mjs';
+import { featuredCourses, lmsOptions } from '../data/lms.mjs';
+import { courseLinks } from '../assets/js/lms-catalogue.js';
 import { icon } from './icons.mjs';
 import { readFileSync } from 'node:fs';
 import { inlineScript, contentSecurityPolicy } from '../security.mjs';
@@ -207,7 +208,7 @@ function footer(root) {
       <nav class="footer-col" aria-label="Courses">
         <h2>Courses</h2>
         <ul>
-          ${courses.map((c) => `<li><a href="${root}academy/${c.slug}/">${c.name}</a></li>`).join('')}
+          ${featuredCourses(3).map((c) => `<li><a href="${esc(courseLinks(c, lmsOptions(root)).page)}" rel="noopener">${esc(c.title)} ${icon('external')}<span class="sr-only"> (on Walnut LMS)</span></a></li>`).join('')}
           <li><a href="${root}academy/">All courses</a></li>
         </ul>
       </nav>
@@ -263,7 +264,8 @@ function consentBanner(root) {
 </section>`;
 }
 
-export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false }) {
+// `redirect` ({ href, canonical }) makes a page that forwards at once to `href` (a moved page); it is never indexed.
+export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
   const clientConfig = JSON.stringify({
@@ -282,7 +284,8 @@ export function layout({ title, description, path, root, body, bodyClass = '', j
 <meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config)}">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
-${config.noindex || noindex ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}
+${config.noindex || noindex || redirect ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}
+${redirect ? `<meta http-equiv="refresh" content="0;url=${esc(redirect.href)}">${redirect.canonical ? `\n<link rel="canonical" href="${esc(redirect.canonical)}">` : ''}` : ''}
 <meta property="og:type" content="website">
 <meta property="og:locale" content="en_IN">
 <meta property="og:site_name" content="${esc(config.company.name)}">

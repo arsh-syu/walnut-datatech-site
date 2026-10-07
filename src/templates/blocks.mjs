@@ -1,8 +1,8 @@
-// Data-driven blocks shared across pages: journey steps, course pricing and cards, the application launcher.
+// Data-driven blocks shared across pages: journey steps and the application launchers.
+// (Course cards come from src/assets/js/lms-catalogue.js, which the browser shares.)
 
 import config from '../../site.config.mjs';
 import { externalApps, educationSuite } from '../data/site.mjs';
-import { inr, offerOf } from '../data/courses.mjs';
 import { icon } from './icons.mjs';
 import { esc } from './layout.mjs';
 
@@ -11,36 +11,6 @@ export function journeySteps(steps) {
   return `<ol class="steps" aria-label="How it works">${steps
     .map((s, i) => `<li><span class="steps-n">${i + 1}</span>${s}</li>`)
     .join('')}</ol>`;
-}
-
-// Price → coupon → what you pay. One unambiguous reading, also for screen readers.
-export function priceFlow(course) {
-  const offer = offerOf(course);
-  if (!offer) {
-    return `<div class="price-flow price-flow-single" role="group" aria-label="Price ${inr(course.price)}. No discount currently.">
-      <div class="price-step price-step-final"><span class="price-label">Price</span><span class="price-value">${inr(course.price)}</span></div>
-      <span class="price-note">No discount currently</span>
-    </div>`;
-  }
-  return `<div class="price-flow" role="group" aria-label="Original price ${inr(course.price)}. Apply coupon ${offer.code} and pay ${inr(offer.finalPrice)}.">
-    <div class="price-step"><span class="price-label">Original price</span><span class="price-value">${inr(course.price)}</span></div>
-    <span class="price-arrow" aria-hidden="true">${icon('arrow')}</span>
-    <div class="price-step price-step-coupon"><span class="price-label">Apply coupon</span><span class="price-code">${icon('tag')}${offer.code}</span></div>
-    <span class="price-arrow" aria-hidden="true">${icon('arrow')}</span>
-    <div class="price-step price-step-final"><span class="price-label">You pay</span><span class="price-value">${inr(offer.finalPrice)}</span></div>
-  </div>`;
-}
-
-// `level` is the heading level that fits where the card sits in the page outline.
-// `reveal: false` is for cards inside a container that already animates in (e.g. the audience panels).
-export function courseCard(root, course, i = 0, level = 3, reveal = true) {
-  return `<article class="course-card spot"${reveal ? ` data-reveal style="--d:${i * 0.1}s"` : ''}>
-    <p class="eyebrow">${course.kicker}</p>
-    <h${level} class="course-card-title"><a href="${root}academy/${course.slug}/" data-track="course_select" data-track-item="${course.slug}">${course.name}</a></h${level}>
-    <p class="course-card-tagline">${course.tagline}</p>
-    ${priceFlow(course)}
-    <span class="btn btn-primary" aria-hidden="true"><span>View course</span>${icon('arrow')}</span>
-  </article>`;
 }
 
 // "Open your application" on the home page: a switch between the Walnut Education Suite and University.

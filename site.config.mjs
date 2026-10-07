@@ -37,6 +37,16 @@ export default {
   // service set as ONBOARDING_API_URL in .env — so that must be set before switching this on.
   accounts: false,
 
+  // Walnut LMS, where courses are sold and taken. /academy/ lists its public catalogue (a snapshot taken
+  // by scripts/fetch-catalogue.mjs, refreshed in the browser) and every course links to it.
+  // `sso` is switched on by the build (LMS_SSO=1) once the LMS sign-in secret is in .env: Enrol then
+  // goes through api/sso.php so the learner arrives signed in with their Walnut account. Without it,
+  // Enrol opens the course on Walnut LMS. WALNUT_LMS_URL in the environment overrides `url`.
+  lms: {
+    url: 'https://walnut-lms.vercel.app',
+    sso: false,
+  },
+
   // YouTube / Vimeo embed URLs, e.g. https://www.youtube.com/embed/VIDEO_ID
   videos: {
     company: '',
@@ -71,7 +81,7 @@ export default {
   // NEEDS BUSINESS / LEGAL CONFIRMATION — the pages say so plainly where a value is empty.
   legal: {
     // Date the legal pages were last reviewed, e.g. '2 October 2026'. Update it whenever the wording changes.
-    lastUpdated: '4 October 2026',
+    lastUpdated: '7 October 2026',
     // Where privacy requests, complaints and refund queries should be sent.
     contactEmail: 'support@walnutdatatech.com',
     // Registered office address of the company.

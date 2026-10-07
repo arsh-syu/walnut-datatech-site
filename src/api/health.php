@@ -18,5 +18,8 @@ respond(200, [
     // the site's own account database: configured, and reachable right now
     'accounts' => accounts_configured($config) && account_db($config) !== null,
     'sms' => sms_configured($config),
+    // Walnut LMS: course progress (signed calls to it) and opening it with this sign-in
+    'lms' => lms_configured($config),
+    'lms_sso' => !empty($config['sso_lms']),
     'mode' => $configured ? (strpos($config['key_id'], 'rzp_live_') === 0 ? 'live' : 'test') : null,
 ]);

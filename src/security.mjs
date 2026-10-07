@@ -16,15 +16,16 @@ const sha256 = (text) => `'sha256-${createHash('sha256').update(text).digest('ba
 // Content-Security-Policy: only this site's own files plus the third parties it actually uses.
 export function contentSecurityPolicy(config) {
   const ga = Boolean(config.analytics?.gaMeasurementId);
+  // Walnut LMS: /academy/ reads its public course feed to show the live catalogue.
+  const lms = config.lms?.url ? new URL(config.lms.url).origin : null;
   const policy = {
     'default-src': ["'self'"],
-    // Razorpay Checkout loads its own helper scripts (e.g. risk detection) from cdn.razorpay.com
-    'script-src': ["'self'", sha256(inlineScript), 'https://*.razorpay.com', ga && 'https://www.googletagmanager.com'],
+    'script-src': ["'self'", sha256(inlineScript), ga && 'https://www.googletagmanager.com'],
     'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // inline is needed for style="" attributes only
     'font-src': ["'self'", 'https://fonts.gstatic.com'],
-    'img-src': ["'self'", 'data:', 'https://*.razorpay.com', ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com'],
-    'connect-src': ["'self'", 'https://*.razorpay.com', ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com'],
-    'frame-src': ['https://*.razorpay.com', 'https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
+    'img-src': ["'self'", 'data:', ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com'],
+    'connect-src': ["'self'", lms, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com'],
+    'frame-src': ['https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
     'base-uri': ["'self'"],
     'form-action': ["'self'"],
     'object-src': ["'none'"],

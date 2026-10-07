@@ -121,6 +121,19 @@
 .acct-stats dt { font-size: .8125rem; color: var(--muted); }
 .acct-progress { height: 8px; border-radius: 999px; background: var(--mist); overflow: hidden; }
 .acct-progress span { display: block; height: 100%; border-radius: inherit; background: var(--violet-600); transition: width .6s var(--ease); }
+/* courses on Walnut LMS, and the purchases made on this website before it */
+.acct-cert { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: .9375rem; }
+.acct-cert > span { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(23, 178, 106, .14); color: #0d7a47; }
+.acct-cert strong { color: var(--ink); font-weight: 600; }
+.acct-cert a { font-weight: 600; color: var(--violet-700); }
+.acct-calm { padding: 12px 16px; border-radius: var(--r-lg); background: var(--mist); font-size: .9375rem; color: var(--ink-2); }
+.acct-history { display: grid; gap: var(--s-2); }
+.acct-history .acct-more-title { margin-top: 0; }
+.acct-purchases { list-style: none; display: grid; margin-top: var(--s-2); border-top: 1px solid var(--line); }
+.acct-purchases li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px var(--s-4); padding: 12px 0; border-bottom: 1px solid var(--line); }
+.acct-purchases div { display: grid; gap: 2px; min-width: 0; }
+.acct-purchases div span { font-size: .8125rem; color: var(--muted); overflow-wrap: anywhere; }
+.acct-paid { font-weight: 600; white-space: nowrap; }
 
 .acct-empty { display: grid; justify-items: center; gap: var(--s-3); padding: clamp(28px, 5vw, 56px) var(--s-4); border: 1.5px dashed var(--line-strong); border-radius: var(--r-lg); text-align: center; }
 .acct-empty h3 { font: 500 1.25rem var(--font-display); letter-spacing: -.02em; }

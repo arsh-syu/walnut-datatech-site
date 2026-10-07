@@ -1,7 +1,7 @@
 // Run with `npm test`. Uses only Node's built-in test runner — nothing to install.
 //
-// Covers the rules that must never drift: course prices and coupons, what the payment API accepts
-// and rejects, and that nothing secret ends up in the published files.
+// Covers the rules that must never drift: courses are sold on Walnut LMS (and only there), what the API
+// accepts and rejects, and that nothing secret ends up in the published files.
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +11,8 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { projectRoot } from '../scripts/env.mjs';
-import { courses, offerOf } from '../src/data/courses.mjs';
+import { legacyCourses } from '../src/data/courses.mjs';
+import { validCourse, parseFeed, renderCard, renderCatalogue, esc } from '../src/assets/js/lms-catalogue.js';
 import { externalApps, audiences } from '../src/data/site.mjs';
 import { areas } from '../src/data/services.mjs';
 import { questions, questionsFor } from '../src/data/questions.mjs';
@@ -25,6 +26,14 @@ const learner = { name: 'Test Learner', email: 'test@example.com', phone: '99999
 const enquiry = { topic: 'General enquiry', name: 'Asha Rao', organisation: 'Example University', email: 'asha@example.com', message: 'Hello' };
 const request = { ...enquiry, topic: 'University empanelment request', flow: 'university', institutionType: 'Private university', phone: '+91 98200 00001', configuration: 'Goal: Launch', page: '/configure/' };
 const outbox = async () => (await (await fetch(`http://localhost:${PORT}/api/_outbox`)).json());
+
+// Walnut LMS, as the build sees it: the default address and the catalogue snapshot the pages are built from.
+const LMS = 'https://walnut-lms.vercel.app';
+const snapshot = parseFeed(JSON.parse(readFileSync(join(projectRoot, 'src/data/lms-catalogue.json'), 'utf8')));
+// The courses as /academy/ shows them: grouped by category, categories in the order they first appear.
+const grouped = [...new Set(snapshot.courses.map((c) => c.category))].flatMap((category) => snapshot.courses.filter((c) => c.category === category));
+const catalogueOf = (html) => html.slice(html.indexOf('data-lms-catalogue'), html.indexOf('id="lms-icons"'));
+const enrolLinks = (html) => [...html.matchAll(/<a class="btn btn-primary" href="([^"]+)"[^>]*data-track="course_enrol" data-track-item="([^"]+)"/g)].map((m) => [m[2], m[1]]);
 
 // A second dev server wired to a stand-in Onboarding Tool, to test where University requests go.
 const TOOL_PORT = 4393;
@@ -74,29 +83,124 @@ after(() => {
 
 /* ---------- business rules ---------- */
 
-test('course prices and coupons match the business rules', () => {
-  const programme = courses.find((c) => c.slug === 'online-programme-course');
-  const agentic = courses.find((c) => c.slug === 'agentic-ai');
-  assert.equal(programme.price, 999);
-  assert.deepEqual(offerOf(programme), { code: 'SYUSANDEEP', finalPrice: 499, saving: 500 });
-  assert.equal(agentic.price, 1999);
-  assert.equal(offerOf(agentic), null, 'Agentic AI has no discount');
-});
-
-test('the server-side price list is generated from the same data', () => {
-  const catalog = readFileSync(join(dist, 'api/catalog.php'), 'utf8');
-  for (const course of courses) {
-    const coupons = course.coupons.map((k) => `'${k.code}' => ${k.finalPrice}`).join(', ');
-    assert.ok(catalog.includes(`'${course.slug}' => ['name' => '${course.name}', 'price' => ${course.price}, 'coupons' => [${coupons}]]`), course.slug);
+test('courses are sold on Walnut LMS: no price list, checkout or course pages of our own are published', () => {
+  assert.ok(!existsSync(join(dist, 'api/catalog.php')), 'no server-side price list');
+  assert.ok(!existsSync(join(dist, 'assets/js/checkout.js')) && !existsSync(join(projectRoot, 'src/assets/js/checkout.js')), 'no checkout script');
+  for (const file of walk(dist).filter((f) => /\.(html|js)$/.test(f))) {
+    const text = readFileSync(file, 'utf8');
+    assert.ok(!text.includes('checkout.js'), `${file} loads the retired checkout`);
+    assert.ok(!/razorpay\.com/i.test(text), `${file} loads Razorpay`);
   }
+  // The old course addresses: the Online Programme Course is the LMS's online counselling course; Agentic AI has none.
+  assert.deepEqual(Object.fromEntries(legacyCourses.map((c) => [c.slug, c.lms])), { 'online-programme-course': 'online-counselling-course', 'agentic-ai': null });
+  assert.ok(snapshot.courses.some((c) => c.slug === 'online-counselling-course'), 'the course the old address forwards to is in the catalogue');
 });
 
-test('course pages show the right prices', () => {
-  const programme = readFileSync(join(dist, 'academy/online-programme-course/index.html'), 'utf8');
-  const agentic = readFileSync(join(dist, 'academy/agentic-ai/index.html'), 'utf8');
-  assert.match(programme, /Original price ₹999\. Apply coupon SYUSANDEEP and pay ₹499\./);
-  assert.match(agentic, /Price ₹1,999\. No discount currently\./);
-  assert.ok(!agentic.includes('SYUSANDEEP'), 'the coupon must not appear on the Agentic AI page');
+test('/academy/ lists every course of the Walnut LMS catalogue, grouped by category, linked to the LMS', () => {
+  assert.ok(snapshot.courses.length > 0 && snapshot.rejected === 0, 'the snapshot is valid as it stands');
+  const html = readFileSync(join(dist, 'academy/index.html'), 'utf8');
+  const catalogue = catalogueOf(html);
+  assert.ok(catalogue.includes(`data-lms-url="${LMS}"`) && catalogue.includes('data-lms-sso="0"'), 'the browser refreshes it from the same LMS');
+  // Each group: its category heading, then exactly the courses of that category, in catalogue order.
+  const expected = [...new Set(snapshot.courses.map((c) => c.category))].map((category) => [esc(category), snapshot.courses.filter((c) => c.category === category).map((c) => c.slug)]);
+  const groups = catalogue.split('<div class="track"').slice(1).map((group) => [group.match(/<h3>([^<]*)<\/h3>/)[1], [...group.matchAll(/data-track="course_select" data-track-item="([^"]+)"/g)].map((m) => m[1])]);
+  assert.deepEqual(groups, expected);
+  for (const course of snapshot.courses) {
+    const page = `${LMS}/courses/${course.slug}`;
+    assert.ok(catalogue.includes(`<a href="${page}" rel="noopener" data-track="course_select" data-track-item="${course.slug}">${esc(course.title)}`), `${course.slug}: the title links to the LMS course page`);
+    assert.ok(catalogue.includes(esc(course.priceLabel)), `${course.slug}: the price is shown`);
+  }
+  // Without the LMS sign-in, Enrol opens the course on Walnut LMS, never this site's sign-in.
+  assert.deepEqual(enrolLinks(catalogue), grouped.map((c) => [c.slug, `${LMS}/courses/${c.slug}`]));
+  assert.ok(!html.includes('api/sso.php'), 'no Enrol button leads to a sign-in that is not set up');
+  for (const [slug, href] of enrolLinks(readFileSync(join(dist, 'index.html'), 'utf8'))) assert.equal(href, `${LMS}/courses/${slug}`, `home: ${slug}`);
+});
+
+test('old course addresses forward: to the same course on Walnut LMS, or to /academy/', () => {
+  const stub = (slug) => readFileSync(join(dist, 'academy', slug, 'index.html'), 'utf8');
+  const programme = stub('online-programme-course');
+  assert.ok(programme.includes(`<meta http-equiv="refresh" content="0;url=${LMS}/courses/online-counselling-course">`));
+  assert.ok(programme.includes(`<link rel="canonical" href="${LMS}/courses/online-counselling-course">`));
+  assert.ok(programme.includes(`href="${LMS}/courses/online-counselling-course"`), 'with a visible link for anyone the refresh does not move');
+  const agentic = stub('agentic-ai');
+  assert.ok(agentic.includes('<meta http-equiv="refresh" content="0;url=../../academy/">'));
+  assert.match(agentic, /<link rel="canonical" href="[^"]*\/academy\/">/);
+  for (const html of [programme, agentic]) {
+    assert.ok(html.includes('<meta name="robots" content="noindex">'), 'the old pages are not indexed');
+    assert.ok(!html.includes('data-track="course_enrol"') && !/₹\d/.test(html), 'and sell nothing');
+  }
+  if (existsSync(join(dist, 'sitemap.xml'))) assert.ok(!readFileSync(join(dist, 'sitemap.xml'), 'utf8').includes('/academy/agentic-ai') && !readFileSync(join(dist, 'sitemap.xml'), 'utf8').includes('/academy/online-programme-course'));
+  // The server answers them with a 301 first.
+  const htaccess = readFileSync(join(dist, '.htaccess'), 'utf8');
+  assert.match(htaccess, /<IfModule mod_alias\.c>\s+RedirectMatch 301 \^\S*\/academy\/online-programme-course\/\?\$ https:\/\/walnut-lms\.vercel\.app\/courses\/online-counselling-course\n\s+RedirectMatch 301 \^\S*\/academy\/agentic-ai\/\?\$ \S*\/academy\/\n<\/IfModule>/);
+  // The stubs promise nothing a reader never sees; the note for past buyers is where the redirects land.
+  for (const html of [programme, agentic]) assert.ok(!html.includes('If you bought this course'), 'no note on a page that forwards at once');
+  const academy = readFileSync(join(dist, 'academy/index.html'), 'utf8');
+  assert.match(academy, /<p class="account-prompt" id="bought-here">Bought a course on this website before it moved to Walnut LMS\? <a href="\.\.\/contact\/">Contact us<\/a> with your payment reference\.<\/p>/);
+});
+
+test('each catalogue group says who it is for, and course cards keep their price row at the foot', () => {
+  const icon = () => '';
+  const course = (category) => validCourse({ slug: 'a-course', title: 'A course', subtitle: '', category, level: 'BEGINNER', duration_hours: 2, lessons: 4, price_label: 'Free', is_free: true, is_featured: false, certificate_title: null });
+  assert.ok(renderCatalogue([course('Data and analytics')], { icon, lmsUrl: LMS }).includes('<p>For analysts and engineers who turn raw data into answers a business can use.</p>'));
+  for (const category of ['Something new', 'constructor', '__proto__']) {
+    const head = renderCatalogue([course(category)], { icon, lmsUrl: LMS }).match(/<header class="track-head">[\s\S]*?<\/header>/)[0];
+    assert.equal((head.match(/<p/g) || []).length, 2, `${category}: the levels line and the count only`);
+  }
+  // Every category in the snapshot has its line.
+  const academy = catalogueOf(readFileSync(join(dist, 'academy/index.html'), 'utf8'));
+  assert.equal((academy.match(/<p>For [^<]+<\/p>/g) || []).length, new Set(snapshot.courses.map((c) => c.category)).size);
+  // Cards in a row grow to the same height; the price and Enrol row is pushed to the foot of each.
+  const css = readFileSync(join(projectRoot, 'src/assets/css/journeys.css'), 'utf8');
+  assert.match(css, /\.course-card \{\s+display: flex; flex-direction: column;/);
+  assert.match(css, /\.course-buy \{[^}]*margin-top: auto;/);
+});
+
+test('the live catalogue refresh keeps courses already on screen in view', () => {
+  const main = readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8');
+  const refresh = main.slice(main.indexOf('async function refreshCatalogue'), main.indexOf('\n}', main.indexOf('async function refreshCatalogue')));
+  const shown = refresh.indexOf("const shown = box.querySelector('[data-reveal].in') !== null;");
+  assert.ok(shown > 0 && shown < refresh.indexOf('box.innerHTML = html;'), 'what was revealed is noted before the swap');
+  assert.ok(refresh.includes("$$('[data-reveal]', box).forEach((el) => (shown ? el.classList.add('in') : revealer.observe(el)));"));
+});
+
+test('the course catalogue trusts nothing in the feed', () => {
+  const good = { slug: 'safe-course', title: 'Safe course', subtitle: '', category: 'Data and analytics', level: 'BEGINNER', duration_hours: 2, lessons: 4, price_label: '₹999', is_free: false, is_featured: false, certificate_title: null };
+  assert.ok(validCourse(good));
+  // A course with any field out of shape is left out.
+  for (const [patch, why] of [
+    [{ slug: 'Bad Slug' }, 'spaces and capitals'], [{ slug: '../etc' }, 'a path'], [{ slug: '' }, 'empty slug'], [{ slug: 42 }, 'numeric slug'], [{ slug: 'x'.repeat(81) }, 'long slug'],
+    [{ level: 'EXPERT' }, 'unknown level'], [{ level: 'beginner' }, 'lower-case level'], [{ level: undefined }, 'no level'],
+    [{ title: 42 }, 'numeric title'], [{ title: null }, 'no title'], [{ title: '   ' }, 'blank title'], [{ title: ['a'] }, 'array title'],
+    [{ is_free: 'yes' }, 'is_free not a boolean'], [{ lessons: -1 }, 'negative lessons'], [{ duration_hours: '2' }, 'hours as text'], [{ price_label: '' }, 'no price'],
+  ]) assert.equal(validCourse({ ...good, ...patch }), null, why);
+  for (const bad of [null, 'course', [], 7]) assert.equal(validCourse(bad), null, String(bad));
+  // Duplicates are dropped and featured courses lead.
+  const feed = parseFeed({ courses: [good, { ...good, slug: 'top', is_featured: true }, { ...good, title: 'Copy' }, { ...good, slug: 'Nope!' }], updated_at: '2026-10-07T10:00:00Z' });
+  assert.deepEqual(feed.courses.map((c) => c.slug), ['top', 'safe-course']);
+  assert.equal(feed.rejected, 2);
+
+  // Text from the feed renders inert, and the feed's own links are never used.
+  const hostile = validCourse({
+    ...good,
+    title: '<script>alert(1)</script> "quoted" \'single\'',
+    subtitle: '"><img src=x onerror=alert(1)>',
+    category: '<b>Data</b>',
+    certificate_title: '<iframe src=//attacker.test>',
+    price_label: '<i>₹1</i>',
+    course_url: 'javascript:alert(1)',
+    enrol_url: 'https://evil.example/enrol',
+    thumbnail_url: 'https://evil.example/x.png',
+  });
+  const icon = (name) => `<svg data-icon="${name}"></svg>`;
+  for (const sso of [false, true]) {
+    const html = renderCard(hostile, { icon, lmsUrl: LMS, root: '../', sso }) + renderCatalogue([hostile], { icon, lmsUrl: LMS, root: '../', sso });
+    for (const raw of ['<script>', '<img', '<b>', '<iframe', '<i>', '"quoted"', "'single'", 'javascript:', 'evil.example']) assert.ok(!html.includes(raw), `${raw} (sso ${sso})`);
+    assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt; &quot;quoted&quot; &#39;single&#39;') && html.includes('&quot;&gt;&lt;img src=x onerror=alert(1)&gt;'));
+    const hrefs = [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+    const enrol = sso ? '../api/sso.php?app=walnut-lms&amp;next=%2Fcourses%2Fsafe-course' : `${LMS}/courses/safe-course`;
+    assert.deepEqual([...new Set(hrefs)].sort(), [...new Set([`${LMS}/courses/safe-course`, enrol])].sort(), 'every link is built from the slug');
+  }
 });
 
 test('partner applications point at the right addresses, and there are three audiences', () => {
@@ -127,33 +231,23 @@ test('health endpoint reports status without leaking details', async () => {
   assert.deepEqual(data, { ok: true, curl: true, configured: false, email: true, onboarding: false, mode: null });
 });
 
-test('create-order rejects an unknown course', async () => {
-  assert.equal((await api('create-order.php', { ...learner, course: 'nope' })).status, 404);
-});
-
-test('create-order rejects the coupon on the wrong course', async () => {
-  const res = await api('create-order.php', { ...learner, course: 'agentic-ai', coupon: 'SYUSANDEEP' });
-  assert.equal(res.status, 422);
-  assert.equal((await res.json()).field, 'coupon');
-});
-
-test('create-order rejects an invalid coupon, email, phone and name', async () => {
-  for (const [patch, field] of [[{ coupon: 'FREE' }, 'coupon'], [{ email: 'nope' }, 'email'], [{ phone: '12' }, 'phone'], [{ name: '' }, 'name']]) {
-    const res = await api('create-order.php', { ...learner, course: 'online-programme-course', ...patch });
-    assert.equal(res.status, 422, field);
-    assert.equal((await res.json()).field, field);
+test('create-order no longer takes orders: 410 Gone, pointing to /academy/', async () => {
+  const gone = { ok: false, error: 'Courses are now sold on Walnut LMS. Please enrol from https://walnutdatatech.com/academy/.' };
+  // Valid input, a coupon, an unknown course or nothing at all: no order is created for any of them.
+  for (const body of [{ ...learner, course: 'online-programme-course', coupon: 'SYUSANDEEP' }, { ...learner, course: 'agentic-ai' }, { ...learner, course: 'nope' }, {}]) {
+    const res = await api('create-order.php', body);
+    assert.equal(res.status, 410, JSON.stringify(body));
+    assert.deepEqual(await res.json(), gone);
   }
-});
-
-test('create-order accepts valid input (including a lower-case coupon) and only then asks for keys', async () => {
-  for (const coupon of ['', 'syusandeep', 'SYUSANDEEP']) {
-    assert.equal((await api('create-order.php', { ...learner, course: 'online-programme-course', coupon })).status, 503);
-  }
+  // The live site runs the PHP twin: the same answer, and nothing left of the order code.
+  const php = readFileSync(join(projectRoot, 'src/api/create-order.php'), 'utf8');
+  assert.ok(php.includes(`respond(410, ['ok' => false, 'error' => '${gone.error}']);`));
+  assert.ok(!php.includes('razorpay(') && !php.includes('catalog.php'));
 });
 
 test('the API only accepts JSON posts', async () => {
-  assert.equal((await api('create-order.php', 'course=agentic-ai', { 'Content-Type': 'application/x-www-form-urlencoded' })).status, 400);
-  assert.equal((await api('create-order.php', '{not json')).status, 400);
+  assert.equal((await api('verify-payment.php', 'razorpay_order_id=x', { 'Content-Type': 'application/x-www-form-urlencoded' })).status, 400);
+  assert.equal((await api('verify-payment.php', '{not json')).status, 400);
 });
 
 test('verify-payment rejects malformed payment details', async () => {
@@ -233,7 +327,7 @@ test('only the University journey files requests', () => {
   const page = (path) => readFileSync(join(dist, path, 'index.html'), 'utf8');
   const script = (name) => readFileSync(join(projectRoot, 'src/assets/js', name), 'utf8');
   assert.ok(page('configure').includes('data-submit') && script('configure.js').includes("flow: 'university'"), 'the empanelment request is marked as the university flow');
-  assert.ok(!script('forms.js').includes('university') && !script('checkout.js').includes('university'), 'the shared enquiry form and the checkout are not');
+  assert.ok(!script('forms.js').includes('university') && !script('lms-catalogue.js').includes('university'), 'the shared enquiry form and the course catalogue are not');
   for (const path of ['contact', 'partners', 'academy', 'academy/agentic-ai', 'academy/online-programme-course']) {
     assert.ok(!page(path).includes('data-submit') && !page(path).includes('configure.js'), `${path} must not file University requests`);
   }
@@ -253,7 +347,7 @@ test('login and the dashboard are part of this site, and built only when account
   const out = mkdtempSync(join(tmpdir(), 'walnut-account-'));
   // A production build, whatever this run itself is (the preview mirror sets NOINDEX and its own SITE_URL).
   const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8',
-    env: { ...process.env, ACCOUNTS: '1', OUT_DIR: out, NOINDEX: '', SITE_URL: 'https://walnutdatatech.com' } });
+    env: { ...process.env, ACCOUNTS: '1', OUT_DIR: out, NOINDEX: '', SITE_URL: 'https://walnutdatatech.com', LMS_SSO: '', WALNUT_LMS_URL: '' } });
   assert.equal(built.status, 0, built.stderr);
   const made = (path) => readFileSync(join(out, path), 'utf8');
   assert.ok(made('index.html').includes('href="login/" data-account-link data-profile="dashboard/"') && made('index.html').includes('login/?type=student'), 'the header and the audience links lead to the site\'s own login');
@@ -261,8 +355,65 @@ test('login and the dashboard are part of this site, and built only when account
   assert.ok(made('dashboard/index.html').includes('<meta name="robots" content="noindex">') && !made('sitemap.xml').includes('/dashboard/'), 'the dashboard is not listed for search engines');
   // Everything stays on this domain: the pages call the site's own API and nothing else.
   assert.ok(made('login/index.html').includes('"account":"../api/account.php?p="'));
-  assert.match(made('login/index.html'), /connect-src 'self' https:\/\/\*\.razorpay\.com;/);
+  assert.match(made('login/index.html'), /connect-src 'self' https:\/\/walnut-lms\.vercel\.app;/, 'beyond itself, only the LMS course feed');
+  // Accounts alone do not send Enrol through the sign-in: that waits for the LMS sign-in secret (LMS_SSO).
+  for (const [slug, href] of enrolLinks(made('academy/index.html'))) assert.equal(href, `${LMS}/courses/${slug}`, slug);
   rmSync(out, { recursive: true, force: true });
+});
+
+test('with accounts and the LMS sign-in on, Enrol signs the person in to Walnut LMS', () => {
+  const build = (env) => {
+    const out = mkdtempSync(join(tmpdir(), 'walnut-lms-'));
+    const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, OUT_DIR: out, NOINDEX: '', SITE_URL: 'https://walnutdatatech.com', WALNUT_LMS_URL: '', ACCOUNTS_OFF: '', ...env } });
+    assert.equal(built.status, 0, built.stderr);
+    const read = (path) => readFileSync(join(out, path), 'utf8');
+    return { read, done: () => rmSync(out, { recursive: true, force: true }) };
+  };
+  const sso = build({ ACCOUNTS: '1', LMS_SSO: '1' });
+  const academy = sso.read('academy/index.html');
+  const sign = (slug) => `api/sso.php?app=walnut-lms&amp;next=%2Fcourses%2F${slug}`;
+  assert.deepEqual(enrolLinks(catalogueOf(academy)), grouped.map((c) => [c.slug, `../${sign(c.slug)}`]));
+  assert.ok(catalogueOf(academy).includes('data-lms-sso="1"'), 'the browser refresh keeps the sign-in links');
+  for (const course of snapshot.courses) assert.ok(academy.includes(`<a href="${LMS}/courses/${course.slug}" rel="noopener" data-track="course_select"`), `${course.slug}: the title still opens the course page`);
+  const home = enrolLinks(sso.read('index.html'));
+  assert.ok(home.length > 0 && home.every(([slug, href]) => href === sign(slug)), 'the home page cards too');
+  // The sign-in accepts these as where to go next (the rule in api/sso.php).
+  const next = readFileSync(join(projectRoot, 'src/api/sso.php'), 'utf8').match(/preg_match\('#(\^\/\(\?!\/\)[^#]+)#'/);
+  assert.ok(next, 'sso.php checks next');
+  for (const course of snapshot.courses) assert.match(`/courses/${course.slug}`, new RegExp(next[1]));
+  // Old addresses and the sitemap are the same with or without the sign-in.
+  assert.ok(!sso.read('sitemap.xml').includes('/academy/agentic-ai') && !sso.read('sitemap.xml').includes('/academy/online-programme-course') && sso.read('sitemap.xml').includes('/academy/</loc>'));
+  assert.ok(sso.read('.htaccess').includes('RedirectMatch 301 ^/academy/agentic-ai/?$ https://walnutdatatech.com/academy/'));
+  sso.done();
+
+  // The LMS sign-in without accounts would be a dead link, so Enrol opens the course page instead.
+  const noAccounts = build({ ACCOUNTS: '', LMS_SSO: '1' });
+  assert.deepEqual(enrolLinks(catalogueOf(noAccounts.read('academy/index.html'))), grouped.map((c) => [c.slug, `${LMS}/courses/${c.slug}`]));
+  noAccounts.done();
+
+  // The LMS address is reduced to its https origin before it reaches a link or .htaccess, and plain http stops the build.
+  const pathed = build({ WALNUT_LMS_URL: 'https://walnut-lms.vercel.app/lms/' });
+  assert.ok(catalogueOf(pathed.read('academy/index.html')).includes(`data-lms-url="${LMS}"`) && pathed.read('.htaccess').includes(` ${LMS}/courses/online-counselling-course\n`));
+  pathed.done();
+  for (const bad of ['http://walnut-lms.vercel.app', 'walnut-lms.vercel.app']) {
+    const out = mkdtempSync(join(tmpdir(), 'walnut-lms-'));
+    const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, OUT_DIR: out, NOINDEX: '', SITE_URL: 'https://walnutdatatech.com', WALNUT_LMS_URL: bad } });
+    rmSync(out, { recursive: true, force: true });
+    assert.notEqual(built.status, 0, bad);
+    assert.match(built.stderr, /must be an https URL/, bad);
+  }
+});
+
+test('the security policy allows the LMS feed and nothing of Razorpay', () => {
+  const pages = walk(dist).filter((f) => f.endsWith('.html'));
+  assert.ok(pages.length > 10);
+  for (const file of pages) {
+    const csp = readFileSync(file, 'utf8').match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)?.[1];
+    assert.ok(csp, `${file} has a policy`);
+    assert.ok(!/razorpay/i.test(csp), `${file}: Razorpay is still allowed`);
+    assert.match(csp, /connect-src 'self' https:\/\/walnut-lms\.vercel\.app[ ;]/, file);
+  }
+  assert.ok(!/razorpay/i.test(readFileSync(join(projectRoot, 'src/security.mjs'), 'utf8')));
 });
 
 test('the account relay only reaches sign-in and "my account", and needs the account service', async () => {
@@ -505,6 +656,150 @@ test('server configuration sets security headers and caching', () => {
   assert.match(api, /config\|catalog\|lib/);
   assert.match(api, /lib\|account-lib/, 'the account library is not served');
   assert.match(api, /\(emails\|agent-questions\)\\\.json/, 'email templates and the partner questions are not served');
+  // The old course addresses answer with a 301, alongside every rule above (see the redirect test).
+  assert.equal((htaccess.match(/RedirectMatch 301 /g) || []).length, legacyCourses.length);
+});
+
+/* ---------- Walnut LMS: sign-in, progress and past purchases ---------- */
+
+test('deploy wires Walnut LMS: catalogue first, secrets only to the server, the backfill off unless asked', () => {
+  const deploy = readFileSync(join(projectRoot, 'scripts/deploy.mjs'), 'utf8');
+  // The sign-in secret joins the other apps' secrets, as sso_lms, and switches Enrol to the sign-in.
+  assert.ok(deploy.includes("['ONBOARDING', 'COURSE_FINDER', 'LEADS', 'LMS'].filter((k) => env[`WALNUT_SSO_SECRET_${k}`])"));
+  assert.ok(deploy.includes('const hasLmsSso = Boolean(hasAccounts && env.WALNUT_SSO_SECRET_LMS);') && deploy.includes("LMS_SSO: hasLmsSso ? '1' : ''"));
+  // The integration secret and address, with the address checked before anything is built.
+  assert.ok(deploy.includes("const lmsUrl = (env.WALNUT_LMS_URL || 'https://walnut-lms.vercel.app')") && deploy.includes('WALNUT_LMS_URL: lmsUrl'));
+  // Checked on every deploy (sign-in tokens go there even without the integration secret): a public https origin.
+  const urlRule = deploy.match(/\nif \(!(\/\^https:[^\n]+\/i)\.test\(lmsUrl\)\) fail\(/);
+  assert.ok(urlRule, 'the address is checked whatever else is set');
+  const lmsRule = new Function(`return ${urlRule[1]}`)();
+  for (const good of ['https://walnut-lms.vercel.app', 'https://lms.walnutdatatech.com:8443']) assert.ok(lmsRule.test(good), good);
+  for (const bad of ['http://walnut-lms.vercel.app', 'https://walnut-lms.vercel.app/lms', 'https://localhost:3000', 'https://127.0.0.1', 'https://walnut-lms.vercel.app?x=1', 'https://a.test\nRedirect 301 / https://evil.test']) assert.ok(!lmsRule.test(bad), bad);
+  assert.ok(deploy.includes('const hasLms = Boolean(hasAccounts && env.WALNUT_LMS_INTEGRATION_SECRET);') && deploy.includes('lms_secret: env.WALNUT_LMS_INTEGRATION_SECRET'));
+  assert.ok(deploy.includes("env.WALNUT_LMS_BACKFILL === '1' ? { lms_backfill: true } : {}"), 'the backfill is written only when switched on');
+  assert.ok(deploy.includes("v === true ? 'true' : phpStr(v)"), 'as a real true, not a string');
+  // A fresh catalogue before the build, which can never stop the deploy.
+  const fetchAt = deploy.indexOf("spawnSync(process.execPath, ['scripts/fetch-catalogue.mjs']");
+  assert.ok(fetchAt > 0 && fetchAt < deploy.indexOf("spawnSync(process.execPath, ['build.mjs']"), 'the catalogue is fetched before the build');
+  assert.ok(!/const \w+ = spawnSync\(process\.execPath, \['scripts\/fetch-catalogue\.mjs'\]/.test(deploy), 'and its result never fails the deploy');
+  // The secrets are probed for after upload, and the server must see what was uploaded.
+  for (const needle of ["'lms_secret', 'sso_lms'", 'env.WALNUT_LMS_INTEGRATION_SECRET, ...', "if (hasLms && !state.data?.lms)", "if (hasLmsSso && !state.data?.lms_sso)"]) assert.ok(deploy.includes(needle), needle);
+  const example = readFileSync(join(projectRoot, '.env.example'), 'utf8');
+  for (const key of ['WALNUT_SSO_SECRET_LMS', 'WALNUT_LMS_INTEGRATION_SECRET', 'WALNUT_LMS_URL', 'WALNUT_LMS_BACKFILL']) assert.match(example, new RegExp(`^${key}=`, 'm'), key);
+  const fetcher = readFileSync(join(projectRoot, 'scripts/fetch-catalogue.mjs'), 'utf8');
+  assert.ok(fetcher.includes('/api/public/courses') && fetcher.includes('if (!courses.length)') && !fetcher.includes('process.exit(1)'), 'only a valid feed replaces the snapshot');
+});
+
+test('the server registers Walnut LMS, makes learners of those who open it, and signs every call to it', () => {
+  const lib = readFileSync(join(projectRoot, 'src/api/account-lib.php'), 'utf8');
+  assert.ok(lib.includes("'walnut-lms' => ['name' => 'Walnut LMS', 'url' => lms_origin($config) ?: 'https://walnut-lms.vercel.app', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_lms'] ?? '']"));
+  // Only an https origin is ever used: for the sign-in redirect, and for the signed calls (whose signature covers the path).
+  // It ends in \z, not $, so an address with a trailing newline is refused; a lost backslash ('?z~i') would refuse every
+  // address and quietly switch the LMS off.
+  assert.ok(lib.includes("preg_match('~^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?\\z~i', $url) === 1 ? $url : ''"));
+  assert.ok(lib.includes("return lms_origin($config) !== '' && !empty($config['lms_secret']);") && lib.includes('$ch = curl_init(lms_origin($config) . $pathAndQuery);'));
+  assert.ok(!/\$config\['lms_url'\]/.test(lib.replace("$url = rtrim((string) ($config['lms_url'] ?? ''), '/');", '')), 'lms_url is read in lms_origin only');
+  // A minute's rest after the LMS failed to answer, so a slow LMS cannot hold every dashboard view.
+  assert.ok(lib.includes("if (!lms_configured($config) || lms_resting() || !function_exists('curl_init')"));
+  assert.match(lib, /if \(\$status === 0 \|\| \$status >= 500\) \{\s+@touch\(lms_rest_file\(\)\);/);
+  assert.ok(lib.includes('return is_file($file) && filemtime($file) > time() - 60;'));
+  for (const fn of ['lms_configured(array $config): bool', 'lms_call(array $config, string $method, string $pathAndQuery, ?array $body): array', 'lms_progress(array $config, array $user): array', 'lms_backfill(array $config, PDO $db): void']) assert.ok(lib.includes(`function ${fn}`), fn);
+  // Signed over exactly what is sent: "<ts>.<path and query>" for a GET, "<ts>.<raw body>" for a POST.
+  assert.ok(lib.includes("$signed = $method === 'POST' ? (string) $raw : $pathAndQuery;") && lib.includes("hash_hmac('sha256', $ts . '.' . $signed, (string) $config['lms_secret'])"));
+  assert.ok(lib.includes("'X-Walnut-Timestamp: ' . $ts") && lib.includes("'X-Walnut-Signature: sha256=' . hash_hmac("));
+  assert.ok(lib.includes("'/api/integrations/walnut/progress?account_id=' . rawurlencode((string) $user['id']) . '&email=' . rawurlencode((string) $user['email'])"));
+  // The dashboard asks for progress for a proven email of a non-university account only, and links are made here.
+  assert.ok(lib.includes("'lms' => $verified && !$universityOnly ? lms_progress($config, $user) : ['configured' => false, 'available' => false, 'courses' => []]"));
+  // "Not set up here" and "did not answer" are told apart, so the dashboard's note appears for an outage only.
+  assert.ok(lib.includes("return ['configured' => false, 'available' => false, 'courses' => []];") && lib.includes("$none = ['configured' => true, 'available' => false, 'courses' => []];"));
+  assert.ok(lib.includes("'onLms' => !empty($e['lms_synced_at'])"));
+  assert.ok(lib.includes("'open' => $sso ? '/api/sso.php?app=walnut-lms&next=' . rawurlencode('/learn/' . $slug) : $lms . '/courses/' . rawurlencode($slug)"), 'Continue is never a dead link');
+  assert.ok(!/\$c\['open_url'\]|\['verify_url'\]/.test(lib), 'links from the LMS are never passed on');
+  // The backfill: off unless switched on, to the proposed path, amounts in paise.
+  assert.ok(lib.includes("if (!lms_configured($config) || empty($config['lms_backfill']) || lms_resting() || !due('lms-backfill', 120))"));
+  // A purchase goes with the account ID only of an account that proved the email; the time budget is checked before each call.
+  assert.ok(lib.includes('LEFT JOIN wa_users u ON u.email = e.email AND u.email_verified_at IS NOT NULL WHERE e.lms_synced_at IS NULL'));
+  const backfill = lib.slice(lib.indexOf('function lms_backfill('), lib.indexOf('/* ---------- the calls of the login page'));
+  const budget = backfill.indexOf('if (time() - $started > 4) {');
+  assert.ok(budget > backfill.indexOf('foreach ($rows as $e) {') && budget < backfill.indexOf('lms_call('), 'the budget is checked before each call');
+  // It runs after the dashboard has been answered, where the server allows it.
+  const dash = lib.slice(lib.indexOf('function account_dashboard('));
+  assert.ok(dash.includes('register_shutdown_function(function () use ($config, $db) {') && dash.indexOf('fastcgi_finish_request();') < dash.indexOf('lms_backfill($config, $db);'));
+  assert.ok(lib.includes("const LMS_BACKFILL_PATH = '/api/integrations/walnut/enrolments';") && lib.includes("'event' => 'enrolment.created'") && lib.includes("'amount_paise' => (int) $e['amount'] * 100"));
+  assert.ok(lib.includes('lms_backfill($config, $db);') && lib.includes('ADD COLUMN IF NOT EXISTS lms_synced_at DATETIME NULL'));
+  // Only a 400 is final (the LMS's contract): a 401, 422 or 5xx is tried again, so no paid buyer is written off.
+  assert.ok(backfill.includes('} elseif ($status === 400) {'), 'only a 400 marks a purchase as refused');
+  assert.ok(!/in_array\(\$status, \[40/.test(backfill), 'no list of other 4xx codes that would write a purchase off');  assert.ok(readFileSync(join(projectRoot, 'src/api/health.php'), 'utf8').includes("'lms' => lms_configured($config),"));
+
+  // sso.php: a university account is still refused first; anyone else opening the LMS becomes a learner before the token is made.
+  const sso = readFileSync(join(projectRoot, 'src/api/sso.php'), 'utf8');
+  const refused = sso.indexOf("if (university_only($user) && $appId !== 'onboarding')");
+  const learner = sso.indexOf("if ($appId === 'walnut-lms' && !in_array('STUDENT', user_types($user), true))");
+  const token = sso.indexOf('$token = sso_token($db, $app, $appId, $user);');
+  assert.ok(refused > 0 && refused < learner && learner < token);
+  assert.ok(sso.slice(learner, token).includes("clean_types(array_merge(user_types($user), ['STUDENT']))") && sso.slice(learner, token).includes('UPDATE wa_users SET account_types = ?'));
+});
+
+test('the dashboard shows courses on Walnut LMS with their progress, and past purchases as a history', () => {
+  // The render path of account.js, run as it is (it needs the page's DOM only to paint).
+  const source = readFileSync(join(projectRoot, 'src/assets/js/account.js'), 'utf8');
+  const slice = (from, to) => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)));
+  const escSource = readFileSync(join(projectRoot, 'src/assets/js/session.js'), 'utf8').match(/export const esc = ([^\n]+)/)[1];
+  const body = [
+    `const esc = ${escSource}`,
+    slice('const day =', 'function requestsPanel'),
+    slice('// Where a course on Walnut LMS stands', '\nfunction agentPanel') ,
+    slice('function tabs()', '\nfunction paint()'),
+    'return { coursesPanel, tabs, appsForAccount, set: (d) => (data = d) };',
+  ].join('\n');
+  const view = new Function('siteRoot', 'portal', 'requestsPanel', 'agentPanel', 'profilePanel', body)('/', '', () => '', () => '', () => '');
+  const purchase = { courseSlug: 'online-programme-course', courseName: 'Online Programme Course', amount: 499, coupon: 'SYUSANDEEP', paymentId: 'pay_ABC123', progress: 0, purchasedAt: '2026-05-01T10:00:00Z', completedAt: null };
+  const lmsCourse = (patch) => ({ slug: 'applied-sql-for-analytics', title: 'Applied SQL', status: 'active', progress: 40, completedLessons: 4, totalLessons: 10, lastActivityAt: '2026-10-01T10:00:00Z', enrolledAt: '2026-09-01T10:00:00Z', completedAt: null, certificate: null, open: '/api/sso.php?app=walnut-lms&next=%2Flearn%2Fapplied-sql-for-analytics', ...patch });
+  const dashboard = (student, types = ['STUDENT']) => ({ profile: { email: 'learner@example.com', accountType: types[0], accountTypes: types }, university: { requests: [], onboarding: null }, agent: { application: null }, student, apps: [{ id: 'walnut-lms' }, { id: 'onboarding' }] });
+
+  view.set(dashboard({
+    enrolments: [{ ...purchase, onLms: true }],
+    lms: { configured: true, available: true, courses: [
+      lmsCourse(),
+      lmsCourse({ slug: 'online-counselling-course', title: '<img src=x onerror=alert(1)>', status: 'completed', progress: 100, completedAt: '2026-10-02T10:00:00Z', certificate: { title: 'Certified Counsellor', serial: 'WAL-2026-0001', score: 92, verifyUrl: `${LMS}/verify/WAL-2026-0001` }, open: 'javascript:alert(1)' }),
+    ] },
+  }));
+  let html = view.coursesPanel();
+  assert.ok(html.includes('<h3>Applied SQL</h3>') && html.includes('40% complete') && html.includes('4 of 10 lessons') && html.includes('href="/api/sso.php?app=walnut-lms&amp;next=%2Flearn%2Fapplied-sql-for-analytics"') && html.includes('<span>Continue</span>'));
+  assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;') && !html.includes('<img') && !html.includes('javascript:'), 'titles are escaped, and a link that is not ours is left out');
+  assert.ok(html.includes('Completed') && html.includes('Certified Counsellor') && html.includes(`href="${LMS}/verify/WAL-2026-0001"`));
+  assert.ok(html.includes('Purchase history') && html.includes('Online Programme Course') && html.includes('₹499') && html.includes('pay_ABC123'), 'past purchases stay on record');
+  assert.ok(!html.includes('href="/academy/online-programme-course/"'), 'and no longer link to the retired course page');
+  assert.deepEqual(view.tabs().map(([id, label]) => [id, label]), [['courses', 'My courses (2)'], ['profile', 'Profile']]);
+
+  // A purchase not yet handed to the LMS counts alongside the LMS courses.
+  view.set(dashboard({ enrolments: [purchase], lms: { configured: true, available: true, courses: [lmsCourse()] } }));
+  assert.equal(view.tabs()[0][1], 'My courses (2)');
+
+  // The LMS did not answer: purchases are still shown, with a calm note, and counted.
+  view.set(dashboard({ enrolments: [purchase], lms: { configured: true, available: false, courses: [] } }));
+  html = view.coursesPanel();
+  assert.ok(html.includes('unavailable right now') && html.includes('Purchase history'));
+  assert.equal(view.tabs()[0][1], 'My courses (1)');
+
+  // The LMS is not set up here (no integration secret): purchases only, and no note that would never clear.
+  view.set(dashboard({ enrolments: [purchase], lms: { configured: false, available: false, courses: [] } }));
+  html = view.coursesPanel();
+  assert.ok(!html.includes('unavailable right now') && html.includes('Purchase history'));
+
+  // A learner who bought on the LMS only, while it is down: told so, not "No courses yet".
+  view.set(dashboard({ enrolments: [], lms: { configured: true, available: false, courses: [] } }));
+  html = view.coursesPanel();
+  assert.ok(html.includes('unavailable right now') && !html.includes('No courses yet') && html.includes('href="/academy/"'));
+
+  // Nothing yet: an invitation to the catalogue.
+  view.set(dashboard({ enrolments: [], lms: { configured: true, available: true, courses: [] } }));
+  assert.ok(view.coursesPanel().includes('No courses yet') && view.coursesPanel().includes('href="/academy/"'));
+
+  // A university account sees no courses and no LMS app.
+  view.set(dashboard({ enrolments: [], lms: { configured: false, available: false, courses: [] } }, ['UNIVERSITY']));
+  assert.ok(!view.tabs().some(([id]) => id === 'courses'));
+  assert.deepEqual(view.appsForAccount().map((a) => a.id), ['onboarding']);
 });
 
 test('form choices: the country is a searchable list, short lists stay in view, counts and disabled options explain themselves', async () => {

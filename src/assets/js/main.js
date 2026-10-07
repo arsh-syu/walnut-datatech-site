@@ -469,6 +469,35 @@ $$('[data-launcher]').forEach((root) => {
   show(); // the browser may restore earlier choices when navigating back
 });
 
+/* ---------- course catalogue: kept up to date from Walnut LMS ---------- */
+
+// /academy/ is built from a snapshot of the Walnut LMS catalogue. Here the live feed is checked, and the
+// courses are redrawn only when they differ from the snapshot. Any failure (the LMS down, a slow answer,
+// a feed with nothing valid) silently leaves the built catalogue as it is.
+async function refreshCatalogue(box) {
+  const lmsUrl = box.dataset.lmsUrl || '';
+  if (!/^https?:\/\/[^/?#]+$/.test(lmsUrl)) return;
+  const { parseFeed, catalogueKey, renderCatalogue } = await import('./lms-catalogue.js');
+  const res = await fetch(`${lmsUrl}/api/public/courses`, { credentials: 'omit', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(6000) });
+  if (!res.ok) return;
+  const { courses, updatedAt } = parseFeed(await res.json());
+  const key = catalogueKey(courses);
+  if (!courses.length || key === box.dataset.lmsKey) return;
+  const icons = JSON.parse($('#lms-icons').textContent);
+  const html = renderCatalogue(courses, { icon: (name) => icons[name] || '', lmsUrl, root: box.dataset.root || '', sso: box.dataset.lmsSso === '1', level: Number(box.dataset.level) || 3 });
+  // A catalogue the visitor has already seen is swapped in place, not hidden and slid in again.
+  const shown = box.querySelector('[data-reveal].in') !== null;
+  box.innerHTML = html;
+  box.dataset.lmsKey = key;
+  box.dataset.updated = updatedAt;
+  $$('[data-reveal]', box).forEach((el) => (shown ? el.classList.add('in') : revealer.observe(el)));
+}
+
+try {
+  const catalogue = $('[data-lms-catalogue]');
+  if (catalogue) refreshCatalogue(catalogue).catch(() => {});
+} catch {}
+
 initForms();
 initAnalytics();
 paintHeader(); // "Sign in" becomes the person's name once they are signed in

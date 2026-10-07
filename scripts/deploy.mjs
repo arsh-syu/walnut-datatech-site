@@ -5,7 +5,8 @@
 //
 // Reads .env (see .env.example): FTP_HOST, FTP_USER, FTP_PASS, FTP_DIR, SITE_URL,
 // RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, TWILIO_API_KEY, TWILIO_API_SECRET, EMAIL_FROM, EMAIL_FROM_NAME, EMAIL_NOTIFY,
-// DB_HOST, DB_NAME, DB_USER, DB_PASS, ACCOUNT_SECRET, TWILIO_ACCOUNT_SID, SMS_FROM.
+// DB_HOST, DB_NAME, DB_USER, DB_PASS, ACCOUNT_SECRET, TWILIO_ACCOUNT_SID, SMS_FROM, WALNUT_SSO_SECRET_<APP>,
+// WALNUT_LMS_URL, WALNUT_LMS_INTEGRATION_SECRET, WALNUT_LMS_BACKFILL.
 //
 // Order matters for safety: the site and the payment API are uploaded first, the API is checked
 // to be executing as PHP, and only then is the file holding the Razorpay secret uploaded.
@@ -39,6 +40,15 @@ const hasOnboarding = Boolean(onboardingPublic && env.ONBOARDING_API_KEY);
 const hasAccounts = Boolean(env.DB_NAME && env.DB_USER && env.ACCOUNT_SECRET && hasEmail);
 const hasSms = Boolean(hasAccounts && env.TWILIO_ACCOUNT_SID && env.SMS_FROM);
 const hasLogin = hasOnboarding || hasAccounts;
+// Walnut LMS sells the courses. Our server asks it for course progress with a shared secret, and the Enrol
+// buttons sign the person in to it — both only with the account database, which holds the learners.
+const lmsUrl = (env.WALNUT_LMS_URL || 'https://walnut-lms.vercel.app').replace(/\/+$/, '');
+const hasLms = Boolean(hasAccounts && env.WALNUT_LMS_INTEGRATION_SECRET);
+const hasLmsSso = Boolean(hasAccounts && env.WALNUT_SSO_SECRET_LMS);
+// Always checked: the course links, the redirects in .htaccess and the sign-in tokens all go to this
+// address. A public https origin with no path (the LMS checks each signature against the path it
+// receives), the rule main.js uses too.
+if (!/^https:\/\/(?!localhost\b|127\.|\[::1\])[A-Za-z0-9.-]+(:\d{1,5})?$/i.test(lmsUrl)) fail('WALNUT_LMS_URL must be the public https address of Walnut LMS, with no path (e.g. https://walnut-lms.vercel.app).');
 
 // Real money must not be taken before the refund terms are published.
 if (hasKeys && env.RAZORPAY_KEY_ID.startsWith('rzp_live_') && !config.legal.refundPolicy) {
@@ -141,7 +151,11 @@ async function health() {
 console.log(`Building for ${siteUrl} …`);
 // Login and the dashboard are published exactly when the accounts they rely on are configured.
 if (config.accounts && !hasLogin) console.log('! `accounts` is on in site.config.mjs but neither the account database (DB_NAME, DB_USER, ACCOUNT_SECRET) nor ONBOARDING_API_URL / ONBOARDING_API_KEY is set — login and the dashboard are left out of this deploy.');
-const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasLogin ? '1' : '', ACCOUNTS_OFF: hasLogin ? '' : '1' } });
+// The course catalogue comes from Walnut LMS. When it cannot be fetched the build uses the last copy,
+// so this never stops a deploy.
+spawnSync(process.execPath, ['scripts/fetch-catalogue.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, WALNUT_LMS_URL: lmsUrl } });
+// Enrol signs the person in to the LMS only when the LMS can receive that sign-in; otherwise it opens the course on the LMS.
+const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasLogin ? '1' : '', ACCOUNTS_OFF: hasLogin ? '' : '1', WALNUT_LMS_URL: lmsUrl, LMS_SSO: hasLmsSso ? '1' : '' } });
 if (build.status !== 0) fail('The build failed.');
 const check = spawnSync(process.execPath, ['check.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl } });
 if (check.status !== 0) fail('Link check failed — nothing was uploaded.');
@@ -192,6 +206,8 @@ if (!hasOnboarding) {
 }
 if (!hasAccounts && !hasOnboarding) console.log('! DB_NAME / DB_USER / ACCOUNT_SECRET (and the email settings) are not all set in .env — login and the dashboard are not published.');
 if (hasAccounts && !hasSms) console.log('  TWILIO_ACCOUNT_SID / SMS_FROM are not set in .env — login offers the email code only (no SMS).');
+if (hasAccounts && !hasLms) console.log('  WALNUT_LMS_INTEGRATION_SECRET is not set in .env — the dashboard shows past purchases but not course progress from Walnut LMS.');
+if (hasAccounts && !hasLmsSso) console.log('  WALNUT_SSO_SECRET_LMS is not set in .env — Enrol opens the course on Walnut LMS, where the learner signs in there.');
 
 if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
   const phpStr = (v) => `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
@@ -202,33 +218,42 @@ if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
     ...(hasAccounts ? { db_host: env.DB_HOST || 'localhost', db_name: env.DB_NAME, db_user: env.DB_USER, db_pass: env.DB_PASS || '', account_secret: env.ACCOUNT_SECRET } : {}),
     ...(hasSms ? { twilio_sid: env.TWILIO_ACCOUNT_SID, sms_from: env.SMS_FROM } : {}),
     // one sign-in for the other Walnut apps: each app's own secret, set only once that app can receive it
-    ...(hasAccounts ? Object.fromEntries(['ONBOARDING', 'COURSE_FINDER', 'LEADS'].filter((k) => env[`WALNUT_SSO_SECRET_${k}`]).map((k) => [`sso_${k.toLowerCase()}`, env[`WALNUT_SSO_SECRET_${k}`]])) : {}),
+    ...(hasAccounts ? Object.fromEntries(['ONBOARDING', 'COURSE_FINDER', 'LEADS', 'LMS'].filter((k) => env[`WALNUT_SSO_SECRET_${k}`]).map((k) => [`sso_${k.toLowerCase()}`, env[`WALNUT_SSO_SECRET_${k}`]])) : {}),
+    // Walnut LMS: its address, the secret our server signs its calls with, and whether past website
+    // purchases are handed to it (off until the LMS has confirmed how it receives them)
+    ...(hasAccounts ? { lms_url: lmsUrl } : {}),
+    ...(hasLms ? { lms_secret: env.WALNUT_LMS_INTEGRATION_SECRET } : {}),
+    ...(hasLms && env.WALNUT_LMS_BACKFILL === '1' ? { lms_backfill: true } : {}),
   };
   const configFile = join(tmp, 'config.php');
   writeFileSync(
     configFile,
-    `<?php\n// Written by scripts/deploy.mjs. Never commit or share this file.\nreturn [\n${Object.entries(settings).map(([k, v]) => `  '${k}' => ${phpStr(v)},`).join('\n')}\n];\n`,
+    `<?php\n// Written by scripts/deploy.mjs. Never commit or share this file.\nreturn [\n${Object.entries(settings).map(([k, v]) => `  '${k}' => ${v === true ? 'true' : phpStr(v)},`).join('\n')}\n];\n`,
     { mode: 0o600 }
   );
   upload([[configFile, 'api/config.php']], remoteDir);
 
   // The secrets must never be readable over the web.
   const probe = await fetch(`${siteUrl}/api/config.php?t=${Date.now()}`).then((r) => r.text()).catch(() => '');
-  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', 'db_pass', 'account_secret', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY, env.DB_PASS, env.ACCOUNT_SECRET].filter(Boolean).some((needle) => probe.includes(needle));
+  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', 'db_pass', 'account_secret', 'lms_secret', 'sso_lms', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY, env.DB_PASS, env.ACCOUNT_SECRET, env.WALNUT_LMS_INTEGRATION_SECRET, ...['ONBOARDING', 'COURSE_FINDER', 'LEADS', 'LMS'].map((k) => env[`WALNUT_SSO_SECRET_${k}`])].filter(Boolean).some((needle) => probe.includes(needle));
   if (leaked) {
     curl([`url = ${q(ftpUrl(remoteDir))}`, `quote = ${q(`DELE ${remoteDir}api/config.php`)}`, 'list-only'], { quiet: true });
-    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay, Twilio, database and Onboarding Tool secrets and contact the host about PHP handling.');
+    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay, Twilio, database, Onboarding Tool and Walnut app (SSO and LMS) secrets and contact the host about PHP handling.');
   }
 
   state = await health();
   if (hasKeys && !state.data?.configured) fail('The keys were uploaded but the payment API does not see them.');
   if (hasEmail && !state.data?.email) fail('The email settings were uploaded but the API does not see them.');
   if (hasOnboarding && !state.data?.onboarding) fail('The Onboarding Tool settings were uploaded but the API does not see them.');
+  if (hasLms && !state.data?.lms) fail('The Walnut LMS settings were uploaded but the API does not see them. Check WALNUT_LMS_URL (a public https address) and WALNUT_LMS_INTEGRATION_SECRET in .env.');
+  if (hasLmsSso && !state.data?.lms_sso) fail('WALNUT_SSO_SECRET_LMS was uploaded but the API does not see it.');
   if (hasAccounts && !state.data?.accounts) fail('The account database settings were uploaded, but the server could not connect to the database. Check DB_HOST, DB_NAME, DB_USER and DB_PASS in .env, and that PHP has the pdo_mysql extension.');
   if (hasKeys) console.log(`✓ Razorpay connected in ${state.data.mode.toUpperCase()} mode`);
   if (hasEmail) console.log(`✓ Email connected — sending from ${env.EMAIL_FROM}, notifications to ${env.EMAIL_NOTIFY}`);
   if (hasOnboarding) console.log(`✓ University requests will be filed in the Onboarding Tool at ${onboardingUrl}`);
   if (hasAccounts) console.log(`✓ Walnut accounts connected — database ${env.DB_NAME}, one-time codes by email${hasSms ? ' and SMS' : ''}`);
+  if (hasLms) console.log(`✓ Walnut LMS connected at ${lmsUrl} — course progress on the dashboard${env.WALNUT_LMS_BACKFILL === '1' ? ', past website purchases handed to the LMS' : ''}`);
+  if (hasLmsSso) console.log('✓ Walnut LMS sign-in connected — Enrol and Continue open the LMS signed in');
 }
 
 const home200 = await fetch(`${siteUrl}/?t=${Date.now()}`).then((r) => r.status).catch(() => 0);

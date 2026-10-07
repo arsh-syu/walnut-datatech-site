@@ -31,8 +31,8 @@ const universityOnly = () => {
   return types.includes('UNIVERSITY') && !types.includes('AGENT') && !types.includes('STUDENT');
 };
 // Which journey each Walnut app belongs to. An app nobody has claimed stays visible to everyone.
-const APP_JOURNEY = { onboarding: 'UNIVERSITY', 'course-finder': 'AGENT', leads: 'AGENT' };
-const appsForAccount = () => (data.apps ?? []).filter((a) => !universityOnly() || APP_JOURNEY[a.id] !== 'AGENT');
+const APP_JOURNEY = { onboarding: 'UNIVERSITY', 'course-finder': 'AGENT', leads: 'AGENT', 'walnut-lms': 'STUDENT' };
+const appsForAccount = () => (data.apps ?? []).filter((a) => !universityOnly() || !['AGENT', 'STUDENT'].includes(APP_JOURNEY[a.id]));
 
 let data; // the dashboard as the service last sent it
 let tab; // the open tab
@@ -75,20 +75,59 @@ function requestsPanel() {
   );
 }
 
+// Where a course on Walnut LMS stands, in plain words.
+const COURSE = {
+  active: ['In progress'],
+  completed: ['Completed', 'is-ok'],
+  expired: ['Access ended', 'is-stop'],
+};
+// The links in a course come from our own server; anything else is left out rather than linked.
+const safeLink = (href) => (typeof href === 'string' && /^(\/api\/sso\.php\?|https:\/\/)/.test(href) ? href : '');
+const lmsCourses = () => data.student.lms?.courses ?? [];
+
+function courseItem(c) {
+  const [label, tone = ''] = COURSE[c.status] ?? COURSE.active;
+  const progress = Math.min(100, Math.max(0, Number(c.progress) || 0));
+  const open = safeLink(c.open);
+  const verify = safeLink(c.certificate?.verifyUrl);
+  const action = c.status === 'completed' ? 'Review course' : progress > 0 ? 'Continue' : 'Open course';
+  return `<article class="acct-item">
+      <header><h3>${esc(c.title)}</h3><span class="status-badge ${tone}">${label}</span></header>
+      <div class="acct-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}" aria-valuetext="${progress}% complete" aria-label="Progress in ${esc(c.title)}"><span style="width:${progress}%"></span></div>
+      <p class="acct-meta"><strong>${progress}% complete</strong>${c.totalLessons ? ` · ${Number(c.completedLessons) || 0} of ${Number(c.totalLessons)} lessons` : ''}${c.lastActivityAt ? ` · Last activity ${day(c.lastActivityAt)}` : ''}</p>
+      ${c.certificate ? `<p class="acct-cert"><span>${tick}</span><strong>${esc(c.certificate.title)}</strong>${verify ? `<a href="${esc(verify)}" target="_blank" rel="noopener">Verify certificate<span class="sr-only"> (opens in a new tab)</span></a>` : ''}</p>` : ''}
+      ${open ? `<div class="acct-actions"><a class="btn btn-primary btn-sm" href="${esc(open)}" data-track="course_open" data-track-item="${esc(c.slug)}"><span>${action}</span></a></div>` : ''}
+    </article>`;
+}
+
+// Courses bought on this website before Walnut LMS sold them: a record of the payment, not of progress.
+const purchases = (enrolments) => `<section class="acct-history" aria-labelledby="acct-history-title">
+    <h3 class="acct-more-title" id="acct-history-title">Purchase history</h3>
+    <p class="acct-meta">Courses bought on this website before they moved to Walnut LMS.</p>
+    <ul class="acct-purchases">${enrolments
+      .map((e) => `<li><div><strong>${esc(e.courseName)}</strong><span>${day(e.purchasedAt)} · payment reference ${esc(e.paymentId)}</span></div><span class="acct-paid">${rupees(e.amount)}</span></li>`)
+      .join('')}</ul>
+  </section>`;
+
+// What 'My courses' counts: the courses on Walnut LMS, plus purchases from this site not handed to it yet.
+// The tab and the panel's own figure use this one number, so they always agree.
+function courseTotal() {
+  const { enrolments, lms } = data.student;
+  return lms?.available ? lmsCourses().length + enrolments.filter((e) => !e.onLms).length : enrolments.length;
+}
+
 function coursesPanel() {
-  const { enrolments } = data.student;
-  if (!enrolments.length) return empty('No courses yet', `Courses you buy on this website appear here. Use ${esc(data.profile.email)} at checkout.`, `${siteRoot}academy/`, 'Browse courses');
-  const completed = enrolments.filter((e) => e.completedAt || e.progress >= 100).length;
-  return `<dl class="acct-stats">${[['Courses purchased', enrolments.length], ['In progress', enrolments.length - completed], ['Completed', completed]].map(([label, value]) => `<div><dd>${value}</dd><dt>${label}</dt></div>`).join('')}</dl>
-    ${enrolments
-      .map(
-        (e) => `<article class="acct-item">
-        <header><h3><a href="${siteRoot}academy/${encodeURIComponent(e.courseSlug)}/">${esc(e.courseName)}</a></h3><span class="status-badge is-ok">Paid ${rupees(e.amount)}</span></header>
-        <div class="acct-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${e.progress}" aria-label="Progress in ${esc(e.courseName)}"><span style="width:${Math.min(100, Math.max(0, e.progress))}%"></span></div>
-        <p class="acct-meta"><strong>${e.progress}% complete</strong> · Purchased ${day(e.purchasedAt)}${e.coupon ? ` · coupon ${esc(e.coupon)}` : ''} · payment reference ${esc(e.paymentId)}</p>
-      </article>`
-      )
-      .join('')}
+  const { enrolments, lms } = data.student;
+  const courses = lmsCourses();
+  // Said only when this site asks Walnut LMS and it did not answer just now; not when the LMS is not set up here.
+  const calm = lms && lms.configured !== false && !lms.available ? '<p class="acct-calm">Your courses on Walnut LMS are unavailable right now. Your courses are safe; please check again in a little while.</p>' : '';
+  if (!courses.length && !enrolments.length && calm) return `${calm}<p><a class="link-arrow" href="${siteRoot}academy/"><span>Browse courses</span></a></p>`;
+  if (!courses.length && !enrolments.length) return empty('No courses yet', `Enrol on a course with ${esc(data.profile.email)} and it appears here, with your progress.`, `${siteRoot}academy/`, 'Browse courses');
+  const completed = courses.filter((c) => c.status === 'completed').length;
+  const active = courses.filter((c) => c.status === 'active').length;
+  return `${calm}
+    ${courses.length ? `<dl class="acct-stats">${[['Courses', courseTotal()], ['In progress', active], ['Completed', completed]].map(([label, value]) => `<div><dd>${value}</dd><dt>${label}</dt></div>`).join('')}</dl>${courses.map(courseItem).join('')}` : ''}
+    ${enrolments.length ? purchases(enrolments) : ''}
     <p><a class="link-arrow" href="${siteRoot}academy/"><span>Browse more courses</span></a></p>`;
 }
 
@@ -171,7 +210,7 @@ function more() {
   if (universityOnly()) return [];
   return [
     !types.includes('AGENT') && !data.agent.application && !applying && { label: 'Become a partner', line: 'Apply with this account.', start: 'agent' },
-    !types.includes('STUDENT') && !data.student.enrolments.length && { label: 'Take a short course', line: 'Courses bought with this email appear here.', href: `${siteRoot}academy/` },
+    !types.includes('STUDENT') && !data.student.enrolments.length && !lmsCourses().length && { label: 'Take a short course', line: 'Enrol on Walnut LMS with this account; your progress appears here.', href: `${siteRoot}academy/` },
   ].filter(Boolean);
 }
 
@@ -183,9 +222,13 @@ function tabs() {
   const types = typesOf(data.profile);
   const hasRequests = data.university.requests.length > 0 || Boolean(data.university.onboarding);
   const others = !universityOnly(); // a university account has the university flow and nothing else
+  // Courses are counted on Walnut LMS when it answered, with the purchases made on this website that
+  // have not been handed to it yet; otherwise by the purchases made on this website.
+  const { enrolments, lms } = data.student;
+  const courseCount = courseTotal();
   return [
     (types.includes('UNIVERSITY') || hasRequests) && ['requests', `My requests (${data.university.requests.length})`, requestsPanel],
-    others && (types.includes('STUDENT') || data.student.enrolments.length > 0) && ['courses', `My courses (${data.student.enrolments.length})`, coursesPanel],
+    others && (types.includes('STUDENT') || enrolments.length > 0 || lmsCourses().length > 0) && ['courses', `My courses (${courseCount})`, coursesPanel],
     others && (types.includes('AGENT') || data.agent.application || applying) && ['agent', 'Partner application', agentPanel],
     ['profile', 'Profile', profilePanel],
   ]
@@ -214,7 +257,7 @@ function paint() {
     <div class="acct-main">
       <div class="acct-hello"><p>${greeting()},</p><h2>${esc(p.name)}</h2></div>
       ${apps.length ? `<nav class="acct-apps" aria-label="Walnut apps"><p>Open with this account</p><ul>${apps.map((a) => `<li><a class="btn btn-ghost btn-sm" href="${esc(a.href)}" data-track="app_open" data-track-item="${esc(a.id)}"><span>${esc(a.name)}</span></a></li>`).join('')}</ul></nav>` : ''}
-      ${p.emailVerified ? '' : `<div class="acct-notice"><div><strong>Verify your email to see your activity</strong><span>Requests and course purchases made with ${esc(p.email)} appear once you confirm the address is yours.</span></div><button class="btn btn-primary btn-sm" type="button" data-verify="email"><span>Verify email</span></button></div>`}
+      ${p.emailVerified ? '' : `<div class="acct-notice"><div><strong>Verify your email to see your activity</strong><span>Requests and courses linked to ${esc(p.email)} appear once you confirm the address is yours.</span></div><button class="btn btn-primary btn-sm" type="button" data-verify="email"><span>Verify email</span></button></div>`}
       <div class="acct-panel">
         <div class="acct-tabs" role="tablist" aria-label="Your account">${list.map(([id, label]) => `<button type="button" role="tab" id="tab-${id}" aria-selected="${id === tab}" aria-controls="acct-view" data-tab="${id}"${id === tab ? '' : ' tabindex="-1"'}>${label}</button>`).join('')}</div>
         <div class="acct-view" id="acct-view" role="tabpanel" aria-labelledby="tab-${tab}" tabindex="0">${panel()}</div>

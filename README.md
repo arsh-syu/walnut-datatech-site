@@ -2,7 +2,7 @@
 
 Website for Walnut Data Tech: technology and services for universities, short courses for learners, and applications for education agents.
 
-A zero-dependency static site plus a small PHP payment API. Data files describe every service, course and application; a Node script turns them into HTML.
+A zero-dependency static site plus a small PHP API. Data files describe every service and application, a snapshot of the Walnut LMS catalogue describes the courses, and a Node script turns them into HTML.
 
 ## Commands
 
@@ -13,6 +13,7 @@ npm test         # syntax-check every file, then run the test suite (prices, cou
 npm run dev      # build and serve at http://localhost:4173 (with a local mirror of the payment API)
 npm run deploy   # build, upload to the web host over FTP, and verify the live site
 node scripts/test-emails.mjs you@example.com   # send every website email, with sample data, to that address
+node scripts/fetch-catalogue.mjs               # refresh the Walnut LMS course snapshot (src/data/lms-catalogue.json)
 ```
 
 Requires Node 20+. There is nothing to install — no dependencies.
@@ -22,15 +23,17 @@ Requires Node 20+. There is nothing to install — no dependencies.
 | What | Where |
 |---|---|
 | University services, modules, engagement models, configurator goals | `src/data/services.mjs` |
-| Courses, prices and coupons | `src/data/courses.mjs` |
+| Courses (a snapshot of the Walnut LMS catalogue) | `src/data/lms-catalogue.json`, read by `src/data/lms.mjs` |
+| Walnut LMS address | `lms` in `site.config.mjs` |
+| Old course addresses and where they now go | `src/data/courses.mjs` |
 | Audiences ("What brings you to Walnut?"), partner applications, navigation | `src/data/site.mjs` |
 | Site URL, links, videos, clients, certifications, **legal details**, analytics | `site.config.mjs` |
 | Email templates (enquiry and enrolment emails) | `src/emails/templates.mjs` |
 | Page templates and shared blocks | `src/templates/` |
 | Security policy (CSP and response headers) | `src/security.mjs` |
 | Styles (tokens → components → sections → journeys) | `src/assets/css/` |
-| Interactions, forms, configurator, checkout, analytics | `src/assets/js/` |
-| Payment and enquiry API (runs on the web host) | `src/api/` |
+| Interactions, forms, configurator, course cards, analytics | `src/assets/js/` |
+| Enquiry and account API (runs on the web host) | `src/api/` |
 | Deploy script, local dev server | `scripts/` |
 | Tests | `tests/` |
 | Brand kit for re-theming other tools (tokens, component styles, logos, icons, guidelines) | `brand/` — start with `brand/brand-book.html` |
@@ -38,27 +41,25 @@ Requires Node 20+. There is nothing to install — no dependencies.
 
 ## Common edits
 
-- **Change a course price or coupon** — edit `price` or `coupons` in `src/data/courses.mjs`, update the matching test in `tests/site.test.mjs`, then deploy. The course pages, the checkout and the server-side price list all come from that one file. A coupon only applies to the course it is listed under.
-- **Add a course** — add an entry to `courses`; its page, card and checkout are generated.
+- **Add a course, or change a price** — do it on Walnut LMS. `/academy/` picks it up in the browser at once, and the built pages at the next deploy (or after `node scripts/fetch-catalogue.mjs`).
 - **Add or change a partner application** — edit `externalApps` in `src/data/site.mjs`.
 - **Add or reword a university service module** — edit that service's `items` in `src/data/services.mjs`.
 - **Videos, client logos, certifications, social links, Student Login** — fill the matching fields in `site.config.mjs`. Anything left empty is simply not shown; there are no "coming soon" placeholders.
 - **Legal details** — `legal` in `site.config.mjs` feeds the Privacy Policy and Terms (contact email, registered address, refund policy, course access, retention, governing law). Update `lastUpdated` whenever the wording changes.
 - **Analytics** — set `analytics.gaMeasurementId`. Visitors are then asked for consent and Google Analytics runs only after they accept. The event list is at the top of `src/assets/js/analytics.js`.
 
-## Payments
+## Courses (Walnut LMS)
 
-Checkout uses Razorpay. The browser never decides the price:
+Courses are sold and taken on Walnut LMS (`lms.url` in `site.config.mjs`, https://walnut-lms.vercel.app). This site lists them and sends learners there; it takes no payments itself.
 
-1. `api/create-order.php` computes the amount from the course catalogue (and coupon, if valid for that course) and creates a Razorpay order.
-2. Razorpay Checkout collects the payment.
-3. `api/verify-payment.php` checks Razorpay's signature before the enrolment is confirmed.
-
-The Razorpay **key secret lives only on the server** in `api/config.php`, which the deploy script writes from `.env`. It is not in this repository and never reaches the browser. The API accepts same-origin JSON only and is rate-limited per visitor.
-
-To go live: fill `legal.refundPolicy` in `site.config.mjs`, replace the test keys in `.env` with live keys, and deploy. The deploy script refuses live keys while the refund policy is empty.
-
-`scripts/dev-server.mjs` mirrors the PHP endpoints in Node for local testing and refuses anything but Razorpay **test** keys. Keep the two in step when changing payment rules.
+- **The catalogue.** `/academy/` lists every published course from the LMS's public feed (`{lms.url}/api/public/courses`), grouped by category, featured courses first. The home page and the footer show up to three featured courses. All counts on the page come from the feed.
+- **Snapshot, then live.** The build renders from `src/data/lms-catalogue.json`, a snapshot taken by `node scripts/fetch-catalogue.mjs`. The script keeps the old snapshot (and still exits 0) when the LMS is down or sends nothing valid, so a deploy never fails because of the LMS. In the browser, `main.js` fetches the live feed and redraws the catalogue only when the courses differ from the snapshot; on any failure the built catalogue stays as it is.
+- **Nothing in the feed is trusted.** `src/assets/js/lms-catalogue.js` (shared by the build and the browser) checks every field, escapes every text and ignores the feed's own URLs: every link is built from the course slug.
+- **Links.** A course's title opens its page on Walnut LMS. **Enrol** goes through this site's sign-in (`api/sso.php?app=walnut-lms&next=/courses/<slug>`) when the LMS sign-in is on — `LMS_SSO=1` for the build, with accounts switched on — so the learner arrives on Walnut LMS signed in with their Walnut account. Otherwise Enrol opens the course page on Walnut LMS, so it is never a dead button.
+- **Other addresses.** `WALNUT_LMS_URL` points the build, the snapshot script and the links at another LMS (e.g. a staging copy). It must be an https origin with no path: the build keeps only the origin, and the deploy stops on anything else.
+- **Progress and past purchases.** With `WALNUT_LMS_INTEGRATION_SECRET` set, the dashboard asks the LMS for the learner's courses, signing each call. When the LMS does not answer (or answers with a 5xx), it is left alone for a minute, so a slow LMS cannot hold every dashboard view. Without the secret the dashboard shows past purchases only, with no "unavailable" note. `WALNUT_LMS_BACKFILL=1` hands past website purchases to the LMS: up to 10 every two minutes, after a signed-in person's dashboard has been answered, so it relies on dashboard visits to finish. A purchase carries the account ID only when that account has verified the email.
+- **Testing the LMS calls locally.** Our server calls the LMS over https only, with the certificate checked. To point it at a local mock, give the mock a certificate for `127.0.0.1` and start PHP with `-d curl.cainfo=<that certificate>.pem`.
+- **Old course pages.** The courses this site used to sell (`src/data/courses.mjs`) keep their addresses: `/academy/online-programme-course/` forwards to `online-counselling-course` on Walnut LMS, and `/academy/agentic-ai/` (which has no LMS course) to `/academy/`. The server answers both with a 301 (`dist/.htaccess`); the small noindex pages built at those paths forward everywhere else. They are not in the sitemap.
 
 ## Email
 
@@ -155,7 +156,7 @@ One account can be used for more than one thing, with one exception.
 
 ## Security
 
-- A Content-Security-Policy on every page allows only this site's own files and the third parties it uses (Razorpay, Google Fonts and video hosts). Adding a new third party means adding it in `src/security.mjs`.
+- A Content-Security-Policy on every page allows only this site's own files and the third parties it uses (Walnut LMS for the live course catalogue, Google Fonts and video hosts). Adding a new third party means adding it in `src/security.mjs`.
 - The web server sends `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and HSTS (generated into `dist/.htaccess`).
 - `npm test` fails if a key, secret or FTP setting appears in the published files.
 
@@ -187,4 +188,4 @@ If you prefer your host's File Manager or an FTP app:
 
    Never put this file in the repository, in `dist/`, or in a zip you share.
 
-Pushing to `main` runs the tests and publishes a preview mirror to GitHub Pages. The mirror is hidden from search engines and has no payment API, so checkout shows "payment isn't available" there.
+Pushing to `main` runs the tests and publishes a preview mirror to GitHub Pages. The mirror is hidden from search engines and has no PHP API.

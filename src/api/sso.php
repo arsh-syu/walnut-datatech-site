@@ -49,13 +49,24 @@ if (!$user) {
 
 // A university account opens the university's own tool and nothing else.
 if (university_only($user) && $appId !== 'onboarding') {
-    $stop(403, 'Not available for university accounts', $app['name'] . ' is part of the partner programme. A university account is used for the university application only.');
+    $stop(403, 'Not available for university accounts', $app['name'] . ($appId === 'walnut-lms' ? ' is where learners take Walnut courses.' : ' is part of the partner programme.') . ' A university account is used for the university application only.');
 }
 
 // The app trusts this email as proven, so only a verified address is handed over. (An account made with a
 // mobile code has an email nobody has confirmed yet.)
 if ($user['email_verified_at'] === null) {
     $stop(403, 'Verify your email first', 'Before opening ' . $app['name'] . ', please verify ' . $user['email'] . ' from the Profile tab of your dashboard.');
+}
+
+// Opening Walnut LMS is enrolling as a learner (Walnut's decision): an account without the learner type
+// is given it here, as /account/services would, so the LMS receives STUDENT in the token. Nothing is
+// removed, and a university account never gets this far.
+if ($appId === 'walnut-lms' && !in_array('STUDENT', user_types($user), true)) {
+    $types = clean_types(array_merge(user_types($user), ['STUDENT']));
+    if (allowed_types($types)) {
+        db_run($db, 'UPDATE wa_users SET account_types = ?, account_type = COALESCE(account_type, ?), updated_at = ? WHERE id = ?', [implode(',', $types), $types[0], utc(), $user['id']]);
+        $user = db_row($db, 'SELECT * FROM wa_users WHERE id = ?', [$user['id']]) ?? $user;
+    }
 }
 
 $token = sso_token($db, $app, $appId, $user);
