@@ -2,6 +2,7 @@
 // so what is tested locally is what production serves.
 
 import { createHash } from 'node:crypto';
+import { THUMBNAIL_ORIGIN } from './assets/js/lms-catalogue.js';
 
 // The only inline script on the site. Before first paint it:
 //   - marks the document as JS-capable (scroll-reveal and tabs depend on it);
@@ -14,19 +15,25 @@ export const inlineScript =
 const sha256 = (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`;
 
 // Content-Security-Policy: only this site's own files plus the third parties it actually uses.
-export function contentSecurityPolicy(config) {
+// `payments` is for the pay page (/pay/) only: Razorpay's checkout script, its frame and its calls. Every
+// other page has no reason to load anything from Razorpay, so it cannot.
+export function contentSecurityPolicy(config, { payments = false } = {}) {
   const ga = Boolean(config.analytics?.gaMeasurementId);
+  const rzp = payments && 'https://*.razorpay.com';
+  // Walnut LMS: /academy/ reads its public course feed to show the live catalogue.
+  const lms = config.lms?.url ? new URL(config.lms.url).origin : null;
   const policy = {
     'default-src': ["'self'"],
-    // Razorpay Checkout loads its own helper scripts (e.g. risk detection) from cdn.razorpay.com
-    'script-src': ["'self'", sha256(inlineScript), 'https://*.razorpay.com', ga && 'https://www.googletagmanager.com'],
+    'script-src': ["'self'", sha256(inlineScript), ga && 'https://www.googletagmanager.com', rzp],
     'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // inline is needed for style="" attributes only
     'font-src': ["'self'", 'https://fonts.gstatic.com'],
-    'img-src': ["'self'", 'data:', 'https://*.razorpay.com', ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com'],
-    'connect-src': ["'self'", 'https://*.razorpay.com', ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com'],
-    'frame-src': ['https://*.razorpay.com', 'https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
+    // Course images are kept in the Walnut LMS file store (see lms-catalogue.js).
+    'img-src': ["'self'", 'data:', THUMBNAIL_ORIGIN, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', rzp],
+    'connect-src': ["'self'", lms, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com', rzp],
+    'frame-src': ['https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com', rzp],
     'base-uri': ["'self'"],
-    'form-action': ["'self'"],
+    // Razorpay's checkout falls back to posting a form to its own pages (a blocked pop-up, some banks).
+    'form-action': ["'self'", rzp],
     'object-src': ["'none'"],
   };
   return Object.entries(policy)

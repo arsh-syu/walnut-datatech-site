@@ -7,11 +7,8 @@
 // Events — none of them carries personal information:
 //   audience_select   { item }                     "What brings you to Walnut?" choice
 //   service_select    { item }                     a university service picked in the showcase
-//   course_select     { item }                     a course card opened
-//   course_view       { item }                     a course information page viewed
-//   coupon_applied    { item, coupon }             a valid coupon applied at checkout
-//   checkout_start    { item, value, currency }    "Pay" pressed with valid details
-//   purchase          { item, value, currency, coupon }   payment verified by the server
+//   course_select     { item }                     a course opened on Walnut LMS from its card
+//   course_enrol      { item }                     "Enrol" pressed on a course card (enrolment and payment happen on Walnut LMS)
 //   enquiry_submit    { topic }                    an enquiry form delivered
 //   app_open          { item }                     Agent Onboard / Course Finder / Online Leads opened
 

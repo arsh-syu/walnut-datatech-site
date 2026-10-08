@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Audience journeys — the "What brings you to Walnut?" selector, courses and
-   pricing, the application launcher, course pages and checkout
+   Audience journeys — the "What brings you to Walnut?" selector, course cards
+   and the catalogue, and the application launcher
    ========================================================================== */
 
 .section-gap { height: var(--section); }
@@ -75,62 +75,112 @@
 .steps-n { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--violet-soft); color: var(--violet-700); font-size: .75rem; font-weight: 600; }
 .page-hero .steps li { background: var(--mist); box-shadow: none; }
 
-/* ---------- price: original → coupon → you pay ---------- */
+/* ---------- course cards (courses on Walnut LMS) ---------- */
 
-.price-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.price-step { display: grid; gap: 2px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; }
-.price-label { font-size: .75rem; font-weight: 600; color: var(--muted); }
-.price-value { font: 500 1.35rem/1.1 var(--font-display); letter-spacing: -.02em; }
-.price-step-coupon { border-style: dashed; border-color: var(--violet); background: var(--violet-soft); }
-.price-code { display: inline-flex; align-items: center; gap: 6px; font: 600 .95rem/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .04em; color: var(--violet-700); }
-.price-step-final { border-color: var(--ink); background: var(--ink); color: #fff; }
-.price-step-final .price-label { color: var(--on-dark-muted); }
-.price-step-final .price-value { font-size: 1.6rem; }
-.price-arrow { display: grid; color: var(--muted); }
-.price-note { font-size: .875rem; color: var(--muted); }
-
-/* ---------- course cards ---------- */
-
-.course-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); }
+/* Three to a row on a wide screen, one on a phone. Each card is a column, so the price and Enrol row
+   sits at the foot of every card in a row, whatever is above it. */
+.course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: var(--s-4); }
 .course-card {
-  display: grid; gap: var(--s-3); align-content: start; justify-items: start;
-  padding: clamp(22px, 3vw, 40px); border: 1.5px solid var(--line); border-radius: var(--r-xl); background: #fff;
+  display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: var(--r-xl); background: #fff;
+  transition: translate .45s var(--ease), box-shadow .45s var(--ease);
 }
 .course-card:hover { translate: 0 -4px; box-shadow: var(--shadow-lg); }
-.course-card-title { font: 500 clamp(1.5rem, 2.6vw, 2.1rem)/1.1 var(--font-display); letter-spacing: -.035em; }
+
+/* the picture: the course's image from Walnut LMS, or a cover in the brand's violets naming the category */
+.course-media { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--mist); }
+.course-media img { display: block; width: 100%; height: 100%; object-fit: cover; transition: scale .7s var(--ease); }
+.course-card:hover .course-media img { scale: 1.035; }
+.course-cover {
+  position: absolute; inset: 0; display: flex; align-items: flex-end; padding: clamp(16px, 2vw, 22px); color: #fff;
+  background: radial-gradient(110% 90% at 88% 6%, rgba(255, 255, 255, .26), transparent 55%), linear-gradient(140deg, var(--violet-600), var(--night));
+}
+.course-cover[data-tone="1"] { background: radial-gradient(110% 90% at 12% 8%, rgba(255, 255, 255, .22), transparent 55%), linear-gradient(200deg, var(--violet), var(--night-2)); }
+.course-cover[data-tone="2"] { background: radial-gradient(120% 100% at 80% 100%, rgba(179, 163, 255, .45), transparent 60%), linear-gradient(160deg, var(--night-2), var(--violet-700)); }
+.course-cover[data-tone="3"] { background: radial-gradient(100% 80% at 50% 0%, rgba(255, 255, 255, .2), transparent 60%), linear-gradient(115deg, var(--violet-700), var(--violet-600) 55%, var(--violet)); }
+.course-cover span { max-width: 80%; font: 500 clamp(1rem, 1.5vw, 1.12rem)/1.2 var(--font-display); letter-spacing: -.01em; opacity: .92; }
+.course-badge {
+  position: absolute; top: 14px; left: 14px; padding: 5px 11px; border-radius: 999px;
+  background: rgba(255, 255, 255, .94); color: var(--ink); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+}
+/* bottom right, clear of the cover's category name (bottom left) and the badge and "i" (top) */
+.course-play {
+  position: absolute; z-index: 2; right: 14px; bottom: 14px; display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px 7px 10px; border: 0; border-radius: 999px; background: rgba(13, 12, 20, .74); color: #fff;
+  font: 600 .8125rem var(--font-body); cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: background-color .25s;
+}
+.course-play .ico { width: 14px; height: 14px; }
+.course-play:hover { background: var(--violet-600); }
+
+/* the text */
+.course-body { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: var(--s-3); padding: clamp(20px, 2.4vw, 28px); }
+.course-card-title { font: 500 clamp(1.3rem, 1.9vw, 1.55rem)/1.15 var(--font-display); letter-spacing: -.03em; }
+/* the title links to the course on Walnut LMS and covers the whole card; the "i", Preview and Enrol sit above it */
 .course-card-title a::after { content: ""; position: absolute; inset: 0; z-index: 1; }
-.course-card-tagline { color: var(--muted); }
-.course-card { container-type: inline-size; }
-.course-card .price-flow { margin-block: var(--s-3); flex-wrap: nowrap; gap: 6px; }
-.course-card .price-step { padding: 9px 12px; }
-/* too narrow for one row: stack the three steps instead of wrapping mid-flow */
-@container (max-width: 400px) {
-  .course-card .price-flow:not(.price-flow-single) { flex-direction: column; align-items: stretch; width: 100%; }
-  .course-card .price-arrow { align-self: center; rotate: 90deg; }
+.course-card-tagline { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--muted); }
+.course-meta { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.course-meta li { padding: 5px 11px; border-radius: 999px; background: var(--mist); font-size: .8125rem; font-weight: 500; }
+.course-buy {
+  position: relative; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--s-3); width: 100%; margin-top: auto; padding-top: var(--s-4); border-top: 1px solid var(--line);
 }
-.course-card .btn { margin-top: var(--s-2); }
+.course-price { font: 500 1.5rem/1.1 var(--font-display); letter-spacing: -.02em; }
+.course-price.is-free { padding: 4px 14px; border-radius: 999px; background: var(--violet-soft); color: var(--violet-700); font-size: 1.15rem; }
+.course-soon { padding: 6px 14px; border-radius: 999px; background: var(--mist); color: var(--ink-2); font-size: .9375rem; font-weight: 600; }
 .course-card:hover .btn { background: var(--violet-600); }
+/* not open yet: the picture is quieter, so the open course leads */
+.is-upcoming .course-media img, .is-upcoming .course-cover { filter: saturate(.6); }
+
+/* the "i": the course's details and preview, above the card's link */
+.course-info {
+  position: absolute; z-index: 2; top: 12px; right: 12px; display: grid; place-items: center; width: 34px; height: 34px;
+  border: 0; border-radius: 50%; background: rgba(255, 255, 255, .94); color: var(--ink); cursor: pointer;
+  font: italic 700 1.05rem/1 Georgia, "Times New Roman", serif; box-shadow: 0 4px 14px -4px rgba(13, 12, 20, .35);
+  transition: transform .3s var(--spring), background-color .2s;
+}
+.course-info:hover { transform: scale(1.1); background: #fff; }
+.course-info:focus-visible, .course-play:focus-visible { outline: 2px solid var(--violet-600); outline-offset: 3px; }
+
+/* a group of one: the picture beside the text */
+.course-grid.is-single { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 821px) {
+  .course-grid.is-single .course-card { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  .course-grid.is-single .course-media { aspect-ratio: auto; min-height: 320px; }
+  .course-grid.is-single .course-card-title { font-size: clamp(1.6rem, 2.4vw, 2.1rem); }
+  .course-grid.is-single .course-card-tagline { -webkit-line-clamp: 5; }
+}
 .audience-panel .course-card { border-color: transparent; }
-@media (max-width: 820px) {
-  .course-grid { grid-template-columns: minmax(0, 1fr); }
-}
+.audience-panel .course-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
 
-/* ---------- course tracks (the catalogue, grouped by category) ---------- */
+/* ---------- the catalogue: open for enrolment, then coming soon ---------- */
 
-.tracks { display: grid; gap: clamp(36px, 5vw, 64px); }
-.track {
-  display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: clamp(24px, 5vw, 64px);
-  align-items: start; padding-top: clamp(28px, 4vw, 44px); border-top: 2px solid var(--ink);
+.course-groups { display: grid; gap: clamp(44px, 6vw, 76px); }
+.course-group { display: grid; gap: var(--s-5); }
+.course-group-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px;
+  padding-top: clamp(20px, 3vw, 28px); border-top: 2px solid var(--ink);
 }
-.track-head { display: grid; justify-items: start; gap: var(--s-3); }
-.track-head h3 { font: 500 clamp(1.4rem, 2.4vw, 1.9rem)/1.12 var(--font-display); letter-spacing: -.035em; }
-.track-head p { color: var(--muted); }
-.track-count { font-size: .875rem; font-weight: 500; color: var(--violet-700); }
-/* one course fills the row; more share it */
-.track .course-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
-@media (max-width: 900px) {
-  .track { grid-template-columns: minmax(0, 1fr); gap: var(--s-5); }
-}
+.course-group-head h3 { font: 500 clamp(1.4rem, 2.4vw, 1.9rem)/1.12 var(--font-display); letter-spacing: -.035em; }
+.course-group-head p { color: var(--muted); }
+.course-group-head .course-group-count { margin-left: auto; font-size: .875rem; font-weight: 500; color: var(--violet-700); }
+
+/* ---------- course details (the "i" on a card) ---------- */
+
+.modal-course { width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }
+.modal-course .modal-close { background: rgba(255, 255, 255, .9); }
+/* the whole picture, full width at 16:9: the LMS composes its covers as complete images, so none is cropped */
+.course-detail .course-media { width: 100%; border-radius: var(--r-xl) var(--r-xl) 0 0; }
+.course-detail-body { display: grid; gap: var(--s-3); padding: clamp(22px, 3.5vw, 36px); }
+.course-detail-title { font: 500 clamp(1.5rem, 3vw, 2.1rem)/1.12 var(--font-display); letter-spacing: -.035em; }
+.course-detail-lede { color: var(--muted); }
+.course-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-block: var(--s-2); }
+.course-facts div { padding: 12px 14px; border-radius: var(--r); background: var(--mist); }
+.course-facts .is-wide { grid-column: 1 / -1; }
+.course-facts dt { color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.course-facts dd { margin: 4px 0 0; font-weight: 500; }
+.course-learn-head { font-weight: 600; }
+.course-learn { display: grid; gap: 6px; padding-left: 1.2em; color: var(--ink-2); }
+.course-detail-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-4); margin-top: var(--s-2); }
+.course-detail-actions .btn-ghost .ico { width: 16px; height: 16px; }
 
 /* ---------- application launcher ---------- */
 
@@ -230,75 +280,15 @@
   .app-preview { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ---------- course page ---------- */
+/* ---------- two columns: text beside a checklist (partners: what you’ll need) ---------- */
 
-.course-hero { padding-block: clamp(40px, 6vw, 88px) clamp(32px, 5vw, 64px); }
-.course-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: clamp(28px, 5vw, 72px); align-items: start; }
-.course-hero-text { display: grid; gap: var(--s-4); justify-items: start; }
-.course-meta { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--s-2); }
-.course-meta li { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--mist); font-size: .9rem; font-weight: 500; }
-.course-meta .ico { color: var(--violet-700); }
-.buy-card { position: sticky; top: calc(var(--header-h) + 24px); display: grid; gap: var(--s-4); padding: clamp(20px, 2.6vw, 30px); border-radius: var(--r-xl); background: var(--mist); }
-.buy-card-title { font: 500 1.125rem var(--font-display); letter-spacing: -.02em; }
-.buy-card .price-flow { flex-direction: column; align-items: stretch; }
-.buy-card .price-arrow { align-self: center; rotate: 90deg; }
-.buy-card .btn { width: 100%; }
-.buy-note { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: .8125rem; color: var(--muted); }
 .course-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(28px, 6vw, 88px); align-items: start; }
 .course-details > div { display: grid; gap: var(--s-4); }
 .who-list { list-style: none; display: grid; gap: 12px; margin-top: var(--s-2); font-size: 1.125rem; font-weight: 500; }
 .who-list li { display: flex; align-items: center; gap: 12px; }
 .who-list .ico { color: var(--violet-700); }
-.detail-list div { display: flex; justify-content: space-between; gap: var(--s-5); padding-block: 16px; border-top: 1px solid var(--line-strong); }
-.detail-list div:last-child { border-bottom: 1px solid var(--line-strong); }
-.detail-list dt { display: flex; align-items: center; gap: 10px; color: var(--muted); }
-.detail-list dd { font-weight: 600; text-align: right; }
-.page-course .cap h3 { margin-bottom: 0; }
 @media (max-width: 900px) {
-  .course-hero-grid, .course-details { grid-template-columns: minmax(0, 1fr); }
-  .buy-card { position: static; }
-}
-
-/* ---------- checkout ---------- */
-
-.enrol-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(32px, 6vw, 88px); align-items: start; }
-.enrol-intro { display: grid; gap: var(--s-4); }
-.order { margin-top: var(--s-3); padding: 22px; border-radius: var(--r-lg); background: var(--mist); }
-.order h3 { font: 500 1.0625rem var(--font-display); letter-spacing: -.02em; margin-bottom: var(--s-3); }
-.order dl div { display: flex; justify-content: space-between; gap: var(--s-4); padding-block: 8px; font-size: .9375rem; }
-.order dl div[hidden] { display: none; }
-.order dt { color: var(--muted); }
-.order dd { font-weight: 600; white-space: nowrap; }
-.order-discount { animation: rise .4s var(--ease); }
-.order-discount dd, .order-discount dt span { color: #0b7a43; }
-.order-discount dt span { font: 600 .875rem ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
-.order .order-total { margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--line-strong); font-size: 1rem; }
-.order-total dt { color: var(--ink); font-weight: 600; }
-.order-total dd { font: 500 1.6rem/1 var(--font-display); letter-spacing: -.03em; }
-.order-total dd.bump { animation: pop .45s var(--spring); }
-.coupon-row { display: flex; gap: 8px; }
-.coupon-row input { flex: 1; min-width: 0; text-transform: uppercase; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .04em; }
-.coupon-row input::placeholder { text-transform: none; }
-.coupon.is-applied input { border-color: var(--ok); }
-.coupon-offer { font-size: .875rem; color: var(--muted); }
-.coupon-offer[hidden] { display: none; }
-.coupon-chip {
-  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; cursor: pointer;
-  border: 1.5px dashed var(--violet); border-radius: 999px; background: var(--violet-soft); color: var(--violet-700);
-  font: 600 .8125rem/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .04em;
-  transition: background-color .2s, transform .25s var(--spring);
-}
-.coupon-chip:hover { background: #e3dcff; }
-.coupon-chip:active { transform: scale(.95); }
-.coupon-status:empty { display: none; }
-.coupon-status { font-size: .875rem; font-weight: 500; animation: rise .3s var(--ease); }
-.coupon-status.is-ok { color: #0b7a43; }
-.coupon-status.is-error { color: var(--danger); }
-.coupon-none { display: flex; align-items: center; gap: 8px; font-size: .875rem; color: var(--muted); }
-.pay-ref { font-size: .875rem; color: var(--muted); }
-.pay-ref span { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--ink); }
-@media (max-width: 860px) {
-  .enrol-grid { grid-template-columns: minmax(0, 1fr); }
+  .course-details { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---------- about: who we serve ---------- */
@@ -311,3 +301,23 @@
 @media (max-width: 820px) {
   .serve { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---------- the pay page (/pay/): one calm card, the amount large, one button ---------- */
+
+.pay-section { min-height: 62vh; }
+.pay-card {
+  max-width: 520px; margin: 0 auto; padding: clamp(24px, 4vw, 40px);
+  border: 1.5px solid var(--line); border-radius: var(--r-xl); background: #fff; box-shadow: var(--shadow-md);
+}
+.pay-title { margin: 6px 0 var(--s-4); font: 500 clamp(1.6rem, 3vw, 2.1rem)/1.12 var(--font-display); letter-spacing: -.035em; }
+.pay-body { display: grid; justify-items: start; gap: var(--s-3); }
+.pay-app { color: var(--violet-700); font-size: .875rem; font-weight: 600; }
+.pay-what { font-size: 1.15rem; font-weight: 500; }
+.pay-amount { margin-block: var(--s-2); font: 500 clamp(2.2rem, 6vw, 3rem)/1 var(--font-display); letter-spacing: -.03em; }
+.pay-button { justify-content: center; width: 100%; }
+.pay-error { color: #b42318; font-weight: 500; }
+.pay-error:empty { display: none; }
+.pay-cancel { color: var(--muted); font-size: .9375rem; }
+.pay-state { font-size: 1.15rem; font-weight: 600; }
+.pay-note { color: var(--muted); }
+.pay-trust { max-width: 520px; margin: var(--s-4) auto 0; color: var(--muted); font-size: .8125rem; text-align: center; }

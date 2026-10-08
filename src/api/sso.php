@@ -31,12 +31,21 @@ $stop = function (int $status, string $title, string $text) {
 if (!$app) {
     $stop(404, 'Unknown app', 'That Walnut app does not exist.');
 }
-if (!accounts_configured($config) || empty($app['secret']) || !($db = account_db($config))) {
-    $stop(503, 'Not available yet', 'Signing in to ' . $app['name'] . ' from here is not switched on yet. Please try again later.');
-}
-// Only a path inside that app may follow the sign-in — never another site.
-if ($next !== '' && !preg_match('#^/(?!/)[A-Za-z0-9/_\-.?=&%]{0,300}$#', $next)) {
+// Only a path inside that app may follow the sign-in — never another site. \z (not $, which would let a
+// trailing newline through), and no '//' or '..' anywhere, since a browser resolves those into another path.
+if ($next !== '' && (!preg_match('#^/(?!/)[A-Za-z0-9/_\-.?=&%]{0,300}\z#', $next) || strpos($next, '//') !== false || preg_match('#(^|/)\.\.(/|\?|\z)#', $next))) {
     $next = '';
+}
+// Never a dead end: when this site cannot hand the person over signed in (sign-in to that app not set up,
+// or not loaded yet — the host picks up new settings minutes after a deploy — or the database down), they
+// are sent to the app itself, at the same page, and sign in there. Walnut LMS course pages are public, so
+// Enrol lands on the course; any other LMS page needs its sign-in, which then says why the Walnut one is
+// unavailable. (Nothing is written here, so an account is given STUDENT on its next pass through below.)
+if (!accounts_configured($config) || empty($app['secret']) || !($db = account_db($config))) {
+    header('Cache-Control: no-store');
+    $lmsLogin = $appId === 'walnut-lms' && strpos($next, '/courses/') !== 0;
+    header('Location: ' . $app['url'] . ($lmsLogin ? '/login?sso_error=unavailable' . ($next !== '' ? '&next=' . rawurlencode($next) : '') : ($next !== '' ? $next : '/')), true, 302);
+    exit;
 }
 
 $hash = session_token_hash();
@@ -49,13 +58,24 @@ if (!$user) {
 
 // A university account opens the university's own tool and nothing else.
 if (university_only($user) && $appId !== 'onboarding') {
-    $stop(403, 'Not available for university accounts', $app['name'] . ' is part of the partner programme. A university account is used for the university application only.');
+    $stop(403, 'Not available for university accounts', $app['name'] . ($appId === 'walnut-lms' ? ' is where learners take Walnut courses.' : ' is part of the partner programme.') . ' A university account is used for the university application only.');
 }
 
 // The app trusts this email as proven, so only a verified address is handed over. (An account made with a
 // mobile code has an email nobody has confirmed yet.)
 if ($user['email_verified_at'] === null) {
     $stop(403, 'Verify your email first', 'Before opening ' . $app['name'] . ', please verify ' . $user['email'] . ' from the Profile tab of your dashboard.');
+}
+
+// Opening Walnut LMS is enrolling as a learner (Walnut's decision): an account without the learner type
+// is given it here, as /account/services would, so the LMS receives STUDENT in the token. Nothing is
+// removed, and a university account never gets this far.
+if ($appId === 'walnut-lms' && !in_array('STUDENT', user_types($user), true)) {
+    $types = clean_types(array_merge(user_types($user), ['STUDENT']));
+    if (allowed_types($types)) {
+        db_run($db, 'UPDATE wa_users SET account_types = ?, account_type = COALESCE(account_type, ?), updated_at = ? WHERE id = ?', [implode(',', $types), $types[0], utc(), $user['id']]);
+        $user = db_row($db, 'SELECT * FROM wa_users WHERE id = ?', [$user['id']]) ?? $user;
+    }
 }
 
 $token = sso_token($db, $app, $appId, $user);

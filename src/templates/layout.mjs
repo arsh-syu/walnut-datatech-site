@@ -3,7 +3,8 @@
 import config from '../../site.config.mjs';
 import { nav, externalApps } from '../data/site.mjs';
 import { areas } from '../data/services.mjs';
-import { courses } from '../data/courses.mjs';
+import { featuredCourses, lmsOptions } from '../data/lms.mjs';
+import { courseLinks } from '../assets/js/lms-catalogue.js';
 import { icon } from './icons.mjs';
 import { readFileSync } from 'node:fs';
 import { inlineScript, contentSecurityPolicy } from '../security.mjs';
@@ -153,8 +154,8 @@ export function accountPrompt(root, type, text = 'Track everything in one place.
   return `<p class="account-prompt">${text} <a href="${root}login/?type=${type}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${root}login/" data-track="account_sign_in">sign in</a>.</p>`;
 }
 
-// The learning platform (LMS) link: `links.lms` in site.config.mjs (or the older `studentLogin`).
-const lmsUrl = config.links.lms || config.links.studentLogin || '';
+// "LMS Login": Walnut LMS (`lms.url` in site.config.mjs), where courses are taken; `links.studentLogin` overrides it.
+const lmsUrl = config.links.studentLogin || config.lms.url || '';
 
 function header(root, path) {
   // The script swaps "Sign in" for the person's name (and a link to their profile) once they are signed in.
@@ -210,7 +211,7 @@ function footer(root) {
       <nav class="footer-col" aria-label="Courses">
         <h2>Courses</h2>
         <ul>
-          ${courses.map((c) => `<li><a href="${root}academy/${c.slug}/">${c.name}</a></li>`).join('')}
+          ${featuredCourses(3).map((c) => `<li><a href="${esc(courseLinks(c, lmsOptions(root)).page)}" rel="noopener">${esc(c.title)} ${icon('external')}<span class="sr-only"> (on Walnut LMS)</span></a></li>`).join('')}
           <li><a href="${root}academy/">All courses</a></li>
           <li><a href="${root}verify-certificate/">Verify a certificate</a></li>
           ${lmsUrl ? `<li><a href="${esc(lmsUrl)}" rel="noopener">LMS Login ${icon('external')}${newTab}</a></li>` : ''}
@@ -239,6 +240,8 @@ function footer(root) {
       <ul>
         <li><a href="${root}privacy/">Privacy policy</a></li>
         <li><a href="${root}terms/">Terms &amp; conditions</a></li>
+        <li><a href="${root}refund-policy/">Cancellation &amp; refunds</a></li>
+        <li><a href="${root}delivery-policy/">Shipping &amp; delivery</a></li>
         ${config.analytics.gaMeasurementId ? '<li><button class="footer-link" type="button" data-consent-open>Cookie settings</button></li>' : ''}
       </ul>
     </div>
@@ -250,6 +253,10 @@ function dialogs() {
   return `<dialog class="modal modal-video" id="video-modal" aria-label="Video">
   <button class="modal-close" type="button" data-modal-close aria-label="Close">${icon('close')}</button>
   <div class="video-frame" data-video-frame></div>
+</dialog>
+<dialog class="modal modal-course" id="course-modal" aria-labelledby="course-modal-title">
+  <button class="modal-close" type="button" data-modal-close aria-label="Close">${icon('close')}</button>
+  <div data-course-modal-body></div>
 </dialog>`;
 }
 
@@ -268,7 +275,9 @@ function consentBanner(root) {
 </section>`;
 }
 
-export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false }) {
+// `redirect` ({ href, canonical }) makes a page that forwards at once to `href` (a moved page); it is never indexed.
+// `payments` is for the pay page only: it lets Razorpay's checkout load there (see security.mjs).
+export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null, payments = false }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
   const clientConfig = JSON.stringify({
@@ -284,10 +293,11 @@ export function layout({ title, description, path, root, body, bodyClass = '', j
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config)}">
+<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config, { payments })}">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
-${config.noindex || noindex ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}
+${config.noindex || noindex || redirect ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}
+${redirect ? `<meta http-equiv="refresh" content="0;url=${esc(redirect.href)}">${redirect.canonical ? `\n<link rel="canonical" href="${esc(redirect.canonical)}">` : ''}` : ''}
 <meta property="og:type" content="website">
 <meta property="og:locale" content="en_IN">
 <meta property="og:site_name" content="${esc(config.company.name)}">

@@ -1,11 +1,12 @@
 import config from '../../site.config.mjs';
 import { areas, stages } from '../data/services.mjs';
 import { audiences, externalApps } from '../data/site.mjs';
-import { courses } from '../data/courses.mjs';
+import { featuredCourses, lmsOptions, learnerSteps, lmsUrl, lmsSso, lmsIconsJson } from '../data/lms.mjs';
+import { renderCard, catalogueKey } from '../assets/js/lms-catalogue.js';
 import { icon } from './icons.mjs';
 import { vignette } from './vignettes.mjs';
 import { button, mark, splitWords, sectionHead, videoTile, ctaBand, esc, accountPrompt, clientele } from './layout.mjs';
-import { journeySteps, courseCard, applicationLauncher } from './blocks.mjs';
+import { journeySteps, applicationLauncher } from './blocks.mjs';
 
 // Interactive service showcase: a tab list of all service areas, grouped by lifecycle stage.
 export function showcase(root) {
@@ -60,7 +61,11 @@ function audienceBody(root, id) {
       </div>`;
   }
   if (id === 'learners') {
-    return `<div class="course-grid">${courses.map((c, i) => courseCard(root, c, i, 4, false)).join('')}</div>
+    // Featured courses from Walnut LMS; the cards are the same as on /academy/. Like the catalogue there, the
+    // browser redraws them from the live feed when they differ, so a price changed on the LMS shows here too.
+    const picks = featuredCourses(3);
+    return `<div class="course-grid" data-lms-featured data-count="3" data-level="4" data-lms-url="${esc(lmsUrl)}" data-lms-sso="${lmsSso ? 1 : 0}" data-root="${esc(root)}" data-lms-key="${catalogueKey(picks)}">${picks.map((c) => renderCard(c, { ...lmsOptions(root), level: 4, reveal: false })).join('')}</div>
+      <script type="application/json" id="lms-icons">${lmsIconsJson()}</script>
       <div class="actions center">
         ${button({ href: `${root}academy/`, label: 'See all courses', variant: 'ghost', size: 'lg', arrow: true })}
       </div>`;
@@ -124,7 +129,7 @@ export default function home({ root }) {
             <h3>${a.title}</h3>
             <p>${a.line}</p>
           </div>
-          ${journeySteps(a.steps)}
+          ${journeySteps(a.id === 'learners' ? learnerSteps : a.steps)}
         </div>
         ${audienceBody(root, a.id)}
         ${accountPrompt(root, { universities: 'university', learners: 'student', partners: 'agent' }[a.id], { universities: 'Follow your request from submission to approval.', learners: 'See the courses you bought and your progress.', partners: 'Apply and follow your application.' }[a.id])}

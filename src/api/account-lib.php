@@ -21,7 +21,7 @@ const OTP_RATE_LIMIT_WINDOW_SECONDS = 900;
 const OTP_MAX_REQUESTS_PER_WINDOW = 5;
 const DEFAULT_COUNTRY_CODE = '+91';
 const ACCOUNT_TYPES = ['UNIVERSITY', 'AGENT', 'STUDENT'];
-const ACCOUNT_SCHEMA = 'v4';
+const ACCOUNT_SCHEMA = 'v7';
 
 function accounts_configured(array $config): bool
 {
@@ -172,6 +172,72 @@ function account_schema(): array
             source VARCHAR(80) NOT NULL,
             created_at DATETIME NOT NULL"),
         "INSERT IGNORE INTO wa_admins (email, source, created_at) VALUES ('support@walnutdatatech.com', 'onboarding SUPER_ADMIN', UTC_TIMESTAMP()), ('admin@selectyouruniversity.com', 'course-finder master_admin', UTC_TIMESTAMP())",
+        // v5: courses are sold on Walnut LMS now. A purchase made on this website is handed to the LMS once
+        // (lms_backfill), and either marked as handed over or given the reason the LMS refused it.
+        'ALTER TABLE wa_enrolments ADD COLUMN IF NOT EXISTS lms_synced_at DATETIME NULL, ADD COLUMN IF NOT EXISTS lms_error VARCHAR(200) NULL',
+        // v6: the payment gateway (pay-lib.php) — every Walnut product's payments, in one ledger. An intent is
+        // one thing to pay for; open_key holds "<app>|<reference>" while it is open or paid, so a reference has
+        // at most one such intent (an expired one gives it up).
+        $table('wa_pay_intents', "
+            intent_id CHAR(29) NOT NULL PRIMARY KEY,
+            app_id VARCHAR(40) NOT NULL,
+            reference VARCHAR(64) NOT NULL,
+            open_key VARCHAR(110) NULL,
+            amount INT UNSIGNED NOT NULL,
+            currency CHAR(3) NOT NULL,
+            description VARCHAR(120) NOT NULL,
+            customer_email VARCHAR(191) NOT NULL,
+            customer_name VARCHAR(120) NULL,
+            customer_phone VARCHAR(20) NULL,
+            customer_account_id CHAR(36) NULL,
+            return_url VARCHAR(500) NOT NULL,
+            cancel_url VARCHAR(500) NOT NULL,
+            metadata TEXT NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            razorpay_order_id VARCHAR(40) NOT NULL,
+            payment_id VARCHAR(40) NULL,
+            method VARCHAR(30) NULL,
+            last_failure_reason VARCHAR(200) NULL,
+            refunded_amount INT UNSIGNED NOT NULL DEFAULT 0,
+            paid_at DATETIME NULL,
+            expires_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            UNIQUE KEY wa_pay_intents_open (open_key),
+            UNIQUE KEY wa_pay_intents_order (razorpay_order_id),
+            UNIQUE KEY wa_pay_intents_payment (payment_id),
+            KEY wa_pay_intents_ref (app_id, reference),
+            KEY wa_pay_intents_due (status, expires_at)"),
+        $table('wa_pay_refunds', "
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            intent_id CHAR(29) NOT NULL,
+            refund_reference VARCHAR(64) NOT NULL,
+            amount INT UNSIGNED NOT NULL,
+            reason VARCHAR(200) NULL,
+            razorpay_refund_id VARCHAR(40) NULL,
+            status VARCHAR(20) NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            UNIQUE KEY wa_pay_refunds_ref (intent_id, refund_reference),
+            UNIQUE KEY wa_pay_refunds_rzp (razorpay_refund_id)"),
+        // A signed callback to the app that owns an intent, kept until the app answers 2xx.
+        $table('wa_pay_callbacks', "
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            intent_id CHAR(29) NOT NULL,
+            event VARCHAR(30) NOT NULL,
+            body MEDIUMTEXT NOT NULL,
+            attempts INT UNSIGNED NOT NULL DEFAULT 0,
+            next_at DATETIME NOT NULL,
+            delivered_at DATETIME NULL,
+            last_error VARCHAR(200) NULL,
+            created_at DATETIME NOT NULL,
+            KEY wa_pay_callbacks_due (delivered_at, next_at)"),
+        // Razorpay webhook events already handled (Razorpay may send one more than once).
+        $table('wa_pay_events', "
+            event_id VARCHAR(64) NOT NULL PRIMARY KEY,
+            received_at DATETIME NOT NULL"),
+        // v7: why Razorpay refused a refund, for the app's admins.
+        'ALTER TABLE wa_pay_refunds ADD COLUMN IF NOT EXISTS error VARCHAR(200) NULL',
     ];
 }
 
@@ -256,6 +322,8 @@ function walnut_apps(array $config): array
         'onboarding' => ['name' => 'Onboarding Tool', 'url' => 'https://walnut-onboarding.vercel.app', 'receiver' => '/api/v1/auth/sso/walnut', 'secret' => $config['sso_onboarding'] ?? ''],
         'course-finder' => ['name' => 'Course Finder', 'url' => 'https://syu-course-finder.vercel.app', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_course_finder'] ?? ''],
         'leads' => ['name' => 'Online Leads', 'url' => 'https://syu-leads.vercel.app', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_leads'] ?? ''],
+        // Where courses are sold and taken. Its address can be changed (WALNUT_LMS_URL) without a code change.
+        'walnut-lms' => ['name' => 'Walnut LMS', 'url' => lms_origin($config) ?: 'https://walnut-lms.vercel.app', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_lms'] ?? ''],
     ];
 }
 
@@ -729,6 +797,233 @@ function account_record_enrolment(array $config, array $e): void
     }
 }
 
+/* ---------- Walnut LMS: where courses are sold and taken ---------- */
+
+// The LMS answers our server, not the browser: each call is signed with the integration secret
+// (config lms_secret, from WALNUT_LMS_INTEGRATION_SECRET; the LMS holds it as WALNUT_INTEGRATION_SECRET).
+function lms_configured(array $config): bool
+{
+    return lms_origin($config) !== '' && !empty($config['lms_secret']);
+}
+
+// The LMS's address (config lms_url) when it is an https origin with no path, otherwise ''. A path would
+// break every signed call: the LMS checks the signature against the path it receives, prefix included.
+// Sign-in tokens travel to this address too, so it is never plain http.
+function lms_origin(array $config): string
+{
+    $url = rtrim((string) ($config['lms_url'] ?? ''), '/');
+    return preg_match('~^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?\z~i', $url) === 1 ? $url : '';
+}
+
+// While the LMS is down or slow, each call would hold the person's dashboard for seconds. After a call
+// it did not answer (or answered with a 5xx), it is left alone for a minute.
+function lms_resting(): bool
+{
+    $file = lms_rest_file();
+    return is_file($file) && filemtime($file) > time() - 60;
+}
+
+function lms_rest_file(): string
+{
+    return sys_get_temp_dir() . '/walnut-lms-down-' . hash('sha256', __DIR__);
+}
+
+// One signed call to the LMS. $pathAndQuery is sent exactly as given, and the signature covers exactly
+// that string ("<timestamp>.<path and query>" for a GET, "<timestamp>.<raw body>" for a POST), so it is
+// built with rawurlencode() on every value and may hold nothing curl would encode again.
+// Returns [HTTP status (0 when it could not be reached), decoded reply or null]. Never throws.
+function lms_call(array $config, string $method, string $pathAndQuery, ?array $body): array
+{
+    try {
+        if (!lms_configured($config) || lms_resting() || !function_exists('curl_init') || !preg_match('#^/[A-Za-z0-9/_.~%=&?-]{0,1000}$#', $pathAndQuery)) {
+            return [0, null];
+        }
+        $raw = $body === null ? null : json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($raw === false) {
+            return [0, null];
+        }
+        $ts = (string) time();
+        $signed = $method === 'POST' ? (string) $raw : $pathAndQuery;
+        $headers = ['Accept: application/json', 'X-Walnut-Timestamp: ' . $ts, 'X-Walnut-Signature: sha256=' . hash_hmac('sha256', $ts . '.' . $signed, (string) $config['lms_secret'])];
+        $ch = curl_init(lms_origin($config) . $pathAndQuery);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_PATH_AS_IS => true, // the path goes out as signed, without "/./" or "/../" being tidied
+        ]);
+        if ($method === 'POST') {
+            $headers[] = 'Content-Type: application/json';
+            curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $raw]);
+        } else {
+            curl_setopt($ch, CURLOPT_HTTPGET, true);
+        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        $answer = curl_exec($ch);
+        $reply = is_string($answer) ? json_decode($answer, true) : null;
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        if ($status === 0 || $status >= 500) {
+            @touch(lms_rest_file());
+        }
+        return [$status, is_array($reply) ? $reply : null];
+    } catch (Throwable $e) {
+        error_log('Walnut LMS call failed: ' . get_class($e));
+        return [0, null];
+    }
+}
+
+// A time from the LMS as the browser expects it (ISO 8601, UTC), or null when it is not a time.
+function lms_time($value): ?string
+{
+    $time = is_string($value) && strlen($value) <= 40 ? strtotime($value) : false;
+    return $time ? gmdate('Y-m-d\TH:i:s\Z', $time) : null;
+}
+
+// A line of text from the LMS, fit to show: no control characters, and not longer than $max.
+function lms_text($value, int $max): string
+{
+    return is_string($value) ? text_cut(trim((string) preg_replace('/[\x00-\x1F\x7F]+/', ' ', $value)), $max) : '';
+}
+
+// The person's courses on the LMS, with how far they have got. Only the fields the dashboard shows are
+// kept, and every link is made here: a link in the LMS's answer is never passed on to the page.
+// 'configured' is false when this site does not ask the LMS at all (no integration secret), and
+// 'available' is false when it could not be asked just now; the dashboard then shows the rest as usual.
+function lms_progress(array $config, array $user): array
+{
+    if (!lms_configured($config)) {
+        return ['configured' => false, 'available' => false, 'courses' => []];
+    }
+    $none = ['configured' => true, 'available' => false, 'courses' => []];
+    if (lms_resting()) {
+        return $none; // it failed a moment ago and is asked again after a minute
+    }
+    [$status, $reply] = lms_call($config, 'GET', '/api/integrations/walnut/progress?account_id=' . rawurlencode((string) $user['id']) . '&email=' . rawurlencode((string) $user['email']), null);
+    if ($status !== 200 || !is_array($reply) || !is_array($reply['courses'] ?? [])) {
+        if ($status !== 200) {
+            error_log('Course progress was not available from Walnut LMS (HTTP ' . $status . ').');
+        }
+        return $none;
+    }
+    $lms = lms_origin($config);
+    // Without the sign-in secret a course is opened on the LMS itself, where the person signs in there.
+    $sso = !empty($config['sso_lms']);
+    $count = function ($value): int {
+        return is_numeric($value) ? max(0, min(100000, (int) $value)) : 0;
+    };
+    $courses = [];
+    foreach (array_slice(array_values((array) ($reply['courses'] ?? [])), 0, 50) as $c) {
+        $slug = is_array($c) && is_string($c['lms_course_slug'] ?? null) ? $c['lms_course_slug'] : '';
+        $state = is_array($c) && is_string($c['status'] ?? null) ? $c['status'] : '';
+        if (!preg_match('/^[a-z0-9][a-z0-9-]{0,79}$/', $slug) || !in_array($state, ['active', 'completed', 'expired'], true)) {
+            continue;
+        }
+        $total = $count($c['total_lessons'] ?? 0);
+        $certificate = null;
+        if (is_array($c['certificate'] ?? null)) {
+            $serial = is_string($c['certificate']['serial'] ?? null) && preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/', $c['certificate']['serial']) ? $c['certificate']['serial'] : null;
+            $score = $c['certificate']['score'] ?? null;
+            $certificate = [
+                'title' => lms_text($c['certificate']['title'] ?? null, 160) ?: 'Certificate',
+                'serial' => $serial,
+                'score' => is_numeric($score) ? max(0, min(100, round((float) $score, 1))) : null,
+                'verifyUrl' => $serial !== null ? $lms . '/verify/' . rawurlencode($serial) : null,
+            ];
+        }
+        $courses[] = [
+            'slug' => $slug,
+            'title' => lms_text($c['title'] ?? null, 160) ?: $slug,
+            'status' => $state,
+            'progress' => is_numeric($c['progress_percent'] ?? null) ? max(0, min(100, (int) round((float) $c['progress_percent']))) : 0,
+            'completedLessons' => $total > 0 ? min($total, $count($c['completed_lessons'] ?? 0)) : $count($c['completed_lessons'] ?? 0),
+            'totalLessons' => $total,
+            'lastActivityAt' => lms_time($c['last_activity_at'] ?? null),
+            'enrolledAt' => lms_time($c['enrolled_at'] ?? null),
+            'completedAt' => lms_time($c['completed_at'] ?? null),
+            'certificate' => $certificate,
+            'open' => $sso ? '/api/sso.php?app=walnut-lms&next=' . rawurlencode('/learn/' . $slug) : $lms . '/courses/' . rawurlencode($slug),
+        ];
+    }
+    return ['configured' => true, 'available' => true, 'courses' => $courses];
+}
+
+// The LMS's address for a purchase made on this website. PROPOSED, NOT YET CONFIRMED by the LMS team:
+// keep WALNUT_LMS_BACKFILL off until they confirm this path and the body below.
+const LMS_BACKFILL_PATH = '/api/integrations/walnut/enrolments';
+
+// Hands the courses bought on this website, before the LMS sold them, to the LMS once, so those learners
+// have them there. Switched off unless config lms_backfill is set (WALNUT_LMS_BACKFILL=1). At most 10
+// purchases every two minutes, oldest first, after the dashboard that set it off has been answered (see
+// account_dashboard). The LMS keys each one on its payment ID, so sending one again is harmless.
+// A purchase carries the account ID only when that account has proved the email is theirs; otherwise
+// account_id is null and the LMS keys it on the email.
+//   2xx               → handed over (lms_synced_at), never sent again.
+//   a refusal (4xx)   → the reason is kept (lms_error) and the purchase is not tried again, so one bad
+//                       row cannot block the rest. To try it again: UPDATE wa_enrolments SET lms_error = NULL.
+//   401, 403, 404, 408, 429, 5xx or no answer → about the connection, not the purchase: this run stops
+//                       and the purchase waits for the next one.
+// `$now` is for the site's own tooling (api/lms-sync.php): it runs a sweep straight away instead of at most
+// every two minutes; everything else about it is the same.
+function lms_backfill(array $config, PDO $db, bool $now = false): void
+{
+    if (!lms_configured($config) || empty($config['lms_backfill']) || lms_resting() || (!$now && !due('lms-backfill', 120))) {
+        return;
+    }
+    try {
+        $started = time();
+        $rows = db_run($db, 'SELECT e.*, u.id AS account_id FROM wa_enrolments e LEFT JOIN wa_users u ON u.email = e.email AND u.email_verified_at IS NOT NULL WHERE e.lms_synced_at IS NULL AND e.lms_error IS NULL ORDER BY e.id LIMIT 10')->fetchAll();
+        foreach ($rows as $e) {
+            if (time() - $started > 4) {
+                break; // checked before each call, so a run ends within a few seconds; the rest go next time
+            }
+            [$status, $reply] = lms_call($config, 'POST', LMS_BACKFILL_PATH, [
+                'event' => 'enrolment.created',
+                'account_id' => $e['account_id'],
+                'email' => $e['email'],
+                'name' => $e['name'],
+                'phone' => $e['phone'],
+                'course_slug' => $e['course_slug'],
+                'course_name' => $e['course_name'],
+                'amount_paise' => (int) $e['amount'] * 100, // stored here in whole rupees
+                'coupon' => $e['coupon'],
+                'payment_id' => $e['payment_id'],
+                'order_id' => $e['order_id'],
+                'created_at' => iso($e['created_at']),
+            ]);
+            if ($status >= 200 && $status < 300) {
+                db_run($db, 'UPDATE wa_enrolments SET lms_synced_at = ? WHERE id = ?', [utc(), $e['id']]);
+            } elseif ($status === 400) { // the LMS's word for a body it will never accept; every other answer is worth retrying
+                $why = lms_text(is_array($reply) ? ($reply['error']['message'] ?? $reply['error'] ?? $reply['message'] ?? null) : null, 150);
+                db_run($db, 'UPDATE wa_enrolments SET lms_error = ? WHERE id = ?', [text_cut('HTTP ' . $status . ($why !== '' ? ': ' . $why : ''), 200), $e['id']]);
+                error_log('Walnut LMS refused purchase ' . $e['id'] . ' (HTTP ' . $status . '); it will not be sent again.');
+            } else {
+                error_log('Walnut LMS did not take purchase ' . $e['id'] . ' (HTTP ' . $status . '); it will be tried again.');
+                break;
+            }
+        }
+    } catch (Throwable $err) {
+        error_log('Purchases were not handed to Walnut LMS: ' . $err->getMessage());
+    }
+}
+
+// Where the backfill stands, per course: purchases waiting to be sent, sent (acknowledged by the LMS), and
+// refused (a 400, never sent again, with the LMS's reason). Counts only, plus the reasons — no buyer details.
+function lms_backfill_counts(PDO $db): array
+{
+    $courses = array_map(function (array $r): array {
+        return ['courseSlug' => $r['course_slug'], 'total' => (int) $r['total'], 'waiting' => (int) $r['waiting'], 'sent' => (int) $r['sent'], 'refused' => (int) $r['refused']];
+    }, db_run($db, 'SELECT course_slug, COUNT(*) AS total,'
+        . ' SUM(CASE WHEN lms_synced_at IS NULL AND lms_error IS NULL THEN 1 ELSE 0 END) AS waiting,'
+        . ' SUM(CASE WHEN lms_synced_at IS NOT NULL THEN 1 ELSE 0 END) AS sent,'
+        . ' SUM(CASE WHEN lms_error IS NOT NULL THEN 1 ELSE 0 END) AS refused'
+        . ' FROM wa_enrolments GROUP BY course_slug ORDER BY course_slug')->fetchAll());
+    $refusals = array_map(function (array $r): array {
+        return ['id' => (int) $r['id'], 'courseSlug' => $r['course_slug'], 'reason' => $r['lms_error']];
+    }, db_run($db, 'SELECT id, course_slug, lms_error FROM wa_enrolments WHERE lms_error IS NOT NULL ORDER BY id')->fetchAll());
+    return ['courses' => $courses, 'refusals' => $refusals];
+}
+
 /* ---------- the calls of the login page and the dashboard ---------- */
 
 function account_dashboard(PDO $db, array $config, array $user): array
@@ -738,6 +1033,16 @@ function account_dashboard(PDO $db, array $config, array $user): array
     if ($verified && due('push', 300)) {
         onboarding_push($config, $db);
     }
+    // Off unless switched on, and asks itself at most every two minutes. It runs once this answer has been
+    // sent where the server allows it (PHP-FPM, LiteSpeed), so the person does not wait on the LMS for it.
+    register_shutdown_function(function () use ($config, $db) {
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } elseif (function_exists('litespeed_finish_request')) {
+            litespeed_finish_request();
+        }
+        lms_backfill($config, $db);
+    });
     $requests = $verified ? db_run($db, 'SELECT * FROM wa_requests WHERE email = ? ORDER BY seq DESC LIMIT 20', [$user['email']])->fetchAll() : [];
     foreach ($requests as $i => $request) {
         if (!in_array($request['status'], ['APPROVED', 'POC_ACCOUNT_CREATED', 'REJECTED'], true)) {
@@ -797,8 +1102,13 @@ function account_dashboard(PDO $db, array $config, array $user): array
                     'purchasedAt' => iso($e['created_at']),
                     'progress' => (int) $e['progress'],
                     'completedAt' => iso($e['completed_at']),
+                    'onLms' => !empty($e['lms_synced_at']), // handed to Walnut LMS, so it is counted there
                 ];
             }, $enrolments),
+            // Courses are taken on Walnut LMS. Asked of it for a proven email only, and never for a
+            // university account (not asked at all: 'configured' false, so no "unavailable" note); the
+            // dashboard works the same when the LMS cannot be reached.
+            'lms' => $verified && !$universityOnly ? lms_progress($config, $user) : ['configured' => false, 'available' => false, 'courses' => []],
         ],
         'agent' => [
             'questions' => agent_questions(),

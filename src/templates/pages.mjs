@@ -1,10 +1,11 @@
 import config from '../../site.config.mjs';
 import { areas, stages } from '../data/services.mjs';
 import { audiences, externalApps } from '../data/site.mjs';
-import { courses, tracks, currency, inr, offerOf } from '../data/courses.mjs';
+import { lmsCourses, lmsCategories, lmsUpdatedAt, lmsKey, lmsUrl, lmsHost, lmsSso, lmsOptions, lmsIconsJson, learnerSteps } from '../data/lms.mjs';
+import { renderCatalogue, courseLinks } from '../assets/js/lms-catalogue.js';
 import { icon } from './icons.mjs';
 import { button, mark, splitWords, sectionHead, videoTile, enquiryForm, ctaBand, esc, accountPrompt, clientele } from './layout.mjs';
-import { journeySteps, priceFlow, courseCard, appLauncher } from './blocks.mjs';
+import { journeySteps, appLauncher } from './blocks.mjs';
 
 const audience = (id) => audiences.find((a) => a.id === id);
 
@@ -168,43 +169,49 @@ ${ctaBand(root, {
   };
 }
 
-/* ---------- /academy/ — learners: explore courses → course information → enrol ---------- */
+/* ---------- /academy/ — learners: explore courses → enrol and learn on Walnut LMS ---------- */
 
+// Courses are sold and taken on Walnut LMS; this page lists its catalogue. Every count on it comes from
+// the catalogue, and the browser swaps in the live catalogue when it has changed (see main.js).
 export function academy({ root }) {
-  const a = audience('learners');
-  const cheapest = courses.reduce((low, c) => Math.min(low, offerOf(c)?.finalPrice ?? c.price), Infinity);
-
-  // Courses grouped by track, so the catalogue reads as categories rather than one flat list.
-  const trackSections = tracks
-    .map((t) => {
-      const inTrack = courses.filter((c) => c.track === t.id);
-      if (!inTrack.length) return '';
-      return `<div class="track" data-reveal>
-        <header class="track-head">
-          <span class="area-ico">${icon(t.icon)}</span>
-          <h3>${t.name}</h3>
-          <p>${t.line}</p>
-          <p class="track-count">${inTrack.length} ${inTrack.length === 1 ? 'course' : 'courses'}</p>
-        </header>
-        <div class="course-grid">${inTrack.map((c, i) => courseCard(root, c, i, 4)).join('')}</div>
-      </div>`;
-    })
-    .join('\n      ');
+  const courses = lmsCourses;
+  // Only courses open for enrolment can be taken (or taken free); the rest are announced as upcoming.
+  const open = courses.filter((c) => !c.upcoming);
+  const soon = courses.length - open.length;
+  const free = open.filter((c) => c.isFree);
+  const certified = courses.filter((c) => c.certificateTitle).length;
+  const hours = courses.map((c) => c.durationHours).filter((h) => h > 0);
+  const levels = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].filter((l) => courses.some((c) => c.level === l)).map((l) => l.toLowerCase());
+  const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+  const list = (items) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : items[0]);
+  const freeLine = free.length ? `${free.length === open.length ? (open.length === 1 ? 'free' : 'all free') : `${free.length} free`}` : '';
+  // "7 online courses, 2 free" while all are open; "1 course open now (free) and 6 upcoming" otherwise.
+  const offer = soon
+    ? `${plural(open.length, 'course')} open now${freeLine ? ` (${freeLine})` : ''} and ${soon} upcoming`
+    : `${plural(courses.length, 'online course')}${freeLine ? `, ${freeLine}` : ''}`;
 
   const included = [
-    ['screen', 'Online, on your own time', 'Every course is delivered online. Start when you like and work through it at your own pace, on a laptop or a phone.'],
-    ['clock', 'Short and focused', 'These are short courses, not degrees. They are built to be finished alongside a job or your studies.'],
-    ['certificate', 'Certification where offered', `A certificate is issued on completion of ${courses.filter((c) => c.certificate).map((c) => c.name).join(' and ')}.`],
-    ['cap', 'Open to everyone', 'No entrance test and no prior qualification. Each course page states anything you should know before you start.'],
-    ['lock', 'Secure online payment', 'Pay by card, UPI or netbanking through Razorpay. Your receipt and access details are emailed to you straight away.'],
-    ['user', 'Your courses in one place', 'Enrol with the same email each time and every course you have bought sits together in your Walnut account.'],
-  ];
+    ['screen', `${plural(lmsCategories.length, 'subject')} to choose from`, `${list(lmsCategories)}.`],
+    hours.length
+      ? ['clock', 'Short and focused', Math.min(...hours) === Math.max(...hours) ? `Each course takes about ${plural(hours[0], 'hour')} of learning.` : `Courses take from ${plural(Math.min(...hours), 'hour')} to ${plural(Math.max(...hours), 'hour')} of learning.`]
+      : null,
+    certified
+      ? ['certificate', 'A certificate at the end', certified === courses.length ? 'Every course ends with a certificate once you complete it.' : `${certified} of the ${plural(courses.length, 'course')} end with a certificate once you complete them.`]
+      : null,
+    ['cap', levels.length > 1 ? `From ${levels[0]} to ${levels.at(-1)}` : `${levels[0].charAt(0).toUpperCase()}${levels[0].slice(1)} level`, `Each course states its level, so you can start where you are: ${list(levels)}.`],
+    free.length ? ['tag', free.length === 1 ? 'A free course to start with' : 'Free courses to start with', `${list(free.map((c) => c.title))} ${free.length === 1 ? 'costs' : 'cost'} nothing to take.`] : null,
+    lmsSso
+      ? ['user', 'One Walnut account', 'Sign in to Walnut LMS with the account you use on this site — there is no second password to remember.']
+      : ['lock', 'Taught on Walnut LMS', 'Enrolment, payment, lessons and certificates are all handled on Walnut LMS, our learning platform.'],
+  ].filter(Boolean);
 
   const steps = [
-    ['Choose your course', 'Pick a track above and open the course to see what it covers, who it is for and what it costs.'],
-    ['Check the details', 'Each course page lists the format, the duration, what you will learn and the certificate — before you pay anything.'],
-    ['Enrol and pay securely', 'Enter your name, email and phone, apply a coupon if you have one, and pay online through Razorpay.'],
-    ['Start learning', 'Your access details are emailed to you. Sign in to your Walnut account any time to see the courses you own.'],
+    ['Choose a course', 'Pick a course above. Its title opens the course on Walnut LMS, with its lessons, level and price.'],
+    lmsSso
+      ? ['Sign in with your Walnut account', 'Press Enrol and sign in with the account you use on this site. You arrive on Walnut LMS already signed in.']
+      : ['Enrol on Walnut LMS', 'Press Enrol to open the course on Walnut LMS, and enrol there.'],
+    ['Pay on Walnut LMS', `Paid courses are paid for on Walnut LMS, at the price shown on the course.${free.length ? ' Free courses skip this step.' : ''}`],
+    ['Learn and earn the certificate', `Work through the lessons on Walnut LMS.${certified ? ' Complete a course that carries a certificate and it is issued to you there.' : ''}`],
   ];
 
   const body = `
@@ -212,12 +219,12 @@ export function academy({ root }) {
   <div class="wrap">
     <p class="eyebrow hero-fade">For counsellors, students and professionals</p>
     <h1 class="display display-md">${splitWords('Upgrade your skills.')}</h1>
-    <p class="lede hero-fade" style="--d:.4s">Short online courses from Walnut Data Tech. Choose a course to see what it covers, who it’s for and what it costs — then enrol when you’re ready.</p>
+    <p class="lede hero-fade" style="--d:.4s">${soon ? `Online courses from Walnut Data Tech, taught on Walnut LMS: ${offer}.` : `${offer} from Walnut Data Tech, taught on Walnut LMS.`} ${lmsSso ? 'Choose a course, sign in with your Walnut account and start learning.' : 'Choose a course here, then enrol and learn on Walnut LMS.'}</p>
     <div class="actions hero-fade" style="--d:.55s">
       ${button({ href: '#courses', label: 'Explore courses', size: 'lg', arrow: true })}
       ${button({ href: '#how', label: 'How enrolling works', variant: 'ghost', size: 'lg' })}
     </div>
-    <div class="hero-fade" style="--d:.7s">${journeySteps(a.steps)}</div>
+    <div class="hero-fade" style="--d:.7s">${journeySteps(learnerSteps)}</div>
   </div>
 </section>
 
@@ -226,24 +233,25 @@ export function academy({ root }) {
     ${sectionHead({
       eyebrow: 'The catalogue',
       title: 'Choose your course.',
-      text: `${courses.length} short online ${courses.length === 1 ? 'course' : 'courses'} across ${tracks.filter((t) => courses.some((c) => c.track === t.id)).length} tracks, from ${inr(cheapest)}. Open a course for the full details, then enrol from the same page.`,
+      text: `${plural(courses.length, 'course')} across ${plural(lmsCategories.length, 'subject')}${soon ? `: ${open.length} open now, ${soon} upcoming` : freeLine ? `, ${freeLine}` : ''}. Press i on a course for its details${courses.some((c) => c.preview) ? ' and preview' : ''}.`,
     })}
-    <div class="tracks">
-      ${trackSections}
+    <div class="course-groups" data-lms-catalogue data-lms-url="${esc(lmsUrl)}" data-lms-sso="${lmsSso ? 1 : 0}" data-root="${esc(root)}" data-updated="${esc(lmsUpdatedAt)}" data-lms-key="${lmsKey}" data-level="3">
+      ${renderCatalogue(courses, { ...lmsOptions(root), level: 3 })}
     </div>
+    <script type="application/json" id="lms-icons">${lmsIconsJson()}</script>
   </div>
 </section>
 
 <section class="section section-mist" id="included">
   <div class="wrap">
-    ${sectionHead({ eyebrow: 'What you get', title: 'What every Walnut course includes.', text: 'The same format, the same clear pricing and the same account across the catalogue.' })}
+    ${sectionHead({ eyebrow: 'What you get', title: 'What Walnut courses offer.', text: 'Short, practical courses with the level, length and price stated up front.' })}
     <div class="facts">
       ${included
         .map(
           ([ico, label, text], i) => `<div class="fact" data-reveal style="--d:${i * 0.06}s">
         <span class="area-ico">${icon(ico)}</span>
-        <h3>${label}</h3>
-        <p>${text}</p>
+        <h3>${esc(label)}</h3>
+        <p>${esc(text)}</p>
       </div>`
         )
         .join('\n      ')}
@@ -253,7 +261,7 @@ export function academy({ root }) {
 
 <section class="section" id="how">
   <div class="wrap">
-    ${sectionHead({ eyebrow: 'Enrolment', title: 'From choosing a course to starting it.', text: 'Four steps, all on this site. Nothing is charged until you confirm the payment.' })}
+    ${sectionHead({ eyebrow: 'Enrolment', title: 'From choosing a course to your certificate.', text: lmsSso ? 'Four steps, with one Walnut sign-in. Enrolment and payment happen on Walnut LMS.' : 'Four steps. Enrolment and payment happen on Walnut LMS.' })}
     <ol class="caps">
       ${steps
         .map(
@@ -268,7 +276,10 @@ export function academy({ root }) {
       ${button({ href: '#courses', label: 'Explore courses', size: 'lg', arrow: true })}
       ${button({ href: `${root}contact/`, label: 'Ask a question', variant: 'ghost', size: 'lg' })}
     </div>
-    ${accountPrompt(root, 'student', 'Every course you buy with the same email sits together in your Walnut account.')}
+    ${lmsSso ? accountPrompt(root, 'student', 'One Walnut account signs you in here and on Walnut LMS.') : ''}
+    <p class="account-prompt" id="bought-here">Bought a course on this website before it moved to Walnut LMS? ${
+      config.accounts ? `<a href="${root}login/" data-track="account_sign_in">Sign in</a> with the email you paid with to see it, with its payment reference, under My courses — or <a href="${root}contact/">contact us</a>.` : `<a href="${root}contact/">Contact us</a> with your payment reference.`
+    }</p>
   </div>
 </section>
 
@@ -283,167 +294,65 @@ ${ctaBand(root, {
 `;
   return {
     title: 'Courses — upgrade your skills',
-    description: `Short online courses from Walnut Data Tech: ${courses.map((c) => c.name).join(' and ')}. See the details and enrol online.`,
+    description: `${plural(courses.length, 'online course')} from Walnut Data Tech across ${plural(lmsCategories.length, 'subject')}${soon ? `: ${open.length} open now, ${soon} upcoming` : freeLine ? `, ${freeLine}` : ''}. Choose a course here, then enrol and learn on Walnut LMS.`,
     body,
     bodyClass: 'page-academy',
     sticky: { href: '#courses', label: 'Explore courses' },
-  };
-}
-
-/* ---------- /academy/<slug>/ — course information first, enrolment last ---------- */
-
-export function coursePage({ root }, course) {
-  const offer = offerOf(course);
-  const details = [
-    ['screen', 'Format', course.format],
-    ['clock', 'Duration', course.duration || 'Short course'],
-    course.certificate ? ['certificate', 'Certification', 'Certificate on completion'] : null,
-  ].filter(Boolean);
-
-  const body = `
-<section class="course-hero">
-  <div class="wrap course-hero-grid">
-    <div class="course-hero-text">
-      <nav class="crumbs hero-fade" aria-label="Breadcrumb"><a href="${root}academy/">Courses</a><span aria-hidden="true">/</span><span>${course.name}</span></nav>
-      <p class="eyebrow hero-fade">${course.kicker}</p>
-      <h1 class="display display-sm">${splitWords(course.name)}</h1>
-      <p class="svc-tagline hero-fade" style="--d:.45s">${course.tagline}</p>
-      <p class="lede hero-fade" style="--d:.55s">${course.summary}</p>
-      <ul class="course-meta hero-fade" style="--d:.65s">
-        ${details.map(([ico, , value]) => `<li>${icon(ico)}${value}</li>`).join('')}
-      </ul>
-    </div>
-    <aside class="buy-card hero-fade" style="--d:.35s" aria-label="Course fee">
-      <p class="buy-card-title">Course fee</p>
-      ${priceFlow(course)}
-      ${button({ href: '#enrol', label: 'Enrol now', variant: 'accent', size: 'lg', arrow: true })}
-      <p class="buy-note">${icon('lock')}Secure payment by Razorpay</p>
-    </aside>
-  </div>
-</section>
-
-<section class="section section-tight" id="learn">
-  <div class="wrap">
-    ${sectionHead({ eyebrow: 'What you’ll learn', title: 'What this course covers.' })}
-    <ol class="caps">
-      ${course.outcomes
-        .map(
-          (o, i) => `<li class="cap" data-reveal style="--d:${(i % 2) * 0.08}s">
-        <span class="cap-n">${String(i + 1).padStart(2, '0')}</span>
-        <div><h3>${o}</h3></div>
-      </li>`
-        )
-        .join('\n      ')}
-    </ol>
-  </div>
-</section>
-
-<section class="section section-mist" id="details">
-  <div class="wrap course-details">
-    <div data-reveal>
-      <p class="eyebrow">Who it’s for</p>
-      <h2 class="title">Made for you if you are…</h2>
-      <ul class="who-list">
-        ${course.audience.map((w) => `<li>${icon('check')}${w}</li>`).join('')}
-      </ul>
-    </div>
-    <dl class="detail-list" data-reveal style="--d:.1s">
-      ${details.map(([ico, label, value]) => `<div><dt>${icon(ico)}${label}</dt><dd>${value}</dd></div>`).join('')}
-      ${course.eligibility ? `<div><dt>${icon('cap')}Eligibility</dt><dd>${course.eligibility}</dd></div>` : ''}
-      <div><dt>${icon('tag')}Fee</dt><dd>${inr(course.price)}${offer ? ` · ${inr(offer.finalPrice)} with coupon ${offer.code}` : ' · no discount currently'}</dd></div>
-    </dl>
-  </div>
-</section>
-
-<section class="section" id="enrol">
-  <div class="wrap enrol-grid" data-checkout>
-    <div class="enrol-intro" data-reveal>
-      <p class="eyebrow">Enrol</p>
-      <h2 class="title">Ready? Enrol in a minute.</h2>
-      <p class="lede">Tell us who’s enrolling, then pay securely online.</p>
-      <div class="order" aria-live="polite">
-        <h3>Order summary</h3>
-        <dl>
-          <div><dt>${course.name}</dt><dd>${inr(course.price)}</dd></div>
-          <div class="order-discount" data-order-discount hidden><dt>Coupon <span data-order-code></span></dt><dd data-order-saving></dd></div>
-          <div class="order-total"><dt>You pay</dt><dd data-order-total>${inr(course.price)}</dd></div>
-        </dl>
-      </div>
-    </div>
-    <div class="form-card" data-reveal style="--d:.1s" data-form-wrap>
-      <form class="form" data-checkout-form novalidate>
-        <div class="field field-wide">
-          <label for="enrol-name">Full name</label>
-          <input id="enrol-name" name="name" type="text" autocomplete="name" required>
-        </div>
-        <div class="field">
-          <label for="enrol-email">Email</label>
-          <input id="enrol-email" name="email" type="email" autocomplete="email" inputmode="email" required>
-        </div>
-        <div class="field">
-          <label for="enrol-phone">Phone</label>
-          <input id="enrol-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required data-phone>
-        </div>
-        ${
-          offer
-            ? `<div class="field field-wide coupon">
-          <label for="enrol-coupon">Coupon code <span class="optional">optional</span></label>
-          <div class="coupon-row">
-            <input id="enrol-coupon" name="coupon" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false">
-            <button class="btn btn-ghost" type="button" data-coupon-apply><span>Apply</span></button>
-          </div>
-          <p class="coupon-offer" data-coupon-offer>Use <button class="coupon-chip" type="button" data-coupon-use="${offer.code}">${icon('tag')}${offer.code}</button> to pay ${inr(offer.finalPrice)} instead of ${inr(course.price)}.</p>
-          <p class="coupon-status" data-coupon-status role="status"></p>
-        </div>`
-            : `<p class="field-wide coupon-none">${icon('tag')}No discount is currently available for this course.</p>`
-        }
-        <div class="form-foot field-wide">
-          <button class="btn btn-accent btn-lg" type="submit" data-pay>${icon('lock')}<span data-pay-label>Pay ${inr(course.price)}</span></button>
-          <p class="form-note">Payments are processed securely by Razorpay. By paying you agree to our <a href="${root}terms/">terms</a> and <a href="${root}privacy/">privacy policy</a>.</p>
-        </div>
-        <p class="form-status field-wide" role="status" aria-live="polite"></p>
-        <noscript><p class="form-status field-wide is-error">Online enrolment needs JavaScript. Please enable it, or <a href="${root}contact/">contact us</a> to enrol.</p></noscript>
-      </form>
-      <div class="form-success" hidden tabindex="-1">
-        <span class="success-check" aria-hidden="true">${icon('check')}</span>
-        <h2>You’re enrolled.</h2>
-        <p>Payment received for ${course.name}. ${config.legal.courseAccess ? `Your course access is delivered ${esc(config.legal.courseAccess)}, to` : 'We’ll send your course access details to'} <strong data-success-email></strong>.</p>
-        <p class="pay-ref">Payment reference: <span data-success-ref></span></p>
-        ${accountPrompt(root, 'student', 'Use the same email to see your courses and progress.')}
-      </div>
-    </div>
-  </div>
-</section>
-<script type="application/json" id="course-data">${JSON.stringify({ slug: course.slug, name: course.name, price: course.price, currency, coupons: course.coupons, api: `${root}api/` }).replace(/</g, '\\u003c')}</script>
-`;
-
-  return {
-    title: course.name,
-    description: `${course.summary} Fee ${inr(course.price)}${offer ? `, or ${inr(offer.finalPrice)} with coupon ${offer.code}` : ''}.`,
-    body,
-    bodyClass: 'page-course',
-    scripts: ['checkout.js'],
-    sticky: { href: '#enrol', label: 'Enrol now' },
     jsonLd: [
       {
         '@context': 'https://schema.org',
-        '@type': 'Course',
-        name: course.name,
-        description: course.summary,
-        provider: { '@type': 'Organization', name: config.company.name, ...(config.siteUrl ? { sameAs: config.siteUrl } : {}) },
-        offers: { '@type': 'Offer', category: 'Paid', price: course.price, priceCurrency: currency },
+        '@type': 'ItemList',
+        itemListElement: courses.map((c, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          item: {
+            '@type': 'Course',
+            name: c.title,
+            description: c.subtitle || c.title,
+            url: courseLinks(c, lmsOptions(root)).page,
+            provider: { '@type': 'Organization', name: config.company.name, ...(config.siteUrl ? { sameAs: config.siteUrl } : {}) },
+          },
+        })),
       },
-      ...(config.siteUrl
-        ? [{
-            '@context': 'https://schema.org',
-            '@type': 'BreadcrumbList',
-            itemListElement: [
-              { '@type': 'ListItem', position: 1, name: 'Courses', item: `${config.siteUrl}/academy/` },
-              { '@type': 'ListItem', position: 2, name: course.name, item: `${config.siteUrl}/academy/${course.slug}/` },
-            ],
-          }]
-        : []),
     ],
+  };
+}
+
+/* ---------- /academy/<old course>/ — a course this site used to sell ---------- */
+
+// The web server answers these addresses with a 301 (see the .htaccess written by build.mjs); this page
+// is for every other host. It forwards at once with a meta refresh (the CSP allows no inline script)
+// and shows the link too, for a browser that does not follow it.
+export function courseMoved({ root }, course) {
+  const away = /^https?:\/\//.test(course.target);
+  const href = away ? course.target : `${root}academy/`;
+  const lmsCourse = away ? lmsCourses.find((c) => c.slug === course.lms) : null;
+  const body = `
+<section class="page-hero notfound">
+  <div class="wrap center">
+    ${mark('hero-mark')}
+    <p class="eyebrow">${esc(course.name)}</p>
+    <h1 class="display display-md">${away ? 'This course is now on Walnut LMS.' : 'This course is no longer offered.'}</h1>
+    <p class="lede">${
+      away
+        ? `${esc(course.name)} is now taught on Walnut LMS${lmsCourse ? ` as ${esc(lmsCourse.title)}` : ''}. Taking you there…`
+        : `${esc(course.name)} is not available any more. Taking you to the courses we offer now…`
+    }</p>
+    <div class="actions center">
+      ${button({ href: esc(href), label: away ? 'Open the course on Walnut LMS' : 'See all courses', size: 'lg', arrow: true })}
+    </div>
+  </div>
+</section>
+`;
+  return {
+    title: `${course.name} has moved`,
+    description: away
+      ? `${course.name} has moved to Walnut LMS, where the courses of ${config.company.name} are now taken.`
+      : `${course.name} is no longer offered by ${config.company.name}. See the courses available now on Walnut LMS.`,
+    body,
+    bodyClass: 'page-system',
+    noindex: true,
+    redirect: { href, canonical: away ? course.target : config.siteUrl ? `${config.siteUrl}/academy/` : '' },
   };
 }
 
@@ -479,7 +388,7 @@ export function about({ root }) {
     <div class="about-stats" data-reveal>
       <div><strong>${areas.length}</strong><span>service areas for universities</span></div>
       <div><strong>${moduleCount}</strong><span>modules to choose from</span></div>
-      <div><strong>${courses.length}</strong><span>short courses</span></div>
+      <div><strong>${lmsCourses.length}</strong><span>online courses</span></div>
       <div><strong>${externalApps.length}</strong><span>partner applications</span></div>
     </div>
   </div>
@@ -715,22 +624,28 @@ export function privacy({ root }) {
       ['who', 'Who we are', `<p>This website is operated by ${esc(config.company.legalName)}${legal.registeredAddress ? `, ${esc(legal.registeredAddress)}` : ''}. For anything in this policy, ${contactLine(root)}.</p>`],
       ['collect', 'Information you give us', `<ul>
       <li><strong>Enquiries.</strong> When you use a contact form or the solution builder: your name, organisation, email address, phone number (optional), your message, and the services and modules you selected.</li>
-      <li><strong>Course enrolment.</strong> When you enrol in a course: your name, email address, phone number, the course and coupon you chose, and the payment reference issued by our payment provider.</li>
+      <li><strong>Courses.</strong> Courses are enrolled in and paid for on Walnut LMS (${lmsHost}), not on this website.${lmsSso ? ' When you open Walnut LMS with your Walnut account, we send it your name, email address, mobile number and the kind of Walnut account you hold, so it can sign you in.' : ''}</li>
+      <li><strong>Earlier course purchases.</strong> If you bought a course on this website before courses moved to Walnut LMS, we keep the record of that purchase: your name, email address, phone number, the course and coupon you chose, and the payment reference issued by Razorpay.</li>
+      ${config.payments ? `<li><strong>Payments.</strong> When you pay for one of our products on this website, we keep a record of the payment: what you paid for and the amount, your name, email address and phone number as the product you are buying gave them to us, the kind of payment method you used (for example UPI or card), the date, and the payment references Razorpay issues. We never receive your card, UPI or bank details.</li>` : ''}
     </ul>
     <p>We do not ask for, and you should not send us, sensitive information such as identity documents or bank details through this website.</p>`],
       ['automatic', 'Information collected automatically', `<p>Like most websites, the servers that host this site record technical information about each request — such as your IP address, browser type, the page requested and the time — in standard server logs kept for security and troubleshooting.${ga ? ' With your consent we also use Google Analytics, described under “Cookies and similar technologies”.' : ' We do not use analytics, advertising or tracking tools on this website.'}</p>`],
       ['use', 'How we use your information', `<ul>
       <li>to respond to your enquiry and prepare a proposal, and to email you a copy of what you sent;</li>
-      <li>to process your enrolment, email you a confirmation of your payment and give you access to your course;</li>
+      <li>to keep a record of the courses bought on this website, and to give their buyers access to them on Walnut LMS;</li>
+      ${config.payments ? '<li>to take payments for our products, confirm them to the product you bought from, and handle refunds;</li>' : ''}
       <li>to keep the website secure and working;</li>
       <li>to meet our legal, tax and accounting obligations.</li>
     </ul>
     <p>We do not sell your personal information, and we do not use it for automated decision-making.</p>`],
-      ['payments', 'Payments', `<p>Course payments are processed by Razorpay. Your card, UPI or bank details are entered on Razorpay’s secure checkout and are never seen or stored by us. We send Razorpay your name, email address, phone number, the course and the amount so it can process the payment, and Razorpay returns the payment status and reference to us. Razorpay handles your information under its own privacy policy.</p>`],
+      ['payments', 'Payments', config.payments
+        ? `<p>Payments for our products are made on this website through Razorpay’s checkout, where you enter your card, UPI or bank details; they go to Razorpay and are never seen or stored by us. We keep the record described under “Information you give us”, and Razorpay handles your payment information under its own privacy policy.</p>`
+        : `<p>This website no longer takes payments: courses are paid for on Walnut LMS. Courses bought on this website earlier were paid through Razorpay’s checkout, where your card, UPI or bank details were entered; they were never seen or stored by us. We keep the payment status and reference Razorpay returned to us. Razorpay handles your information under its own privacy policy.</p>`],
       ['sharing', 'Who we share information with', `<p>We share information only with service providers that help us run this website, and only as far as they need it:</p>
     <ul>
       <li><strong>${esc(config.email.provider)}</strong> — sends our emails: your enquiry is emailed to our team, and a confirmation is emailed to you.</li>
-      <li><strong>Razorpay</strong> — processes course payments.</li>
+      <li><strong>Walnut LMS</strong> — where courses are taken.${lmsSso ? ' It receives the details listed under “Courses” when you open it with your Walnut account.' : ''}${config.payments ? ' When you pay for a course, it is told whether the payment went through, the amount and the payment references, so it can give you the course.' : ''} For a course bought on this website earlier, it may receive the purchase record so you can take the course there.</li>
+      <li><strong>Razorpay</strong> — ${config.payments ? 'processes the payments made on this website.' : 'processed the payments for courses bought on this website earlier.'}</li>
       <li><strong>Our hosting providers</strong> — serve the website and keep server logs.</li>
       <li><strong>Google Fonts</strong> — serves the typefaces; your browser requests them from Google, which receives your IP address.</li>
       <li><strong>Video platforms</strong> — if you choose to play a video, it is loaded from the platform that hosts it.</li>
@@ -743,16 +658,16 @@ export function privacy({ root }) {
       <li><strong>Solution builder progress</strong> — your in-progress selections are kept until you close the tab, so they survive a page refresh.</li>
       ${ga ? '<li><strong>Your analytics choice</strong> — whether you accepted or declined analytics.</li>' : ''}
     </ul>
-    <p>This information stays on your device and is not sent to us. When you pay, Razorpay’s checkout may set its own cookies to process the payment securely.${ga ? ' If you accept, Google Analytics sets cookies to measure how the site is used; you can change your choice at any time through “Cookie settings” at the bottom of any page.' : ''}</p>`],
+    <p>This information stays on your device and is not sent to us.${ga ? ' If you accept, Google Analytics sets cookies to measure how the site is used; you can change your choice at any time through “Cookie settings” at the bottom of any page.' : ''}</p>`],
       ['retention', 'How long we keep it', `<p>${legal.retention ? `We keep enquiry and enrolment records ${esc(legal.retention)}.` : 'We keep enquiry and enrolment records only for as long as we need them for the purposes above, and for as long as the law requires us to keep financial records.'}</p>`],
       ['rights', 'Your choices and rights', `<p>You can ask us to tell you what information we hold about you, to correct it, or to delete it, and you can withdraw a consent you have given. To do so, ${contactLine(root)}. We will respond as required by applicable data-protection law.${legal.grievanceOfficer ? ` Complaints can be addressed to our grievance officer, ${esc(legal.grievanceOfficer)}.` : ''}</p>`],
-      ['security', 'Security', `<p>The website is served over an encrypted connection and payment details are handled entirely by Razorpay. No method of transmission or storage is completely secure, so we cannot guarantee absolute security.</p>`],
+      ['security', 'Security', `<p>The website is served over an encrypted connection${config.payments ? ', and payment details are entered only in Razorpay’s checkout, so they never reach our servers' : ' and does not take payments'}. No method of transmission or storage is completely secure, so we cannot guarantee absolute security.</p>`],
       ['changes', 'Changes to this policy', `<p>We may update this policy when the website or the law changes. The date at the top shows when it was last revised.</p>`],
     ],
   });
   return {
     title: 'Privacy policy',
-    description: `How ${config.company.name} collects, uses and protects the information you share through this website, including enquiries and course payments.`,
+    description: `How ${config.company.name} collects, uses and protects the information you share through this website, including enquiries and course purchases.`,
     body,
     bodyClass: 'page-legal',
   };
@@ -765,18 +680,22 @@ export function terms({ root }) {
     title: 'Terms &amp; conditions',
     intro: `<p>These terms apply to your use of this website, which is operated by ${esc(config.company.legalName)} (“${config.company.name}”, “we”, “us”). By using the website you agree to them.</p>`,
     sections: [
-      ['use', 'Using this website', `<p>You may use this website for lawful purposes only. You must not attempt to disrupt it, gain unauthorised access to it, interfere with its payment process, or use it to send unlawful, misleading or harmful material. Information you submit must be accurate and must be your own, or sent with the permission of the person it belongs to.</p>`],
+      ['use', 'Using this website', `<p>You may use this website for lawful purposes only. You must not attempt to disrupt it, gain unauthorised access to it, or use it to send unlawful, misleading or harmful material. Information you submit must be accurate and must be your own, or sent with the permission of the person it belongs to.</p>`],
       ['services', 'Services for universities and institutions', `<p>The descriptions of our services on this website are for general information. Submitting an enquiry or a configuration through the solution builder is a request for a proposal — it is not an order and does not create a contract. Services are provided only under a separate written agreement between us and the institution, which sets out the scope, fees and terms.</p>`],
       ['courses', 'Courses and enrolment', `<ul>
-      <li>Course descriptions, including what a course covers and whether it carries a certificate, are shown on each course page.</li>
-      <li>Fees are shown in Indian rupees on the course page and again at checkout before you pay. The amount you are charged is the amount shown at checkout.</li>
-      <li>A coupon applies only to the course it is offered for, cannot be exchanged for cash, and may be changed or withdrawn at any time before you pay.</li>
-      <li>Your enrolment is confirmed once your payment has been received and verified. ${legal.courseAccess ? `Course access is delivered ${esc(legal.courseAccess)}.` : 'We will then contact you at the email address you provided with your course access details.'}</li>
+      ${config.payments
+        ? `<li>Courses are listed on this website and taken on Walnut LMS (${lmsHost}). You pay for them on this website’s secure payment page. Each course’s page on Walnut LMS describes what it covers, its level and whether it carries a certificate.</li>
+      <li>Fees are shown in Indian rupees. The amount you are charged is the amount shown on our payment page when you pay. How courses are delivered is set out in our <a href="${root}delivery-policy/">shipping &amp; delivery policy</a>.</li>`
+        : `<li>Courses are listed on this website and are enrolled in, paid for and taken on Walnut LMS (${lmsHost}). Each course’s page there describes what it covers, its level and whether it carries a certificate.</li>
+      <li>Fees are shown in Indian rupees, on this website and on Walnut LMS. The amount you are charged is the amount Walnut LMS shows when you pay.</li>`}
+      <li>A course bought on this website before courses moved to Walnut LMS remains yours. ${legal.courseAccess ? `Course access is delivered ${esc(legal.courseAccess)}.` : 'For anything about it, contact us with your payment reference.'}</li>
       <li>Course access is for the enrolled person only and may not be shared or resold.</li>
     </ul>`],
-      ['payments', 'Payments', `<p>Payments are processed by Razorpay. Your payment details are entered on Razorpay’s checkout and are subject to Razorpay’s terms; we do not see or store them. If a payment is deducted but your enrolment is not confirmed on screen, contact us with your payment reference and we will resolve it.</p>`],
-      ['refunds', 'Refunds and cancellations', legal.refundPolicy ? `<p>${esc(legal.refundPolicy)}</p>` : `<p>To cancel an enrolment or ask for a refund, ${contactLine(root)} with your payment reference. Requests are handled in line with our refund policy and applicable consumer law.</p>`],
-      ['partners', 'Partner applications and external links', `<p>Partner Onboarding, Course Finder and Online Leads are separate applications that open on their own websites and have their own terms. This website may also link to other third-party sites. We are not responsible for the content or practices of websites we do not operate.</p>`],
+      ['payments', 'Payments', config.payments
+        ? `<p>Payments for our products, including courses taken on Walnut LMS, are made on this website through Razorpay’s secure checkout, under Razorpay’s terms. You enter your card, UPI or bank details there; they are never seen or stored by us. If you have a question about a payment, contact us with your order or payment reference and we will resolve it.</p>`
+        : `<p>Course payments are taken on Walnut LMS, not on this website. Courses bought on this website earlier were paid through Razorpay’s checkout, under Razorpay’s terms; if you have a question about one of those payments, contact us with your payment reference and we will resolve it.</p>`],
+      ['refunds', 'Refunds and cancellations', legal.refundPolicy ? `<p>${esc(legal.refundPolicy)} Read our <a href="${root}refund-policy/">cancellation &amp; refund policy</a> for the details.</p>` : `<p>To cancel an enrolment or ask for a refund, ${contactLine(root)} with your payment reference. Requests are handled in line with our refund policy and applicable consumer law.</p>`],
+      ['partners', 'Partner applications and external links', `<p>Walnut LMS is Walnut Data Tech’s own learning platform, where courses are sold and taken; it opens on its own website. Partner Onboarding, Course Finder and Online Leads are separate applications that open on their own websites and have their own terms. This website may also link to other third-party sites. We are not responsible for the content or practices of websites we do not operate.</p>`],
       ['ip', 'Intellectual property', `<p>The content of this website — including text, design, graphics, logos and course materials — belongs to ${esc(config.company.legalName)} or its licensors. You may view it for your own use. You may not copy, republish or use it commercially without our written permission.</p>`],
       ['liability', 'Availability and liability', `<p>We work to keep this website accurate and available, but we provide it “as is” and cannot promise that it will always be available or free of errors. To the extent the law allows, we are not liable for indirect or consequential loss arising from your use of the website. Nothing in these terms limits any right you have under law that cannot be excluded.</p>`],
       ['suspension', 'Suspension', `<p>We may restrict or end access to the website or to a course for anyone who breaks these terms.</p>`],
@@ -790,6 +709,88 @@ export function terms({ root }) {
     description: `The terms that apply to using the ${config.company.name} website, enquiring about our services and enrolling in our courses.`,
     body,
     bodyClass: 'page-legal',
+  };
+}
+
+// The refund rule is the business's (site.config.mjs → legal: refundDays, refundMaxCompleted); this page
+// explains it, and how a refund is asked for and paid back.
+export function refundPolicy({ root }) {
+  const days = legal.refundDays;
+  const share = legal.refundMaxCompleted;
+  const body = legalPage({
+    title: 'Cancellation &amp; refund policy',
+    intro: `<p>This policy explains when you can cancel a purchase from ${esc(config.company.legalName)} (“${config.company.name}”, “we”, “us”) and get your money back, and how. It covers courses bought from us, which are taken on Walnut LMS, our learning platform.</p>`,
+    sections: [
+      ['cancel', 'Cancelling before you pay', `<p>Nothing is charged until you complete a payment. If you close the payment window or leave the payment page, no money is taken, and there is nothing to cancel.</p>`],
+      ['refund', 'Refunds on courses', `<p>You can have a <strong>full refund</strong> of a course if both of these are true:</p>
+    <ul>
+      <li>you ask for it within <strong>${days} days</strong> of paying; and</li>
+      <li>you have completed <strong>less than ${share}%</strong> of the course on Walnut LMS.</li>
+    </ul>
+    <p>After ${days} days, or once you have completed ${share}% of the course or more, the course is not refundable. Courses marked “Upcoming” cannot be bought until they open, so there is nothing to refund on them.</p>`],
+      ['errors', 'Payments taken in error', `<p>If a payment failed but money was deducted, you were charged twice for the same purchase, or you were charged an amount other than the one shown when you paid, we refund the amount taken in error in full, whenever you tell us.</p>`],
+      ['ask', 'How to ask for a refund', `<p>Please ${contactLine(root)} from the email address you paid with, and give your order or payment reference and the course. We check the request against this policy and reply to you by email.</p>`],
+      ['paid', 'How refunds are paid', `<p>An approved refund is paid back to the payment method you used — your card, UPI account, bank account or wallet — through Razorpay, our payment provider. It usually reaches you within 5–7 working days of approval; how soon it shows depends on your bank. Once a course is refunded in full, your access to it on Walnut LMS is withdrawn, including its lessons, files and any certificate.</p>`],
+      ['law', 'Your rights', `<p>Nothing in this policy limits a right you have under the law that cannot be excluded.${legal.grievanceOfficer ? ` Complaints can be addressed to our grievance officer, ${esc(legal.grievanceOfficer)}.` : ''}</p>`],
+      ['contact', 'Contact', `<p>${esc(config.company.legalName)}${legal.registeredAddress ? `, ${esc(legal.registeredAddress)}` : ''}. To ask about a refund, ${contactLine(root)}.</p>`],
+    ],
+  });
+  return {
+    title: 'Cancellation & refund policy',
+    description: `When and how you can cancel a purchase from ${config.company.name} and get a refund: within ${days} days of paying, with less than ${share}% of the course completed.`,
+    body,
+    bodyClass: 'page-legal',
+  };
+}
+
+// Everything Walnut sells is digital: this page says how and when it is delivered (payment providers ask
+// for it under the name "shipping and delivery policy").
+export function deliveryPolicy({ root }) {
+  const body = legalPage({
+    title: 'Shipping &amp; delivery policy',
+    intro: `<p>${esc(config.company.legalName)} (“${config.company.name}”) sells digital products only. This policy explains how they are delivered.</p>`,
+    sections: [
+      ['shipping', 'Nothing is shipped', `<p>We do not sell or ship physical goods, so there are no shipping charges and nothing is sent by post or courier.</p>`],
+      ['courses', 'Courses', `<p>Courses are delivered online, on Walnut LMS (${lmsHost}), our learning platform. You get access ${esc(legal.courseAccess || 'once your payment is confirmed')} — usually within minutes. Sign in to Walnut LMS with the email address you paid with${lmsSso ? ', or with your Walnut account' : ''}, and the course is there. Walnut LMS also emails you a receipt.</p>`],
+      ['missing', 'If your course does not appear', `<p>If you have paid and cannot see your course within 24 hours, please ${contactLine(root)} with your order or payment reference, and we will put it right. If a payment failed but money was deducted, see our <a href="${root}refund-policy/">refund policy</a>.</p>`],
+      ['contact', 'Contact', `<p>${esc(config.company.legalName)}${legal.registeredAddress ? `, ${esc(legal.registeredAddress)}` : ''}. For anything about delivery, ${contactLine(root)}.</p>`],
+    ],
+  });
+  return {
+    title: 'Shipping & delivery policy',
+    description: `How ${config.company.name}'s digital products are delivered: courses on Walnut LMS, as soon as payment is confirmed. Nothing is shipped.`,
+    body,
+    bodyClass: 'page-legal',
+  };
+}
+
+/* ---------- /pay/ — the payment gateway's page ---------- */
+
+// Where the buyer of any Walnut product pays. What is being paid for, and how much, comes from the gateway
+// (api/pay/checkout.php) for the intent in the link; the page holds nothing about any payment itself.
+export function pay({ root }) {
+  const body = `
+<section class="section pay-section">
+  <div class="wrap">
+    <div class="pay-card">
+      <p class="eyebrow">Secure payment</p>
+      <h1 class="pay-title">Complete your payment</h1>
+      <div class="pay-body" id="pay" data-root="${esc(root)}" aria-live="polite">
+        <p class="pay-note">Loading your payment…</p>
+        <noscript><p class="pay-note">Paying needs JavaScript. Please turn it on and reload this page.</p></noscript>
+      </div>
+    </div>
+    <p class="pay-trust">Payments are processed by Razorpay: UPI, cards, netbanking and wallets. Your card and bank details go to Razorpay, never to us. ${esc(config.company.legalName)} · <a href="${root}refund-policy/">Refund policy</a> · <a href="${root}terms/">Terms</a> · <a href="${root}privacy/">Privacy</a></p>
+  </div>
+</section>`;
+  return {
+    title: 'Secure payment',
+    description: `Pay for a ${config.company.name} product securely, through Razorpay: UPI, cards, netbanking and wallets.`,
+    body,
+    bodyClass: 'page-pay',
+    scripts: ['pay.js'],
+    noindex: true,
+    payments: true,
   };
 }
 

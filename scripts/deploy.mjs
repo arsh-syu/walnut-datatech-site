@@ -5,12 +5,18 @@
 //
 // Reads .env (see .env.example): FTP_HOST, FTP_USER, FTP_PASS, FTP_DIR, SITE_URL,
 // RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, TWILIO_API_KEY, TWILIO_API_SECRET, EMAIL_FROM, EMAIL_FROM_NAME, EMAIL_NOTIFY,
-// DB_HOST, DB_NAME, DB_USER, DB_PASS, ACCOUNT_SECRET, TWILIO_ACCOUNT_SID, SMS_FROM.
+// DB_HOST, DB_NAME, DB_USER, DB_PASS, ACCOUNT_SECRET, TWILIO_ACCOUNT_SID, SMS_FROM, WALNUT_SSO_SECRET_<APP>,
+// WALNUT_LMS_URL, WALNUT_LMS_INTEGRATION_SECRET, WALNUT_LMS_BACKFILL, RAZORPAY_WEBHOOK_SECRET, WALNUT_PAY_SECRET_<APP>.
 //
-// Order matters for safety: the site and the payment API are uploaded first, the API is checked
-// to be executing as PHP, and only then is the file holding the Razorpay secret uploaded.
+// Order matters for safety: the API is uploaded first and checked to be executing as PHP, and only then
+// is the file holding the secrets (config.php) uploaded. The host loads a new config.php (and new PHP)
+// only minutes after it is uploaded, so the deploy waits until health.php answers with this deploy's
+// config_id, checks the settings, and only then publishes the pages that rely on them. (On a host where
+// PHP is not running yet, the pages have to go up first, with the API.)
 
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { waitForConfig, describeState } from './wait-config.mjs';
 import { mkdtempSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
@@ -42,6 +48,23 @@ const hasSms = Boolean(hasAccounts && env.TWILIO_ACCOUNT_SID && env.SMS_FROM);
 const certVerifyUrl = /^https:\/\//i.test(env.CERT_VERIFY_URL || '') ? env.CERT_VERIFY_URL : '';
 if (env.CERT_VERIFY_URL && !certVerifyUrl) fail('CERT_VERIFY_URL must be an https:// address.');
 const hasLogin = hasOnboarding || hasAccounts;
+// Walnut LMS sells the courses. Our server asks it for course progress with a shared secret, and the Enrol
+// buttons sign the person in to it — both only with the account database, which holds the learners.
+const lmsUrl = (env.WALNUT_LMS_URL || 'https://walnut-lms.vercel.app').replace(/\/+$/, '');
+const hasLms = Boolean(hasAccounts && env.WALNUT_LMS_INTEGRATION_SECRET);
+const hasLmsSso = Boolean(hasAccounts && env.WALNUT_SSO_SECRET_LMS);
+// The payment gateway (api/pay/): every Walnut product's payments, on this site. Its ledger is the account
+// database; each product (app) has its own secret, WALNUT_PAY_SECRET_<APP> → config pay_secret_<app>.
+const PAY_APPS = ['WALNUT_LMS'];
+const payApps = PAY_APPS.filter((k) => env[`WALNUT_PAY_SECRET_${k}`]);
+const hasPay = Boolean(hasAccounts && hasKeys && env.RAZORPAY_WEBHOOK_SECRET && payApps.length);
+// This deploy's config.php ID, and how long (in seconds) to wait for the host to load that file.
+const configId = randomBytes(8).toString('hex');
+const CONFIG_WAIT = 15 * 60;
+// Always checked: the course links, the redirects in .htaccess and the sign-in tokens all go to this
+// address. A public https origin with no path (the LMS checks each signature against the path it
+// receives), the rule main.js uses too.
+if (!/^https:\/\/(?!localhost\b|127\.|\[::1\])[A-Za-z0-9.-]+(:\d{1,5})?$/i.test(lmsUrl)) fail('WALNUT_LMS_URL must be the public https address of Walnut LMS, with no path (e.g. https://walnut-lms.vercel.app).');
 
 // Real money must not be taken before the refund terms are published.
 if (hasKeys && env.RAZORPAY_KEY_ID.startsWith('rzp_live_') && !config.legal.refundPolicy) {
@@ -127,7 +150,7 @@ const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (
 
 async function health() {
   try {
-    const res = await fetch(`${siteUrl}/api/health.php?t=${Date.now()}`, { headers: { Accept: 'application/json' } });
+    const res = await fetch(`${siteUrl}/api/health.php?t=${Date.now()}`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(20_000) });
     const text = await res.text();
     try {
       return { status: res.status, data: JSON.parse(text) };
@@ -144,7 +167,11 @@ async function health() {
 console.log(`Building for ${siteUrl} …`);
 // Login and the dashboard are published exactly when the accounts they rely on are configured.
 if (config.accounts && !hasLogin) console.log('! `accounts` is on in site.config.mjs but neither the account database (DB_NAME, DB_USER, ACCOUNT_SECRET) nor ONBOARDING_API_URL / ONBOARDING_API_KEY is set — login and the dashboard are left out of this deploy.');
-const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasLogin ? '1' : '', ACCOUNTS_OFF: hasLogin ? '' : '1', ...(env.LMS_URL ? { LMS_URL: env.LMS_URL } : {}) } });
+// The course catalogue comes from Walnut LMS. When it cannot be fetched the build uses the last copy,
+// so this never stops a deploy.
+spawnSync(process.execPath, ['scripts/fetch-catalogue.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, WALNUT_LMS_URL: lmsUrl } });
+// Enrol signs the person in to the LMS only when the LMS can receive that sign-in; otherwise it opens the course on the LMS.
+const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasLogin ? '1' : '', ACCOUNTS_OFF: hasLogin ? '' : '1', WALNUT_LMS_URL: lmsUrl, LMS_SSO: hasLmsSso ? '1' : '', PAY: hasPay ? '1' : '' } });
 if (build.status !== 0) fail('The build failed.');
 const check = spawnSync(process.execPath, ['check.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl } });
 if (check.status !== 0) fail('Link check failed — nothing was uploaded.');
@@ -165,12 +192,26 @@ if (indexFiles.length && !process.argv.includes('--yes')) {
 }
 
 const files = walk(dist).map((f) => [f, relative(dist, f).split(sep).join('/')]);
-console.log(`Uploading ${files.length} files …`);
-upload(files, remoteDir);
-console.log('✓ Site uploaded');
+// Where the API already runs, it goes up first and its new settings are loaded (which takes the host
+// minutes) before the pages that rely on them are published, so a page never points at something the
+// server cannot do yet. On a host where PHP is not running yet, everything goes up at once, as it must
+// before PHP can be proved to execute.
+let state = await health();
+const warm = Boolean(state.data?.ok);
+const api = files.filter(([, path]) => path.startsWith('api/'));
+const pages = files.filter(([, path]) => !path.startsWith('api/'));
+if (warm) {
+  console.log(`Uploading the API (${api.length} files); the pages follow once the server has loaded it …`);
+  upload(api, remoteDir);
+  console.log('✓ API uploaded');
+} else {
+  console.log(`Uploading ${files.length} files …`);
+  upload(files, remoteDir);
+  console.log('✓ Site uploaded');
+}
 
 // The secret is only uploaded once the server has proved it executes PHP (otherwise it could be served as text).
-let state = await health();
+state = await health();
 if (!state.data?.ok) {
   console.log(`\n! ${siteUrl}/api/health.php did not answer as expected (HTTP ${state.status}).`);
   console.log(state.status === 404
@@ -195,6 +236,8 @@ if (!hasOnboarding) {
 }
 if (!hasAccounts && !hasOnboarding) console.log('! DB_NAME / DB_USER / ACCOUNT_SECRET (and the email settings) are not all set in .env — login and the dashboard are not published.');
 if (hasAccounts && !hasSms) console.log('  TWILIO_ACCOUNT_SID / SMS_FROM are not set in .env — login offers the email code only (no SMS).');
+if (hasAccounts && !hasLms) console.log('  WALNUT_LMS_INTEGRATION_SECRET is not set in .env — the dashboard shows past purchases but not course progress from Walnut LMS.');
+if (hasAccounts && !hasLmsSso) console.log('  WALNUT_SSO_SECRET_LMS is not set in .env — Enrol opens the course on Walnut LMS, where the learner signs in there.');
 
 if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
   const phpStr = (v) => `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
@@ -206,33 +249,65 @@ if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
     ...(hasSms ? { twilio_sid: env.TWILIO_ACCOUNT_SID, sms_from: env.SMS_FROM } : {}),
     ...(certVerifyUrl ? { cert_verify_url: certVerifyUrl, ...(env.CERT_VERIFY_KEY ? { cert_verify_key: env.CERT_VERIFY_KEY } : {}) } : {}),
     // one sign-in for the other Walnut apps: each app's own secret, set only once that app can receive it
-    ...(hasAccounts ? Object.fromEntries(['ONBOARDING', 'COURSE_FINDER', 'LEADS'].filter((k) => env[`WALNUT_SSO_SECRET_${k}`]).map((k) => [`sso_${k.toLowerCase()}`, env[`WALNUT_SSO_SECRET_${k}`]])) : {}),
+    ...(hasAccounts ? Object.fromEntries(['ONBOARDING', 'COURSE_FINDER', 'LEADS', 'LMS'].filter((k) => env[`WALNUT_SSO_SECRET_${k}`]).map((k) => [`sso_${k.toLowerCase()}`, env[`WALNUT_SSO_SECRET_${k}`]])) : {}),
+    // Walnut LMS: its address, the secret our server signs its calls with, and whether past website
+    // purchases are handed to it (off until the LMS has confirmed how it receives them)
+    ...(hasAccounts ? { lms_url: lmsUrl } : {}),
+    ...(hasLms ? { lms_secret: env.WALNUT_LMS_INTEGRATION_SECRET } : {}),
+    ...(hasLms && env.WALNUT_LMS_BACKFILL === '1' ? { lms_backfill: true } : {}),
+    // the payment gateway: Razorpay's webhook secret, each app's secret, and this site's address (pay links)
+    ...(hasPay ? { rzp_webhook_secret: env.RAZORPAY_WEBHOOK_SECRET, site_url: siteUrl, ...Object.fromEntries(payApps.map((k) => [`pay_secret_${k.toLowerCase()}`, env[`WALNUT_PAY_SECRET_${k}`]])) } : {}),
+    // which deploy wrote this file (not a secret): health.php reports it once the server has loaded it
+    config_id: configId,
   };
   const configFile = join(tmp, 'config.php');
   writeFileSync(
     configFile,
-    `<?php\n// Written by scripts/deploy.mjs. Never commit or share this file.\nreturn [\n${Object.entries(settings).map(([k, v]) => `  '${k}' => ${phpStr(v)},`).join('\n')}\n];\n`,
+    `<?php\n// Written by scripts/deploy.mjs. Never commit or share this file.\nreturn [\n${Object.entries(settings).map(([k, v]) => `  '${k}' => ${v === true ? 'true' : phpStr(v)},`).join('\n')}\n];\n`,
     { mode: 0o600 }
   );
   upload([[configFile, 'api/config.php']], remoteDir);
 
   // The secrets must never be readable over the web.
-  const probe = await fetch(`${siteUrl}/api/config.php?t=${Date.now()}`).then((r) => r.text()).catch(() => '');
-  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', 'db_pass', 'account_secret', 'cert_verify_key', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY, env.DB_PASS, env.ACCOUNT_SECRET, env.CERT_VERIFY_KEY].filter(Boolean).some((needle) => probe.includes(needle));
+  const probe = await fetch(`${siteUrl}/api/config.php?t=${Date.now()}`, { signal: AbortSignal.timeout(20_000) }).then((r) => r.text()).catch(() => '');
+  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', 'db_pass', 'account_secret', 'lms_secret', 'sso_lms', 'rzp_webhook_secret', 'pay_secret_', 'cert_verify_key', env.CERT_VERIFY_KEY, env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY, env.DB_PASS, env.ACCOUNT_SECRET, env.WALNUT_LMS_INTEGRATION_SECRET, env.RAZORPAY_WEBHOOK_SECRET, ...['ONBOARDING', 'COURSE_FINDER', 'LEADS', 'LMS'].map((k) => env[`WALNUT_SSO_SECRET_${k}`]), ...PAY_APPS.map((k) => env[`WALNUT_PAY_SECRET_${k}`])].filter(Boolean).some((needle) => probe.includes(needle));
   if (leaked) {
     curl([`url = ${q(ftpUrl(remoteDir))}`, `quote = ${q(`DELE ${remoteDir}api/config.php`)}`, 'list-only'], { quiet: true });
-    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay, Twilio, database and Onboarding Tool secrets and contact the host about PHP handling.');
+    fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay, Twilio, database, Onboarding Tool and Walnut app (SSO and LMS) secrets and contact the host about PHP handling.');
   }
 
-  state = await health();
+  // The host caches compiled PHP and loads the new config.php (and new API code) only minutes later.
+  // Until then the API still runs on the previous settings, so they are checked only once health.php
+  // answers with this deploy's config_id — and, where the API was already running, the pages are
+  // published only after that.
+  const wait = await waitForConfig({ configId, health, limit: CONFIG_WAIT, log: (line) => console.log(line) });
+  state = wait.state;
+  if (!wait.loaded) {
+    fail(`The new settings were uploaded, but after ${CONFIG_WAIT / 60} minutes the server is not using them yet (${describeState(state)}).${warm ? ' The new pages were NOT published, so the site still shows the previous ones.' : ''}
+  Uploading again restarts the host's delay, so first check ${siteUrl}/api/health.php until it shows "config_id":"${configId}", then run the deploy again. If it never does, ask the host to clear the PHP cache (OPcache).`);
+  }
+  console.log(`✓ The server is using the new settings (after ${wait.seconds} s)`);
   if (hasKeys && !state.data?.configured) fail('The keys were uploaded but the payment API does not see them.');
   if (hasEmail && !state.data?.email) fail('The email settings were uploaded but the API does not see them.');
   if (hasOnboarding && !state.data?.onboarding) fail('The Onboarding Tool settings were uploaded but the API does not see them.');
+  if (hasLms && !state.data?.lms) fail('The Walnut LMS settings were uploaded but the API does not see them. Check WALNUT_LMS_URL (a public https address) and WALNUT_LMS_INTEGRATION_SECRET in .env.');
+  if (hasLmsSso && !state.data?.lms_sso) fail('WALNUT_SSO_SECRET_LMS was uploaded but the API does not see it.');
+  if (hasPay && !state.data?.pay) fail('The payment gateway settings were uploaded but the API does not see them (Razorpay keys, RAZORPAY_WEBHOOK_SECRET, WALNUT_PAY_SECRET_<APP>).');
   if (hasAccounts && !state.data?.accounts) fail('The account database settings were uploaded, but the server could not connect to the database. Check DB_HOST, DB_NAME, DB_USER and DB_PASS in .env, and that PHP has the pdo_mysql extension.');
   if (hasKeys) console.log(`✓ Razorpay connected in ${state.data.mode.toUpperCase()} mode`);
   if (hasEmail) console.log(`✓ Email connected — sending from ${env.EMAIL_FROM}, notifications to ${env.EMAIL_NOTIFY}`);
   if (hasOnboarding) console.log(`✓ University requests will be filed in the Onboarding Tool at ${onboardingUrl}`);
   if (hasAccounts) console.log(`✓ Walnut accounts connected — database ${env.DB_NAME}, one-time codes by email${hasSms ? ' and SMS' : ''}`);
+  if (hasLms) console.log(`✓ Walnut LMS connected at ${lmsUrl} — course progress on the dashboard${env.WALNUT_LMS_BACKFILL === '1' ? ', past website purchases handed to the LMS' : ''}`);
+  if (hasLmsSso) console.log('✓ Walnut LMS sign-in connected — Enrol and Continue open the LMS signed in');
+  if (hasPay) console.log(`✓ Payment gateway open for ${state.data.pay_apps.join(', ')} — Razorpay in ${state.data.mode.toUpperCase()} mode; webhook ${siteUrl}/api/pay/webhook.php`);
+}
+
+// The API and its settings are in place, so now the pages that use them.
+if (warm) {
+  console.log(`Uploading the pages (${pages.length} files) …`);
+  upload(pages, remoteDir);
+  console.log('✓ Pages uploaded');
 }
 
 const home200 = await fetch(`${siteUrl}/?t=${Date.now()}`).then((r) => r.status).catch(() => 0);

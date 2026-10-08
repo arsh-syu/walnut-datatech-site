@@ -24,7 +24,7 @@ export const audiences = [
     who: 'I want to learn and upgrade my career',
     title: 'Upgrade your skills',
     line: 'Short online courses for counsellors, students and professionals.',
-    steps: ['Explore courses', 'View course details', 'Apply your coupon', 'Enrol and pay'],
+    steps: [], // the learner steps follow Walnut LMS and live in src/data/lms.mjs (learnerSteps)
   },
   {
     id: 'partners',

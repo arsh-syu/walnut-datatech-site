@@ -1,6 +1,6 @@
 # These files are included by the endpoints and must never be requested directly.
 <IfModule mod_authz_core.c>
-  <FilesMatch "^((config|catalog|lib|account-lib)\.php|(emails|agent-questions)\.json)$">
+  <FilesMatch "^((config|catalog|lib|account-lib|pay-lib)\.php|(emails|agent-questions)\.json)$">
     Require all denied
   </FilesMatch>
 </IfModule>
