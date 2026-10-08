@@ -700,7 +700,7 @@ test('the site speaks of partners, names its clients and carries the company det
   for (const logo of ['client-sppu.webp', 'client-ggv.webp']) assert.equal(readFileSync(join(dist, 'assets/img', logo)).subarray(8, 12).toString(), 'WEBP', `${logo} is a WebP image`);
   const home = page('');
   assert.ok(home.includes('support@walnutdatatech.com') && home.includes('Sector 62, Noida') && home.includes('GSTIN 09AADCW6322K1Z1'), 'the footer carries the address, email and GSTIN');
-  assert.ok(page('contact').includes('mailto:support@walnutdatatech.com') && page('privacy').includes('Walnut Data Tech Private Limited'));
+  assert.ok(page('contact').includes('mailto:support@walnutdatatech.com') && page('privacy').includes('Walnut DataTech Private Limited'));
   assert.ok(home.includes('class="hero-hl"'), 'the headline carries its highlight');
 });
 

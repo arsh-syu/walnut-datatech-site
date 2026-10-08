@@ -78,7 +78,7 @@ function ready(data) {
       order_id: data.razorpay_order_id,
       amount: data.amount_paise,
       currency: data.currency,
-      name: 'Walnut Data Tech',
+      name: 'Walnut DataTech',
       description: data.description,
       prefill: data.prefill,
       theme: { color: '#6a4df5' },

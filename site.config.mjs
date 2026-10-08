@@ -7,7 +7,7 @@ export default {
 
   company: {
     name: 'Walnut Data Tech',
-    legalName: 'Walnut Data Tech Private Limited',
+    legalName: 'Walnut DataTech Private Limited',
     gstin: '09AADCW6322K1Z1',
     // The address people write to — shown in the footer, on the contact page and in the legal pages.
     email: 'support@walnutdatatech.com',
