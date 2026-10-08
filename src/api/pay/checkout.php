@@ -19,6 +19,13 @@ $app = $intent ? (pay_apps($config)[$intent['app_id']] ?? null) : null;
 if (!$intent || !$app) {
     respond(404, ['error' => 'This payment link is not valid.']);
 }
+// ?check=1: the pay page asks after the buyer closed Razorpay's window or came back to it (from a UPI app,
+// after a reload). A payment Razorpay already has counts, even past the expiry, so a buyer who paid is never
+// told to pay again. At most once every 5 seconds per intent, as anyone with the link can ask.
+if (($_GET['check'] ?? '') === '1' && in_array($intent['status'], ['created', 'expired'], true) && due('pay-check-' . $intent['intent_id'], 5)
+    && pay_settle_from_razorpay($config, $db, $intent)) {
+    $intent = pay_intent($db, $intent['intent_id']);
+}
 $back = ['intent' => $intent['intent_id']];
 $base = [
     'intent_id' => $intent['intent_id'],

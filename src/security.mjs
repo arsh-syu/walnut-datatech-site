@@ -32,7 +32,8 @@ export function contentSecurityPolicy(config, { payments = false } = {}) {
     'connect-src': ["'self'", lms, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com', rzp],
     'frame-src': ['https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com', rzp],
     'base-uri': ["'self'"],
-    'form-action': ["'self'"],
+    // Razorpay's checkout falls back to posting a form to its own pages (a blocked pop-up, some banks).
+    'form-action': ["'self'", rzp],
     'object-src': ["'none'"],
   };
   return Object.entries(policy)

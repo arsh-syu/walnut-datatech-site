@@ -52,9 +52,35 @@ async function confirm(data, r) {
   box.querySelector('[data-retry]').addEventListener('click', () => confirm(data, r));
 }
 
-function ready(data) {
-  const payButton = el('button', { class: 'btn btn-primary btn-lg pay-button', type: 'button' }, el('span', {}, `Pay ${rupees(data.amount_paise)}`));
-  const status = el('p', { class: 'pay-error', role: 'alert' });
+// The ledger's view of this payment. `check` asks it to look at Razorpay too (see api/pay/checkout.php).
+async function lookup(check) {
+  const res = await fetch(`${api}checkout.php?i=${encodeURIComponent(id)}${check ? '&check=1' : ''}`, { headers: { Accept: 'application/json' } });
+  const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
+// Razorpay's window closed without a success: the buyer stays here. If the payment did go through after all
+// (a UPI app, a bank page), they are taken on; otherwise they can try again or go back themselves.
+// One look at a time: a look asked for while another runs waits for it, then makes its own (so a window
+// closed during the quiet look on arrival still gets its answer).
+let looking = Promise.resolve();
+function recheck(data, note) {
+  looking = looking.then(async () => {
+    try {
+      const { res, data: now } = await lookup(true);
+      if (res.ok && now.status === 'paid' && now.continue_url) return location.replace(now.continue_url);
+      if (res.ok && now.status === 'expired') return show(now);
+    } catch {
+      // Unreachable for now: the buyer can still try again.
+    }
+    if (note) ready(data, note);
+  });
+  return looking;
+}
+
+function ready(data, note = '') {
+  const payButton = el('button', { class: 'btn btn-primary btn-lg pay-button', type: 'button' }, el('span', {}, note ? 'Try again' : `Pay ${rupees(data.amount_paise)}`));
+  const status = el('p', { class: 'pay-error', role: 'alert' }, note);
   box.replaceChildren(
     el('p', { class: 'pay-app' }, data.app_name),
     el('p', { class: 'pay-what' }, data.description),
@@ -82,17 +108,30 @@ function ready(data) {
       description: data.description,
       prefill: data.prefill,
       theme: { color: '#6a4df5' },
-      handler: (r) => confirm(data, r),
-      // Closing the window means not paying now: back to where the buyer came from.
-      modal: { ondismiss: () => location.assign(data.cancel_url) },
+      handler: (r) => {
+        paid = true;
+        confirm(data, r);
+      },
+      retry: { enabled: true },
+      // Closing the window is never taken as cancelling: the payment may still have gone through.
+      modal: { ondismiss: () => paid || recheck(data, failure || 'The payment was not completed. You have not been charged; you can try again.') },
     });
-    // A failed attempt is shown in Razorpay's window, where the buyer can try again.
+    let paid = false;
+    let failure = '';
+    // A failed attempt is shown in Razorpay's window, where the buyer can try again; kept for when it closes.
     checkout.on('payment.failed', (e) => {
-      status.textContent = e?.error?.description || 'The payment did not go through. You can try again.';
+      failure = `${e?.error?.description || 'The payment did not go through.'} You can try again.`;
     });
     checkout.open();
     payButton.disabled = false;
   });
+}
+
+// Paid, expired, or still to pay.
+function show(data) {
+  if (data.status === 'paid') return message('This has been paid', 'Thank you — there is nothing more to pay.', { href: data.continue_url, label: 'Continue' });
+  if (data.status === 'expired') return message('This payment link has expired', 'Please go back and start your payment again. If money was deducted, it is safe: contact us with your payment reference.', { href: data.continue_url, label: 'Go back' });
+  ready(data);
 }
 
 async function start() {
@@ -100,16 +139,21 @@ async function start() {
   if (!/^pi_[a-z2-7]{26}$/.test(id)) return message('This payment link is not valid', 'Please go back and start your payment again.');
   let data;
   try {
-    const res = await fetch(`${api}checkout.php?i=${encodeURIComponent(id)}`, { headers: { Accept: 'application/json' } });
-    data = await res.json();
-    if (res.status === 404) return message('This payment link is not valid', 'Please go back and start your payment again.');
-    if (!res.ok) throw new Error(data?.error);
+    const answer = await lookup(false);
+    data = answer.data;
+    if (answer.res.status === 404) return message('This payment link is not valid', 'Please go back and start your payment again.');
+    if (!answer.res.ok) throw new Error(data?.error);
   } catch (err) {
     return message('Payments are not available right now', err?.message || 'Please try again in a few minutes.');
   }
-  if (data.status === 'paid') return message('This has been paid', 'Thank you — there is nothing more to pay.', { href: data.continue_url, label: 'Continue' });
-  if (data.status === 'expired') return message('This payment link has expired', 'Please go back and start your payment again.', { href: data.continue_url, label: 'Go back' });
-  ready(data);
+  if (data.status === 'paid' && data.continue_url) return location.replace(data.continue_url);
+  show(data);
+  // Then, quietly, Razorpay too: on a phone the page is often reloaded after paying in a UPI app.
+  if (data.status === 'created') recheck(data, '');
+  // Back on this tab (from a UPI app or a bank's page): look again, quietly.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !box.querySelector('.pay-state')) recheck(data, '');
+  });
 }
 
 start();

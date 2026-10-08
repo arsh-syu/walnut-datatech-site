@@ -509,7 +509,7 @@ test('the security policy allows the LMS feed, and Razorpay on the pay page only
   const plain = contentSecurityPolicy(config);
   const paying = contentSecurityPolicy(config, { payments: true });
   assert.ok(!/razorpay/i.test(plain));
-  for (const directive of ['script-src', 'img-src', 'connect-src', 'frame-src']) {
+  for (const directive of ['script-src', 'img-src', 'connect-src', 'frame-src', 'form-action']) {
     assert.match(paying, new RegExp(`${directive} [^;]*https://\\*\\.razorpay\\.com`), directive);
   }
   assert.equal(paying.replace(/ https:\/\/\*\.razorpay\.com/g, ''), plain);
@@ -570,6 +570,10 @@ test('with the gateway on, /pay/ is built: Razorpay is allowed there only, and t
   const script = readFileSync(join(projectRoot, 'src/assets/js/pay.js'), 'utf8');
   assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML|document\.write/.test(script), 'no HTML from data');
   assert.ok(script.includes("if (!/^pi_[a-z2-7]{26}$/.test(id))") && script.includes("src: 'https://checkout.razorpay.com/v1/checkout.js'"));
+  // Closing Razorpay's window is never a cancel: the page looks again (a UPI app may have paid) and stays.
+  assert.match(script, /ondismiss: \(\) => paid \|\| recheck\(/);
+  assert.ok(!/ondismiss[^\n]*location/.test(script), 'closing the window does not leave the page');
+  assert.ok(readFileSync(join(projectRoot, 'src/api/pay/checkout.php'), 'utf8').includes("due('pay-check-' . $intent['intent_id'], 5)"), 'the look at Razorpay is paced per intent');
 });
 
 test('the gateway: signed calls from registered apps, a ledger that cannot pay twice, and callbacks that are never lost', () => {
