@@ -103,7 +103,7 @@ export function enquiryForm({ id, topic, orgLabel = 'University or organisation'
     </div>
     <div class="field">
       <label for="${f('phone')}">Phone <span class="optional">optional</span></label>
-      <input id="${f('phone')}" name="phone" type="tel" autocomplete="tel" inputmode="tel">
+      <input id="${f('phone')}" name="phone" type="tel" autocomplete="tel" inputmode="tel" data-phone>
     </div>
     <div class="field field-wide">
       <label for="${f('message')}">${messageLabel} <span class="optional">optional</span></label>
@@ -153,11 +153,14 @@ export function accountPrompt(root, type, text = 'Track everything in one place.
   return `<p class="account-prompt">${text} <a href="${root}login/?type=${type}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${root}login/" data-track="account_sign_in">sign in</a>.</p>`;
 }
 
+// The learning platform (LMS) link: `links.lms` in site.config.mjs (or the older `studentLogin`).
+const lmsUrl = config.links.lms || config.links.studentLogin || '';
+
 function header(root, path) {
   // The script swaps "Sign in" for the person's name (and a link to their profile) once they are signed in.
   const login =
     (config.accounts ? `<a class="nav-login" href="${root}login/" data-account-link data-profile="${root}dashboard/" data-track="account_sign_in">${icon('user')}<span>Sign in</span></a>` : '') +
-    (config.links.studentLogin ? `<a class="nav-login" href="${esc(config.links.studentLogin)}" rel="noopener">${icon('user')}<span>Student Login</span></a>` : '');
+    (lmsUrl ? `<a class="nav-login nav-lms" href="${esc(lmsUrl)}" rel="noopener" data-track="lms_login">${icon('cap')}<span>LMS Login</span></a>` : '');
   return `<header class="site-header" data-header>
   <div class="wrap header-in">
     <a class="brand" href="${root || './'}" aria-label="Walnut Data Tech — home">
@@ -209,6 +212,8 @@ function footer(root) {
         <ul>
           ${courses.map((c) => `<li><a href="${root}academy/${c.slug}/">${c.name}</a></li>`).join('')}
           <li><a href="${root}academy/">All courses</a></li>
+          <li><a href="${root}verify-certificate/">Verify a certificate</a></li>
+          ${lmsUrl ? `<li><a href="${esc(lmsUrl)}" rel="noopener">LMS Login ${icon('external')}${newTab}</a></li>` : ''}
         </ul>
       </nav>
       <nav class="footer-col" aria-label="For partners">

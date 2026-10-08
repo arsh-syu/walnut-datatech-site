@@ -38,6 +38,9 @@ const hasOnboarding = Boolean(onboardingPublic && env.ONBOARDING_API_KEY);
 // One-time codes go out by email, so accounts need the email settings too.
 const hasAccounts = Boolean(env.DB_NAME && env.DB_USER && env.ACCOUNT_SECRET && hasEmail);
 const hasSms = Boolean(hasAccounts && env.TWILIO_ACCOUNT_SID && env.SMS_FROM);
+// Certificate verification talks to the LMS over https only.
+const certVerifyUrl = /^https:\/\//i.test(env.CERT_VERIFY_URL || '') ? env.CERT_VERIFY_URL : '';
+if (env.CERT_VERIFY_URL && !certVerifyUrl) fail('CERT_VERIFY_URL must be an https:// address.');
 const hasLogin = hasOnboarding || hasAccounts;
 
 // Real money must not be taken before the refund terms are published.
@@ -141,7 +144,7 @@ async function health() {
 console.log(`Building for ${siteUrl} …`);
 // Login and the dashboard are published exactly when the accounts they rely on are configured.
 if (config.accounts && !hasLogin) console.log('! `accounts` is on in site.config.mjs but neither the account database (DB_NAME, DB_USER, ACCOUNT_SECRET) nor ONBOARDING_API_URL / ONBOARDING_API_KEY is set — login and the dashboard are left out of this deploy.');
-const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasLogin ? '1' : '', ACCOUNTS_OFF: hasLogin ? '' : '1' } });
+const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasLogin ? '1' : '', ACCOUNTS_OFF: hasLogin ? '' : '1', ...(env.LMS_URL ? { LMS_URL: env.LMS_URL } : {}) } });
 if (build.status !== 0) fail('The build failed.');
 const check = spawnSync(process.execPath, ['check.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl } });
 if (check.status !== 0) fail('Link check failed — nothing was uploaded.');
@@ -201,6 +204,7 @@ if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
     ...(hasOnboarding ? { onboarding_url: onboardingUrl, onboarding_key: env.ONBOARDING_API_KEY } : {}),
     ...(hasAccounts ? { db_host: env.DB_HOST || 'localhost', db_name: env.DB_NAME, db_user: env.DB_USER, db_pass: env.DB_PASS || '', account_secret: env.ACCOUNT_SECRET } : {}),
     ...(hasSms ? { twilio_sid: env.TWILIO_ACCOUNT_SID, sms_from: env.SMS_FROM } : {}),
+    ...(certVerifyUrl ? { cert_verify_url: certVerifyUrl, ...(env.CERT_VERIFY_KEY ? { cert_verify_key: env.CERT_VERIFY_KEY } : {}) } : {}),
     // one sign-in for the other Walnut apps: each app's own secret, set only once that app can receive it
     ...(hasAccounts ? Object.fromEntries(['ONBOARDING', 'COURSE_FINDER', 'LEADS'].filter((k) => env[`WALNUT_SSO_SECRET_${k}`]).map((k) => [`sso_${k.toLowerCase()}`, env[`WALNUT_SSO_SECRET_${k}`]])) : {}),
   };
@@ -214,7 +218,7 @@ if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
 
   // The secrets must never be readable over the web.
   const probe = await fetch(`${siteUrl}/api/config.php?t=${Date.now()}`).then((r) => r.text()).catch(() => '');
-  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', 'db_pass', 'account_secret', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY, env.DB_PASS, env.ACCOUNT_SECRET].filter(Boolean).some((needle) => probe.includes(needle));
+  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', 'db_pass', 'account_secret', 'cert_verify_key', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY, env.DB_PASS, env.ACCOUNT_SECRET, env.CERT_VERIFY_KEY].filter(Boolean).some((needle) => probe.includes(needle));
   if (leaked) {
     curl([`url = ${q(ftpUrl(remoteDir))}`, `quote = ${q(`DELE ${remoteDir}api/config.php`)}`, 'list-only'], { quiet: true });
     fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay, Twilio, database and Onboarding Tool secrets and contact the host about PHP handling.');

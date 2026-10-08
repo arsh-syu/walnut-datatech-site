@@ -30,7 +30,7 @@ const outbox = async () => (await (await fetch(`http://localhost:${PORT}/api/_ou
 const TOOL_PORT = 4393;
 const LINKED_PORT = 4392;
 const TOOL_KEY = 'test-onboarding-key-0123456789abcdef';
-const tool = { received: [], status: 201 };
+const tool = { received: [], lms: [], status: 201 };
 const linked = (body, endpoint = 'enquiry.php') => fetch(`http://localhost:${LINKED_PORT}/api/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const linkedOutbox = async () => (await (await fetch(`http://localhost:${LINKED_PORT}/api/_outbox`)).json()).emails;
 const started = (child) => new Promise((resolve, reject) => {
@@ -53,6 +53,13 @@ before(async () => {
     const body = JSON.parse(raw || 'null');
     tool.received.push({ method: req.method, url: req.url, key: req.headers['x-walnut-key'], authorization: req.headers.authorization, cookie: req.headers.cookie, body });
     // The status lookup knows one request; everything else is the intake.
+    // The stand-in LMS: one certificate is on record.
+    if (req.url.endsWith('/certificates/verify')) {
+      tool.lms.push({ authorization: req.headers.authorization, body });
+      const known = body?.certificateId === 'WDT-2026-000123';
+      res.writeHead(known ? 200 : 404, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(known ? { valid: true, certificate: { holder: 'Asha Rao', course: 'Online Programme Course', issuedOn: '2026-09-30', status: 'Active', internalId: 'secret' } } : { valid: false, status: 'not found' }));
+    }
     const lookup = req.url.endsWith('/status');
     const known = lookup && body.reference === 'UR-000042' && body.email === 'asha@example.com';
     const status = lookup ? (known ? 200 : 404) : tool.status;
@@ -61,7 +68,7 @@ before(async () => {
   });
   await new Promise((resolve) => toolServer.listen(TOOL_PORT, resolve));
   tmp = mkdtempSync(join(tmpdir(), 'walnut-test-'));
-  writeFileSync(join(tmp, 'env'), `ONBOARDING_API_URL=http://localhost:${TOOL_PORT}/\nONBOARDING_API_KEY=${TOOL_KEY}\n`);
+  writeFileSync(join(tmp, 'env'), `ONBOARDING_API_URL=http://localhost:${TOOL_PORT}/\nONBOARDING_API_KEY=${TOOL_KEY}\nCERT_VERIFY_URL=http://localhost:${TOOL_PORT}/certificates/verify\nCERT_VERIFY_KEY=${TOOL_KEY}\n`);
   linkedServer = spawn(process.execPath, ['scripts/dev-server.mjs', String(LINKED_PORT)], { cwd: projectRoot, env: { ...process.env, WALNUT_ENV_FILE: join(tmp, 'env') } });
   await started(linkedServer);
 });
@@ -146,9 +153,80 @@ test('create-order rejects an invalid coupon, email, phone and name', async () =
 });
 
 test('create-order accepts valid input (including a lower-case coupon) and only then asks for keys', async () => {
-  for (const coupon of ['', 'syusandeep', 'SYUSANDEEP']) {
+  for (const coupon of ['', 'syusandeep', 'SYUSANDEEP', ' SyuSandeep ']) {
     assert.equal((await api('create-order.php', { ...learner, course: 'online-programme-course', coupon })).status, 503);
   }
+  // The amount is never taken from the browser: a tampered price or final amount changes nothing.
+  assert.equal((await api('create-order.php', { ...learner, course: 'online-programme-course', coupon: 'SYUSANDEEP', amount: 1, finalPrice: 1 })).status, 503);
+});
+
+test('the coupon messages read exactly as specified, and the checkout speaks only to the server for the amount', async () => {
+  const checkout = readFileSync(join(projectRoot, 'src/assets/js/checkout.js'), 'utf8');
+  assert.ok(checkout.includes('Coupon applied successfully! You saved ${inr(course.price - coupon.finalPrice)}.'), 'success message');
+  assert.ok(checkout.includes('Invalid or inapplicable coupon code. Please check and try again.'), 'invalid message in the browser');
+  assert.ok(!/amount\s*[:=]\s*[^;]*finalPrice/.test(checkout), 'the browser never posts an amount');
+  const reply = await (await api('create-order.php', { ...learner, course: 'online-programme-course', coupon: 'WRONG' })).json();
+  assert.equal(reply.error, 'Invalid or inapplicable coupon code. Please check and try again.');
+  assert.ok(readFileSync(join(projectRoot, 'src/api/create-order.php'), 'utf8').includes('Invalid or inapplicable coupon code. Please check and try again.'), 'and the PHP says the same');
+  // Apply, remove, re-apply: the script exposes the three states on the field.
+  for (const needle of ['data-coupon-apply', "textContent = 'Remove'", "textContent = 'Apply'", 'clearCoupon(']) assert.ok(checkout.includes(needle), needle);
+});
+
+test('a certificate is verified against the LMS only; without an LMS the page says so', async () => {
+  // No LMS configured: a clear answer, no pretend result.
+  const off = await api('verify-certificate.php', { certificateId: 'WDT-2026-000123' });
+  assert.equal(off.status, 503);
+  assert.match((await off.json()).error, /not available yet/);
+  // Malformed IDs never reach the LMS.
+  for (const certificateId of ['', 'x', '<script>', 'A'.repeat(41)]) {
+    assert.equal((await linked({ certificateId }, 'verify-certificate.php')).status, 422, certificateId);
+  }
+  assert.equal(tool.lms.length, 0);
+  const ok = await (await linked({ certificateId: 'wdt-2026-000123' }, 'verify-certificate.php')).json();
+  assert.deepEqual(ok, { ok: true, valid: true, certificate: { holder: 'Asha Rao', course: 'Online Programme Course', issuedOn: '2026-09-30', status: 'Active' } }, 'the ID is upper-cased and only the public fields come back');
+  assert.equal(tool.lms.at(-1).authorization, `Bearer ${TOOL_KEY}`, 'the key goes to the LMS, never to the browser');
+  const no = await (await linked({ certificateId: 'WDT-2026-999999' }, 'verify-certificate.php')).json();
+  assert.deepEqual(no, { ok: true, valid: false, certificate: { status: 'not found' } });
+  const page = readFileSync(join(dist, 'verify-certificate/index.html'), 'utf8');
+  assert.ok(page.includes('data-verify-form') && page.includes('assets/js/verify.js'), 'the page is built');
+  assert.ok(readFileSync(join(dist, 'index.html'), 'utf8').includes('href="verify-certificate/"'), 'and linked from the footer');
+});
+
+test('certificate checks are rate-limited per visitor', async () => {
+  let last;
+  for (let i = 0; i < 12; i++) last = await linked({ certificateId: 'WDT-2026-000123' }, 'verify-certificate.php');
+  assert.equal(last.status, 429);
+});
+
+test('the LMS Login link appears only once the LMS address is set, in the header and the footer', () => {
+  assert.ok(!readFileSync(join(dist, 'index.html'), 'utf8').includes('LMS Login'), 'no made-up LMS address: nothing is shown until links.lms is set');
+  const out = mkdtempSync(join(tmpdir(), 'walnut-lms-'));
+  const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, OUT_DIR: out, LMS_URL: 'https://lms.example.com/login' } });
+  assert.equal(built.status, 0, built.stderr);
+  const home = readFileSync(join(out, 'index.html'), 'utf8');
+  assert.match(home, /<a class="nav-login nav-lms" href="https:\/\/lms\.example\.com\/login" rel="noopener" data-track="lms_login">[\s\S]*?<span>LMS Login<\/span><\/a>/);
+  assert.ok(home.includes('>LMS Login <svg'), 'footer link');
+  assert.ok(home.indexOf('nav-lms') < home.indexOf('data-menu-btn'), 'the link sits inside the navigation, so the mobile menu carries it too');
+  rmSync(out, { recursive: true, force: true });
+});
+
+test('phone numbers: one country list with ISO alpha-3 codes and dialling codes, India first by default', async () => {
+  const { COUNTRIES, countryByAlpha3, countryByName } = await import('../src/data/countries.mjs');
+  assert.equal(COUNTRIES.length, 195);
+  assert.equal(new Set(COUNTRIES.map((c) => c.alpha3)).size, 195, 'alpha-3 codes are unique');
+  assert.ok(COUNTRIES.every((c) => /^[A-Z]{3}$/.test(c.alpha3) && /^[A-Z]{2}$/.test(c.alpha2) && /^\+\d{1,4}$/.test(c.dial)));
+  assert.deepEqual([countryByAlpha3('ind').name, countryByAlpha3('IND').dial, countryByName('Ukraine').alpha3, countryByName('united kingdom').dial], ['India', '+91', 'UKR', '+44']);
+  const generated = readFileSync(join(dist, 'assets/js/countries.js'), 'utf8');
+  assert.ok(generated.startsWith('// Generated by build.mjs') && generated.includes('"alpha3":"IND"'), 'the browser gets the same list');
+  for (const page of ['academy/online-programme-course', 'contact']) {
+    const html = readFileSync(join(dist, page, 'index.html'), 'utf8');
+    assert.ok(html.includes('type="tel" autocomplete="tel" inputmode="tel"') && html.includes('data-phone'), `${page} uses the international field`);
+  }
+  const phone = readFileSync(join(projectRoot, 'src/assets/js/phone.js'), 'utf8');
+  assert.ok(phone.includes("DEFAULT_ALPHA2 = 'IN'") && phone.includes('[2-9]') && phone.includes("replace(/^00/, '+')"), 'India default, Indian mobile rule, pasted 00 / + prefixes');
+  // Server side still accepts E.164 and rejects nonsense.
+  assert.equal((await api('create-order.php', { ...learner, course: 'agentic-ai', phone: '+919876543210' })).status, 503);
+  assert.equal((await api('create-order.php', { ...learner, course: 'agentic-ai', phone: '+1' })).status, 422);
 });
 
 test('the API only accepts JSON posts', async () => {

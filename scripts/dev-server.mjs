@@ -1,3 +1,4 @@
+
 // Local development server: serves dist/ and mirrors the PHP API (src/api) in Node, so the checkout
 // and the enquiry forms can be exercised on localhost. Production runs the PHP files; keep the two
 // in step when changing payment or email rules.
@@ -27,6 +28,9 @@ const onboardingUrl = (env.ONBOARDING_API_URL || '').replace(/\/+$/, '');
 const onboardingKey = env.ONBOARDING_API_KEY || '';
 const dist = join(projectRoot, 'dist');
 const keyId = env.RAZORPAY_KEY_ID || '';
+// Certificate verification: the LMS endpoint and key (CERT_VERIFY_URL / CERT_VERIFY_KEY in .env).
+const certVerifyUrl = env.CERT_VERIFY_URL || '';
+const certVerifyKey = env.CERT_VERIFY_KEY || '';
 const keySecret = env.RAZORPAY_KEY_SECRET || '';
 // Real money never moves from a development machine.
 const configured = keyId.startsWith('rzp_test_') && keySecret !== '';
@@ -198,6 +202,31 @@ const api = {
     json(res, 200, reference ? { ok: true, reference, duplicate: filed.duplicate } : { ok: true });
   },
 
+  // mirrors src/api/verify-certificate.php — the LMS is the only source of truth; nothing is stored here
+  'POST /api/verify-certificate.php': async (req, res) => {
+    const input = await readBody(req);
+    if (!input) return json(res, 400, { error: 'Invalid request.' });
+    const id = String(input.certificateId ?? '').trim().toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9\-\/]{3,39}$/.test(id)) return json(res, 422, { error: 'Enter the Certificate ID exactly as printed on the certificate.', field: 'certificateId' });
+    if (!certVerifyUrl) return json(res, 503, { error: 'Certificate verification is not available yet. Please email us the Certificate ID and we will confirm it for you.' });
+    if (rateLimited(req, res, 'verify-certificate', 10, 600)) return;
+    const reply = await fetch(certVerifyUrl, {
+      method: 'POST',
+      signal: AbortSignal.timeout(10000),
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(certVerifyKey ? { Authorization: `Bearer ${certVerifyKey}` } : {}) },
+      body: JSON.stringify({ certificateId: id }),
+    }).catch(() => null);
+    const body = reply ? await reply.json().catch(() => null) : null;
+    if (!reply || reply.status >= 500 || (reply.status < 400 && !body)) {
+      console.error(`verify-certificate: LMS responded HTTP ${reply?.status ?? 0}`);
+      return json(res, 502, { error: 'The verification service is not responding right now. Please try again in a few minutes.' });
+    }
+    const valid = reply.status < 400 && Boolean(body?.valid);
+    const cert = body?.certificate && typeof body.certificate === 'object' ? body.certificate : body || {};
+    const str = (key) => (typeof cert[key] === 'string' || typeof cert[key] === 'number' ? String(cert[key]).trim().slice(0, 200) : '');
+    json(res, 200, { ok: true, valid, certificate: valid ? { holder: str('holder') || str('name'), course: str('course'), issuedOn: str('issuedOn'), status: str('status') } : { status: str('status') } });
+  },
+
   // mirrors src/api/request-status.php
   'POST /api/request-status.php': async (req, res) => {
     const input = await readBody(req);
@@ -243,7 +272,7 @@ const api = {
     const code = String(input.coupon ?? '').trim().toUpperCase();
     if (code) {
       const coupon = course.coupons.find((c) => c.code.toUpperCase() === code);
-      if (!coupon) return json(res, 422, { error: 'This coupon is not valid for this course.', field: 'coupon' });
+      if (!coupon) return json(res, 422, { error: 'Invalid or inapplicable coupon code. Please check and try again.', field: 'coupon' });
       amount = coupon.finalPrice;
     }
     if (!configured) return json(res, 503, { error: 'Online payment is not set up yet. Please try again later.' });

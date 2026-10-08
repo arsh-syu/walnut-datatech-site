@@ -60,6 +60,17 @@ To go live: fill `legal.refundPolicy` in `site.config.mjs`, replace the test key
 
 `scripts/dev-server.mjs` mirrors the PHP endpoints in Node for local testing and refuses anything but Razorpay **test** keys. Keep the two in step when changing payment rules.
 
+**Coupons.** A coupon belongs to one course (`coupons` in `src/data/courses.mjs`); `SYUSANDEEP` takes the Online Programme Course from ₹999 to ₹499. The checkout applies, removes and re-applies it in the browser for the summary, but the amount is always recomputed by `create-order.php`, so a tampered or wrong code changes nothing. The messages are exact: *Coupon applied successfully! You saved ₹500.* and *Invalid or inapplicable coupon code. Please check and try again.*
+
+## Learning platform (LMS) and certificates
+
+- **LMS Login** — set `links.lms` in `site.config.mjs` (or `LMS_URL` in `.env` for one deploy) to the learning platform's sign-in address. The header and footer then show *LMS Login*, inside the navigation so the mobile menu carries it too. Nothing is shown until the real address is set; no placeholder address is ever published.
+- **Verify a certificate** (`verify-certificate/`) — a visitor enters a Certificate ID (`?id=…` on the link printed on a certificate fills it in). `api/verify-certificate.php` asks the LMS, the only record of certificates, and returns just the public fields (holder, course, issue date, status). The LMS endpoint and key are `CERT_VERIFY_URL` / `CERT_VERIFY_KEY` in `.env`, uploaded to the server only. Until they are set the page says verification is not available yet; when the LMS does not answer, the page says so rather than guessing. The endpoint is same-origin JSON only and rate-limited (10 checks per 10 minutes per visitor).
+
+## Phone numbers
+
+Every phone field (checkout, contact and enquiry forms, login and the profile) is one international field: a searchable country picker with the flag and dialling code (India, +91, by default) beside the national number. The number is validated for the chosen country (an Indian mobile is 10 digits starting 6–9) and submitted as one E.164 value, `+919876543210`. Pasting a full number (`+44 7700 900123`, `0091…`) switches the country automatically. The country list — names, ISO 3166-1 alpha-2 and alpha-3 codes, dialling codes — lives in `src/data/countries.mjs`; the build generates `assets/js/countries.js` from it.
+
 ## Email
 
 The site sends five emails through Twilio, all from the address in `EMAIL_FROM`:

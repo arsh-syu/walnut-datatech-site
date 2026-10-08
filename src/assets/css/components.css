@@ -380,3 +380,46 @@ a.social:hover { background: var(--violet-600); transform: translateY(-3px); }
 .cta-mark { position: absolute; z-index: -1; right: -6%; bottom: -30%; width: min(46%, 440px); opacity: .22; animation: spin 90s linear infinite; }
 .cta-card::after { background: radial-gradient(520px circle at var(--mx, 50%) var(--my, 50%), rgba(125, 98, 255, .32), transparent 62%); }
 
+
+/* international phone field: country picker (flag + dialling code) beside the national number */
+.phone-field { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+.phone-picker { position: relative; }
+.phone-country {
+  display: inline-flex; align-items: center; gap: 6px; height: 100%; min-height: 48px; padding: 0 12px;
+  border: 1.5px solid var(--line); border-radius: 14px; background: #fff; cursor: pointer;
+  font: inherit; font-size: .9375rem; font-weight: 500; color: var(--ink); white-space: nowrap;
+  transition: border-color .2s, box-shadow .2s;
+}
+.phone-country:hover { border-color: var(--muted); }
+.phone-country:focus-visible, .phone-country[aria-expanded="true"] { outline: none; border-color: var(--violet-600); box-shadow: 0 0 0 4px rgba(125, 98, 255, .2); }
+.phone-flag { font-size: 1.15em; line-height: 1; }
+.phone-menu {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(320px, calc(100vw - 2 * var(--gutter, 16px)));
+  padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: var(--shadow-lg);
+  animation: rise .18s var(--ease);
+}
+.phone-menu[hidden] { display: none; }
+.phone-picker.is-up .phone-menu { top: auto; bottom: calc(100% + 6px); }
+.field .phone-search { width: 100%; min-height: 40px; padding: 8px 12px; font-size: .9375rem; }
+.phone-list { max-height: 240px; margin: 6px 0 0; padding: 0; list-style: none; overflow-y: auto; overscroll-behavior: contain; }
+.phone-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: .55em .7em; border-radius: 10px; cursor: pointer; font-size: .9375rem; }
+.phone-option:hover, .phone-option.is-active { background: var(--mist); }
+.phone-option[aria-selected="true"] { background: var(--violet-soft); color: var(--violet-700); font-weight: 500; }
+.phone-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone-code { color: var(--muted); font-variant-numeric: tabular-nums; }
+.phone-note { padding: .62em .8em; font-size: .875rem; color: var(--muted); }
+.field.has-error .phone-country { border-color: var(--danger); }
+
+/* verify a certificate */
+.verify-result { display: grid; gap: var(--s-4); margin-top: var(--s-5); padding-top: var(--s-5); border-top: 1px solid var(--line); animation: rise .5s var(--ease) both; }
+.verify-result[hidden] { display: none; }
+.verify-result:focus { outline: none; }
+.verify-result p { color: var(--muted); }
+.verify-badge { justify-self: start; padding: 6px 16px; border-radius: 999px; font-weight: 600; }
+.verify-result.is-ok .verify-badge { background: rgba(23, 178, 106, .12); color: #0d7a47; }
+.verify-result.is-no .verify-badge { background: rgba(180, 35, 24, .1); color: var(--danger); }
+.verify-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3) var(--s-5); font-size: .9375rem; }
+.verify-details dt { font-size: .8125rem; color: var(--muted); }
+.verify-details dd { font-weight: 500; overflow-wrap: anywhere; }
+.verify-note { font-size: .8125rem; }
+@media (max-width: 480px) { .verify-details { grid-template-columns: 1fr; } }

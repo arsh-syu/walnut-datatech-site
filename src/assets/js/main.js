@@ -1,6 +1,7 @@
 // Site-wide interactions. Everything here is progressive enhancement: the pages are complete without it.
 
 import { initForms } from './forms.js';
+import { initPhones } from './phone.js';
 import { initAnalytics, track } from './analytics.js';
 import { paintHeader } from './session.js';
 import { keepExclusive } from './roles.js';
@@ -470,5 +471,6 @@ $$('[data-launcher]').forEach((root) => {
 });
 
 initForms();
+initPhones();
 initAnalytics();
 paintHeader(); // "Sign in" becomes the person's name once they are signed in

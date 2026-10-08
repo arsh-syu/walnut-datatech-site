@@ -32,7 +32,7 @@ $amount = (int) $course['price'];
 $coupon = strtoupper(trim(is_string($in['coupon'] ?? null) ? $in['coupon'] : ''));
 if ($coupon !== '') {
     if (!isset($course['coupons'][$coupon])) {
-        respond(422, ['error' => 'This coupon is not valid for this course.', 'field' => 'coupon']);
+        respond(422, ['error' => 'Invalid or inapplicable coupon code. Please check and try again.', 'field' => 'coupon']);
     }
     $amount = (int) $course['coupons'][$coupon];
 }

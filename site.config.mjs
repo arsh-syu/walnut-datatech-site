@@ -24,6 +24,9 @@ export default {
     // The Onboarding Tool's own address, where an approved university continues its onboarding and
     // a password is reset. Optional: without it those two links are simply not shown.
     portal: '',
+    // The learning platform (LMS) where enrolled learners sign in. Shown as "LMS Login" in the header
+    // and footer once set; without it no link is shown. (studentLogin is the older name for the same link.)
+    lms: '',
     studentLogin: '',
     selectYourUniversity: 'https://selectyouruniversity.com',
     youtube: '',

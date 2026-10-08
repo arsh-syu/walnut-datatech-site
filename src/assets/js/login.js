@@ -10,6 +10,8 @@
 import { track } from './analytics.js';
 import { accountApi, portal, siteRoot, esc, call, adopt, restore, AccountError } from './session.js';
 import { otpStep } from './otp.js';
+import { mountPhone } from './phone.js';
+import { COUNTRIES } from './countries.js';
 import { UNIVERSITY, UNIVERSITY_ONLY, canCombine, keepExclusive } from './roles.js';
 
 const box = document.getElementById('login');
@@ -19,7 +21,8 @@ const resume = new URLSearchParams(location.search).get('continue') || '';
 const profile = /^\/api\/sso\.php\?app=[a-z-]{2,30}(&next=[A-Za-z0-9%._~\-]{0,600})?$/.test(resume) ? resume : `${siteRoot}dashboard/`;
 const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 // Dialling codes offered beside the mobile field; the service's default is selected.
-const COUNTRIES = [['+91', 'India'], ['+971', 'UAE'], ['+1', 'US / Canada'], ['+44', 'UK'], ['+65', 'Singapore'], ['+61', 'Australia'], ['+977', 'Nepal'], ['+880', 'Bangladesh'], ['+94', 'Sri Lanka']];
+// The country picker (flag + dialling code, searchable) comes from phone.js; India is the default.
+const alpha2Of = (dial) => ({ '+1': 'US', '+7': 'RU', '+44': 'GB', '+61': 'AU' })[dial] || COUNTRIES.find((c) => c.dial === dial)?.alpha2 || 'IN';
 const PURPOSES = [
   ['UNIVERSITY', 'University / Institution', 'Work with Walnut on your online programmes.'],
   ['STUDENT', 'Learn / Upgrade Career', 'Take our short courses.'],
@@ -124,10 +127,7 @@ function start() {
       ${
         state.method === 'mobile'
           ? `<div class="field"><label for="login-mobile">Mobile Number</label>
-              <div class="login-phone">
-                <select name="dial" aria-label="Country code">${COUNTRIES.map(([code, name]) => `<option value="${code}" title="${name}"${code === state.dial ? ' selected' : ''}>${code}</option>`).join('')}</select>
-                <input id="login-mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Enter mobile number" maxlength="20" value="${esc(state.mobile)}">
-              </div>
+              <input id="login-mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Enter mobile number" maxlength="20" value="${esc(state.mobile)}" required>
               <p class="field-error" data-error="mobile" role="alert"></p></div>`
           : `<div class="field"><label for="login-email">Email Address</label>
               <input id="login-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="Enter your email address" maxlength="254" value="${esc(state.email)}">
@@ -140,6 +140,8 @@ function start() {
         ? '<p class="login-alt"><button class="text-btn" type="button" data-mode="new">Back</button> · Already have an account? <button class="text-btn" type="button" data-mode="existing">Login</button></p>'
         : `<p class="login-alt">New to Walnut? <button class="text-btn" type="button" data-mode="new">Create an account</button>${state.password ? ' · <button class="text-btn" type="button" data-password>Use a password</button>' : ''}</p>`
     }`;
+  const tel = box.querySelector('#login-mobile');
+  if (tel) state.phone = mountPhone(tel, { defaultAlpha2: alpha2Of(state.dial), onChange: ({ country }) => (state.dial = country.dial) });
   box.querySelector(state.method === 'mobile' ? '#login-mobile' : '#login-email')?.focus({ preventScroll: true });
 }
 
@@ -162,8 +164,7 @@ box.addEventListener('click', (e) => {
 });
 box.addEventListener('input', (e) => {
   if (e.target.name === 'email') (state.email = e.target.value), fieldError('email', '');
-  if (e.target.name === 'mobile') (state.mobile = e.target.value), fieldError('mobile', '');
-  if (e.target.name === 'dial') state.dial = e.target.value;
+  if (e.target.id === 'login-mobile') (state.mobile = e.target.value), fieldError('mobile', '');
 });
 
 box.addEventListener('submit', async (e) => {
@@ -172,8 +173,9 @@ box.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (state.sending) return; // one request at a time
   const channel = state.method;
-  const destination = channel === 'email' ? state.email.trim() : `${state.dial}${state.mobile.replace(/\D/g, '').replace(/^0+/, '')}`;
-  const problem = channel === 'email' ? (EMAIL.test(destination) ? '' : 'Please enter a valid email address.') : /^\+\d{8,15}$/.test(destination) ? '' : 'Please enter a valid mobile number.';
+  // The mobile number is the E.164 value the picker keeps (+919876543210), validated for its country.
+  const destination = channel === 'email' ? state.email.trim() : state.phone?.value ?? '';
+  const problem = channel === 'email' ? (EMAIL.test(destination) ? '' : 'Please enter a valid email address.') : destination ? '' : form.querySelector('#login-mobile')?.validationMessage || 'Please enter a valid mobile number.';
   fieldError(channel, problem);
   if (problem) return;
   const button = form.querySelector('[type="submit"]');

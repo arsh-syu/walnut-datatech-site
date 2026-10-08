@@ -76,7 +76,7 @@ function applyCoupon() {
   if (coupon && applied === coupon) return true;
   if (!coupon) {
     clearCoupon({ keepText: true });
-    setCouponStatus('That code isn’t valid for this course.', 'error');
+    setCouponStatus('Invalid or inapplicable coupon code. Please check and try again.', 'error');
     return false;
   }
   applied = coupon;
@@ -84,7 +84,7 @@ function applyCoupon() {
   el.couponBox.classList.add('is-applied');
   el.couponApply.querySelector('span').textContent = 'Remove';
   el.couponOffer.hidden = true;
-  setCouponStatus(`Coupon applied — you save ${inr(course.price - coupon.finalPrice)}.`, 'ok');
+  setCouponStatus(`Coupon applied successfully! You saved ${inr(course.price - coupon.finalPrice)}.`, 'ok');
   renderOrder();
   track('coupon_applied', { item: course.slug, coupon: coupon.code });
   return true;

@@ -382,7 +382,7 @@ export function coursePage({ root }, course) {
         </div>
         <div class="field">
           <label for="enrol-phone">Phone</label>
-          <input id="enrol-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required pattern="[0-9+ \\(\\)\\-]{7,20}">
+          <input id="enrol-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required data-phone>
         </div>
         ${
           offer
@@ -604,6 +604,45 @@ export function requestStatus({ root }) {
     body,
     bodyClass: 'page-contact',
     scripts: ['status.js'],
+  };
+}
+
+export function verifyCertificate({ root }) {
+  const body = `
+<section class="page-hero page-hero-form">
+  <div class="wrap form-section">
+    <div>
+      <p class="eyebrow hero-fade">Certificates</p>
+      <h1 class="display display-md">${splitWords('Verify a certificate.')}</h1>
+      <p class="lede hero-fade" style="--d:.4s">Enter the Certificate ID printed on a ${config.company.name} certificate. It is checked against our learning platform, the only record of certificates we issue.</p>
+      <ul class="contact-alt hero-fade" style="--d:.55s">
+        <li><a class="link-arrow" href="${root}academy/"><span>Looking for a course? Browse the Academy</span>${icon('arrow')}</a></li>
+        <li><a class="link-arrow" href="${root}contact/"><span>Something looks wrong? Contact us</span>${icon('arrow')}</a></li>
+      </ul>
+    </div>
+    <div class="form-card hero-fade" style="--d:.3s">
+      <form class="form" data-verify-form novalidate>
+        <div class="field field-wide">
+          <label for="verify-id">Certificate ID</label>
+          <input id="verify-id" name="certificateId" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" placeholder="WDT-2026-000123" required>
+          <p class="field-help" id="verify-id-help">Letters, numbers and dashes, exactly as printed.</p>
+        </div>
+        <div class="form-foot field-wide">
+          <button class="btn btn-primary btn-lg" type="submit"><span>Verify</span>${icon('arrow')}</button>
+        </div>
+        <p class="form-status field-wide" role="alert"></p>
+      </form>
+      <div class="verify-result" data-verify-result hidden tabindex="-1"></div>
+    </div>
+  </div>
+</section>
+`;
+  return {
+    title: 'Verify a certificate',
+    description: `Check that a certificate was issued by ${config.company.name}: enter the Certificate ID and it is verified against our learning platform.`,
+    body,
+    bodyClass: 'page-contact',
+    scripts: ['verify.js'],
   };
 }
 
