@@ -21,7 +21,7 @@ const OTP_RATE_LIMIT_WINDOW_SECONDS = 900;
 const OTP_MAX_REQUESTS_PER_WINDOW = 5;
 const DEFAULT_COUNTRY_CODE = '+91';
 const ACCOUNT_TYPES = ['UNIVERSITY', 'AGENT', 'STUDENT'];
-const ACCOUNT_SCHEMA = 'v6';
+const ACCOUNT_SCHEMA = 'v7';
 
 function accounts_configured(array $config): bool
 {
@@ -236,6 +236,8 @@ function account_schema(): array
         $table('wa_pay_events', "
             event_id VARCHAR(64) NOT NULL PRIMARY KEY,
             received_at DATETIME NOT NULL"),
+        // v7: why Razorpay refused a refund, for the app's admins.
+        'ALTER TABLE wa_pay_refunds ADD COLUMN IF NOT EXISTS error VARCHAR(200) NULL',
     ];
 }
 

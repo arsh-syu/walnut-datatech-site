@@ -32,7 +32,8 @@ if (!is_string($refRef) || !preg_match('/^[A-Za-z0-9._-]{1,64}\z/', $refRef)) {
 }
 $view = function (array $refund) use ($db, $intent) {
     $now = db_row($db, 'SELECT * FROM wa_pay_intents WHERE intent_id = ?', [$intent['intent_id']]);
-    return ['refund_reference' => $refund['refund_reference'], 'refund_status' => $refund['status'], 'refund_amount_paise' => (int) $refund['amount'], 'razorpay_refund_id' => $refund['razorpay_refund_id']] + pay_view($now);
+    return ['refund_reference' => $refund['refund_reference'], 'refund_status' => $refund['status'], 'refund_amount_paise' => (int) $refund['amount'], 'razorpay_refund_id' => $refund['razorpay_refund_id'],
+        'refund_error' => $refund['status'] === 'failed' ? ($refund['error'] ?? null) : null] + pay_view($now);
 };
 
 // Razorpay's own record of this refund, found by the reference in its notes — for a call whose answer was
@@ -102,8 +103,9 @@ if ($status !== 200 || !is_string($data['id'] ?? null)) {
     // A clear refusal (4xx) is final. No answer, or a server error, may still have made the refund: the
     // record stays "requesting" and the next call with this refund_reference finds out from Razorpay.
     if ($status >= 400 && $status < 500) {
-        db_run($db, "UPDATE wa_pay_refunds SET status = 'failed', updated_at = ? WHERE id = ?", [utc(), $refund['id']]);
-        respond(502, ['error' => 'Razorpay refused the refund: ' . lms_text(is_array($data) ? ($data['error']['description'] ?? '') : '', 150), 'refund_reference' => $refRef]);
+        $why = lms_text(is_array($data) ? ($data['error']['description'] ?? '') : '', 200) ?: "Razorpay answered HTTP $status.";
+        db_run($db, "UPDATE wa_pay_refunds SET status = 'failed', error = ?, updated_at = ? WHERE id = ?", [$why, utc(), $refund['id']]);
+        respond(502, ['error' => 'Razorpay refused the refund: ' . $why, 'refund_error' => $why, 'refund_reference' => $refRef]);
     }
     respond(502, ['error' => 'Razorpay did not answer. Repeat this request with the same refund_reference to learn the outcome; it will not refund twice.', 'refund_reference' => $refRef]);
 }

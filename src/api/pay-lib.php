@@ -81,7 +81,8 @@ function pay_razorpay(array $config, string $method, string $path, ?array $paylo
     $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
     $data = is_string($body) ? json_decode($body, true) : null;
     if ($status < 200 || $status >= 300) {
-        error_log('Razorpay ' . $method . ' ' . preg_replace('/[^\/a-zA-Z0-9_]/', '', $path) . ' answered HTTP ' . $status);
+        error_log('Razorpay ' . $method . ' ' . preg_replace('/[^\/a-zA-Z0-9_]/', '', $path) . ' answered HTTP ' . $status
+            . (is_array($data) && is_string($data['error']['description'] ?? null) ? ': ' . lms_text($data['error']['description'], 200) : ''));
     }
     return [$status, is_array($data) ? $data : null];
 }

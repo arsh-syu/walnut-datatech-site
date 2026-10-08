@@ -595,7 +595,7 @@ test('the gateway: signed calls from registered apps, a ledger that cannot pay t
   assert.ok(hook.includes("hash_equals(hash_hmac('sha256', $raw, $secret), $signature)") && hook.includes("$secret === '' ||"));
   // Paid once only: the conditional update decides, so a confirm, a webhook and a sweep racing each other pay one time.
   assert.ok(lib.includes("WHERE intent_id = ? AND status IN ('created', 'expired') AND payment_id IS NULL"));
-  assert.ok(readFileSync(join(projectRoot, 'src/api/account-lib.php'), 'utf8').includes("const ACCOUNT_SCHEMA = 'v6';"));
+  assert.ok(readFileSync(join(projectRoot, 'src/api/account-lib.php'), 'utf8').includes("const ACCOUNT_SCHEMA = 'v7';"));
   // Callbacks: the due ones go out after every request (after the sweep, so an expiry is told at once), retried with backoff for a week.
   const after = lib.slice(lib.indexOf('function pay_after('), lib.indexOf('/* ---------- refunds'));
   assert.ok(after.indexOf('fastcgi_finish_request();') < after.indexOf('pay_sweep($config, $db);') && after.indexOf('pay_sweep($config, $db);') < after.indexOf('pay_deliver($config, $db);'));
