@@ -235,6 +235,8 @@ function footer(root) {
       <ul>
         <li><a href="${root}privacy/">Privacy policy</a></li>
         <li><a href="${root}terms/">Terms &amp; conditions</a></li>
+        <li><a href="${root}refund-policy/">Cancellation &amp; refunds</a></li>
+        <li><a href="${root}delivery-policy/">Shipping &amp; delivery</a></li>
         ${config.analytics.gaMeasurementId ? '<li><button class="footer-link" type="button" data-consent-open>Cookie settings</button></li>' : ''}
       </ul>
     </div>
@@ -269,7 +271,8 @@ function consentBanner(root) {
 }
 
 // `redirect` ({ href, canonical }) makes a page that forwards at once to `href` (a moved page); it is never indexed.
-export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null }) {
+// `payments` is for the pay page only: it lets Razorpay's checkout load there (see security.mjs).
+export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null, payments = false }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
   const clientConfig = JSON.stringify({
@@ -285,7 +288,7 @@ export function layout({ title, description, path, root, body, bodyClass = '', j
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config)}">
+<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config, { payments })}">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
 ${config.noindex || noindex || redirect ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}

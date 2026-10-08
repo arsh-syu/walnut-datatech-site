@@ -36,6 +36,9 @@ export default {
   // The pages talk only to this site's own API (api/account.php), which relays to the account
   // service set as ONBOARDING_API_URL in .env — so that must be set before switching this on.
   accounts: false,
+  // The payment gateway: /pay/, where every Walnut product's buyers pay. Built only when the server has it
+  // set up (scripts/deploy.mjs passes PAY=1); otherwise there is no pay page to link to.
+  payments: false,
 
   // Walnut LMS, where courses are sold and taken. /academy/ lists its public catalogue (a snapshot taken
   // by scripts/fetch-catalogue.mjs, refreshed in the browser) and every course links to it.
@@ -81,7 +84,7 @@ export default {
   // NEEDS BUSINESS / LEGAL CONFIRMATION — the pages say so plainly where a value is empty.
   legal: {
     // Date the legal pages were last reviewed, e.g. '2 October 2026'. Update it whenever the wording changes.
-    lastUpdated: '7 October 2026',
+    lastUpdated: '8 October 2026',
     // Where privacy requests, complaints and refund queries should be sent.
     contactEmail: 'support@walnutdatatech.com',
     // Registered office address of the company.
@@ -90,14 +93,18 @@ export default {
     grievanceOfficer: '',
     // Refund and cancellation terms for paid courses, in plain sentences.
     // Live payments cannot be deployed while this is empty (see scripts/deploy.mjs).
-    refundPolicy: '',
+    // The business's decision (8 October 2026): 7 days, under 25% of the course completed. The full policy is
+    // the /refund-policy/ page, built from these settings.
+    refundPolicy: 'You can have a full refund of a course if you ask within 7 days of paying and have completed less than 25% of it. Refunds go back to the original payment method within 5–7 working days.',
+    refundDays: 7,
+    refundMaxCompleted: 25,
     // How and when course access is delivered after payment, e.g. 'by email within 24 hours'.
-    courseAccess: '',
+    courseAccess: 'on Walnut LMS as soon as your payment is confirmed',
     // How long enquiry and enrolment records are kept, e.g. 'for 24 months after our last contact'.
     retention: '',
     // Governing law and the courts that have jurisdiction, e.g. 'India' and 'Pune, Maharashtra'.
-    governingLaw: '',
-    jurisdiction: '',
+    governingLaw: 'India',
+    jurisdiction: 'Gautam Buddh Nagar, Uttar Pradesh',
   },
 
   // Analytics. Nothing is loaded and no consent banner is shown while this is empty.

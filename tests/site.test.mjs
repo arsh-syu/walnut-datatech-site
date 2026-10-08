@@ -92,6 +92,8 @@ after(() => {
 test('courses are sold on Walnut LMS: no price list, checkout or course pages of our own are published', () => {
   assert.ok(!existsSync(join(dist, 'api/catalog.php')), 'no server-side price list');
   assert.ok(!existsSync(join(dist, 'assets/js/checkout.js')) && !existsSync(join(projectRoot, 'src/assets/js/checkout.js')), 'no checkout script');
+  // Razorpay is loaded by the payment gateway's page only (/pay/, with pay.js), and neither is built without the gateway.
+  assert.ok(!existsSync(join(dist, 'pay')) && !existsSync(join(dist, 'assets/js/pay.js')), 'no pay page without the gateway');
   for (const file of walk(dist).filter((f) => /\.(html|js)$/.test(f))) {
     const text = readFileSync(file, 'utf8');
     assert.ok(!text.includes('checkout.js'), `${file} loads the retired checkout`);
@@ -494,7 +496,7 @@ test('with accounts and the LMS sign-in on, Enrol signs the person in to Walnut 
   }
 });
 
-test('the security policy allows the LMS feed and nothing of Razorpay', () => {
+test('the security policy allows the LMS feed, and Razorpay on the pay page only', () => {
   const pages = walk(dist).filter((f) => f.endsWith('.html'));
   assert.ok(pages.length > 10);
   for (const file of pages) {
@@ -503,7 +505,109 @@ test('the security policy allows the LMS feed and nothing of Razorpay', () => {
     assert.ok(!/razorpay/i.test(csp), `${file}: Razorpay is still allowed`);
     assert.match(csp, /connect-src 'self' https:\/\/walnut-lms\.vercel\.app[ ;]/, file);
   }
-  assert.ok(!/razorpay/i.test(readFileSync(join(projectRoot, 'src/security.mjs'), 'utf8')));
+  // Asked for, the policy lets Razorpay's checkout load, show its frame and call home; nothing else changes.
+  const plain = contentSecurityPolicy(config);
+  const paying = contentSecurityPolicy(config, { payments: true });
+  assert.ok(!/razorpay/i.test(plain));
+  for (const directive of ['script-src', 'img-src', 'connect-src', 'frame-src']) {
+    assert.match(paying, new RegExp(`${directive} [^;]*https://\\*\\.razorpay\\.com`), directive);
+  }
+  assert.equal(paying.replace(/ https:\/\/\*\.razorpay\.com/g, ''), plain);
+});
+
+/* ---------- policies and the payment gateway ---------- */
+
+test('the refund and delivery policies are published, linked from every page, and follow the settings', () => {
+  const page = (path) => readFileSync(join(dist, path, 'index.html'), 'utf8');
+  const { legal } = config;
+  const refund = page('refund-policy');
+  // The rule is the business's, from site.config.mjs: the page, the terms and the settings say the same.
+  assert.ok(legal.refundPolicy && Number.isInteger(legal.refundDays) && Number.isInteger(legal.refundMaxCompleted));
+  assert.ok(refund.includes(`within <strong>${legal.refundDays} days</strong> of paying`) && refund.includes(`less than ${legal.refundMaxCompleted}%</strong> of the course`));
+  assert.ok(legal.refundPolicy.includes(`within ${legal.refundDays} days`) && legal.refundPolicy.includes(`less than ${legal.refundMaxCompleted}%`), 'the one-line policy says the same');
+  assert.ok(refund.includes(config.company.legalName) && refund.includes('5–7 working days'));
+  const terms = page('terms');
+  assert.ok(terms.includes(legal.refundPolicy) && terms.includes('href="../refund-policy/"'), 'the terms carry the rule and link to the policy');
+  assert.ok(terms.includes(`laws of ${legal.governingLaw}, and the courts of ${legal.jurisdiction}`));
+  const delivery = page('delivery-policy');
+  assert.ok(delivery.includes('Nothing is shipped') && delivery.includes(legal.courseAccess));
+  for (const path of ['', 'academy', 'privacy', 'refund-policy']) {
+    const html = page(path);
+    assert.ok(/href="(\.\.\/)*refund-policy\/"/.test(html) && /href="(\.\.\/)*delivery-policy\/"/.test(html), `${path || 'home'} links to both policies`);
+  }
+  const sitemap = readFileSync(join(dist, 'sitemap.xml'), 'utf8');
+  assert.ok(sitemap.includes('/refund-policy/</loc>') && sitemap.includes('/delivery-policy/</loc>'));
+  // Without the gateway, the pages say courses are paid for on Walnut LMS, and nothing about a pay page.
+  assert.ok(terms.includes('enrolled in, paid for and taken on Walnut LMS') && !terms.includes('secure payment page'));
+  assert.ok(page('privacy').includes('does not take payments'));
+});
+
+test('with the gateway on, /pay/ is built: Razorpay is allowed there only, and the policies say payments are taken here', () => {
+  const out = mkdtempSync(join(tmpdir(), 'walnut-pay-'));
+  const built = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8',
+    env: { ...process.env, ACCOUNTS: '1', PAY: '1', OUT_DIR: out, NOINDEX: '', SITE_URL: 'https://walnutdatatech.com', LMS_SSO: '', WALNUT_LMS_URL: '', ACCOUNTS_OFF: '' } });
+  assert.equal(built.status, 0, built.stderr);
+  const made = (path) => readFileSync(join(out, path), 'utf8');
+  const payPage = made('pay/index.html');
+  assert.ok(payPage.includes('id="pay"') && payPage.includes('assets/js/pay.js') && payPage.includes('<meta name="robots" content="noindex">'));
+  assert.ok(!made('sitemap.xml').includes('/pay/'), 'the pay page is not listed for search engines');
+  assert.ok(existsSync(join(out, 'assets/js/pay.js')));
+  for (const file of walk(out).filter((f) => f.endsWith('.html'))) {
+    const csp = readFileSync(file, 'utf8').match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)[1];
+    assert.equal(/razorpay/i.test(csp), file.includes(`${join('pay', 'index.html')}`), `${file}: Razorpay only on the pay page`);
+  }
+  assert.ok(made('terms/index.html').includes('secure payment page') && made('terms/index.html').includes('href="../delivery-policy/"'));
+  assert.ok(made('privacy/index.html').includes('processes the payments made on this website') && made('privacy/index.html').includes('never reach our servers'));
+  // Without accounts there is no database for the ledger, so no pay page either.
+  const noAccounts = mkdtempSync(join(tmpdir(), 'walnut-pay-'));
+  const plain = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, ACCOUNTS: '', ACCOUNTS_OFF: '1', PAY: '1', OUT_DIR: noAccounts, NOINDEX: '' } });
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.ok(!existsSync(join(noAccounts, 'pay')) && !existsSync(join(noAccounts, 'assets/js/pay.js')));
+  rmSync(out, { recursive: true, force: true });
+  rmSync(noAccounts, { recursive: true, force: true });
+
+  // The page itself renders what the gateway says as text only, and returns to where the server sends it.
+  const script = readFileSync(join(projectRoot, 'src/assets/js/pay.js'), 'utf8');
+  assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML|document\.write/.test(script), 'no HTML from data');
+  assert.ok(script.includes("if (!/^pi_[a-z2-7]{26}$/.test(id))") && script.includes("src: 'https://checkout.razorpay.com/v1/checkout.js'"));
+});
+
+test('the gateway: signed calls from registered apps, a ledger that cannot pay twice, and callbacks that are never lost', () => {
+  const lib = readFileSync(join(projectRoot, 'src/api/pay-lib.php'), 'utf8');
+  const endpoint = (name) => readFileSync(join(projectRoot, 'src/api/pay', `${name}.php`), 'utf8');
+  // Apps are registered in the server settings, each with its own secret; an app without one does not exist.
+  assert.ok(lib.includes("'return_origins' => ['https://walnut-lms.vercel.app', 'https://lms.walnutdatatech.com']"));
+  // The same signature as every other Walnut call: HMAC-SHA256 of "<ts>.<payload>", five minutes either way, \z not $.
+  assert.ok(lib.includes("return 'sha256=' . hash_hmac('sha256', $ts . '.' . $signed, $secret);"));
+  assert.ok(lib.includes("preg_match('/^\\d{9,11}\\z/', $ts) === 1 && abs(time() - (int) $ts) <= 300 && hash_equals(pay_signature($secret, $ts, $signed), $sig)"));
+  // Creating and refunding are signed over the raw body, the status over the exact path and query.
+  for (const name of ['intents', 'refund']) assert.ok(endpoint(name).includes("pay_signed($app['secret'], $raw)"), name);
+  assert.ok(endpoint('intent').includes("pay_signed($app['secret'], (string) ($_SERVER['REQUEST_URI'] ?? ''))"));
+  // The pay page's own calls are public but rate-limited; a payment counts only with Razorpay's signature, checked with the key secret.
+  assert.ok(endpoint('checkout').includes("rate_limit('pay-checkout',") && endpoint('confirm').includes("rate_limit('pay-confirm',"));
+  assert.ok(endpoint('confirm').includes("hash_equals(hash_hmac('sha256', $orderId . '|' . $paymentId, (string) $config['key_secret']), $signature)"));
+  // Razorpay's webhook: signed with its own secret, over the raw body; an event is recorded as done only once handled.
+  const hook = endpoint('webhook');
+  assert.ok(hook.includes("hash_equals(hash_hmac('sha256', $raw, $secret), $signature)") && hook.includes("$secret === '' ||"));
+  // Paid once only: the conditional update decides, so a confirm, a webhook and a sweep racing each other pay one time.
+  assert.ok(lib.includes("WHERE intent_id = ? AND status IN ('created', 'expired') AND payment_id IS NULL"));
+  assert.ok(readFileSync(join(projectRoot, 'src/api/account-lib.php'), 'utf8').includes("const ACCOUNT_SCHEMA = 'v6';"));
+  // Callbacks: the due ones go out after every request (after the sweep, so an expiry is told at once), retried with backoff for a week.
+  const after = lib.slice(lib.indexOf('function pay_after('), lib.indexOf('/* ---------- refunds'));
+  assert.ok(after.indexOf('fastcgi_finish_request();') < after.indexOf('pay_sweep($config, $db);') && after.indexOf('pay_sweep($config, $db);') < after.indexOf('pay_deliver($config, $db);'));
+  assert.ok(lib.includes('const PAY_RETRY = [60, 120, 300, 900, 1800, 3600, 7200, 21600];') && lib.includes('const PAY_RETRY_FOR = 7 * 86400;'));
+  // The library is never served, health says whether the gateway is set up, and nothing else.
+  assert.match(readFileSync(join(dist, 'api/.htaccess'), 'utf8'), /account-lib\|pay-lib\)\\\.php/);
+  assert.ok(readFileSync(join(projectRoot, 'src/api/health.php'), 'utf8').includes("'pay' => pay_configured($config),"));
+  for (const name of ['intents', 'intent', 'refund', 'checkout', 'confirm', 'webhook']) assert.ok(existsSync(join(dist, 'api/pay', `${name}.php`)), name);
+
+  // The deploy: the gateway only with accounts, keys, the webhook secret and an app; its secrets go to the server only.
+  const deploy = readFileSync(join(projectRoot, 'scripts/deploy.mjs'), 'utf8');
+  assert.ok(deploy.includes('const hasPay = Boolean(hasAccounts && hasKeys && env.RAZORPAY_WEBHOOK_SECRET && payApps.length);'));
+  assert.ok(deploy.includes("PAY: hasPay ? '1' : ''") && deploy.includes("if (hasPay && !state.data?.pay) fail("));
+  assert.ok(deploy.includes("'rzp_webhook_secret', 'pay_secret_'") && deploy.includes("...PAY_APPS.map((k) => env[`WALNUT_PAY_SECRET_${k}`])"), 'and are probed for after upload');
+  // Live keys need the refund policy first.
+  assert.ok(deploy.includes("env.RAZORPAY_KEY_ID.startsWith('rzp_live_') && !config.legal.refundPolicy"));
 });
 
 test('the account relay only reaches sign-in and "my account", and needs the account service', async () => {
@@ -773,7 +877,8 @@ test('deploy wires Walnut LMS: catalogue first, secrets only to the server, the 
   assert.ok(fetchAt > 0 && fetchAt < deploy.indexOf("spawnSync(process.execPath, ['build.mjs']"), 'the catalogue is fetched before the build');
   assert.ok(!/const \w+ = spawnSync\(process\.execPath, \['scripts\/fetch-catalogue\.mjs'\]/.test(deploy), 'and its result never fails the deploy');
   // The secrets are probed for after upload, and the server must see what was uploaded.
-  for (const needle of ["'lms_secret', 'sso_lms'", 'env.WALNUT_LMS_INTEGRATION_SECRET, ...', "if (hasLms && !state.data?.lms)", "if (hasLmsSso && !state.data?.lms_sso)"]) assert.ok(deploy.includes(needle), needle);
+  for (const needle of ["'lms_secret', 'sso_lms'", "if (hasLms && !state.data?.lms)", "if (hasLmsSso && !state.data?.lms_sso)"]) assert.ok(deploy.includes(needle), needle);
+  assert.ok(deploy.includes('env.WALNUT_LMS_INTEGRATION_SECRET, env.RAZORPAY_WEBHOOK_SECRET, ...'));
   const example = readFileSync(join(projectRoot, '.env.example'), 'utf8');
   for (const key of ['WALNUT_SSO_SECRET_LMS', 'WALNUT_LMS_INTEGRATION_SECRET', 'WALNUT_LMS_URL', 'WALNUT_LMS_BACKFILL']) assert.match(example, new RegExp(`^${key}=`, 'm'), key);
   const fetcher = readFileSync(join(projectRoot, 'scripts/fetch-catalogue.mjs'), 'utf8');

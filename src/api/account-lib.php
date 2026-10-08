@@ -21,7 +21,7 @@ const OTP_RATE_LIMIT_WINDOW_SECONDS = 900;
 const OTP_MAX_REQUESTS_PER_WINDOW = 5;
 const DEFAULT_COUNTRY_CODE = '+91';
 const ACCOUNT_TYPES = ['UNIVERSITY', 'AGENT', 'STUDENT'];
-const ACCOUNT_SCHEMA = 'v5';
+const ACCOUNT_SCHEMA = 'v6';
 
 function accounts_configured(array $config): bool
 {
@@ -175,6 +175,67 @@ function account_schema(): array
         // v5: courses are sold on Walnut LMS now. A purchase made on this website is handed to the LMS once
         // (lms_backfill), and either marked as handed over or given the reason the LMS refused it.
         'ALTER TABLE wa_enrolments ADD COLUMN IF NOT EXISTS lms_synced_at DATETIME NULL, ADD COLUMN IF NOT EXISTS lms_error VARCHAR(200) NULL',
+        // v6: the payment gateway (pay-lib.php) — every Walnut product's payments, in one ledger. An intent is
+        // one thing to pay for; open_key holds "<app>|<reference>" while it is open or paid, so a reference has
+        // at most one such intent (an expired one gives it up).
+        $table('wa_pay_intents', "
+            intent_id CHAR(29) NOT NULL PRIMARY KEY,
+            app_id VARCHAR(40) NOT NULL,
+            reference VARCHAR(64) NOT NULL,
+            open_key VARCHAR(110) NULL,
+            amount INT UNSIGNED NOT NULL,
+            currency CHAR(3) NOT NULL,
+            description VARCHAR(120) NOT NULL,
+            customer_email VARCHAR(191) NOT NULL,
+            customer_name VARCHAR(120) NULL,
+            customer_phone VARCHAR(20) NULL,
+            customer_account_id CHAR(36) NULL,
+            return_url VARCHAR(500) NOT NULL,
+            cancel_url VARCHAR(500) NOT NULL,
+            metadata TEXT NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            razorpay_order_id VARCHAR(40) NOT NULL,
+            payment_id VARCHAR(40) NULL,
+            method VARCHAR(30) NULL,
+            last_failure_reason VARCHAR(200) NULL,
+            refunded_amount INT UNSIGNED NOT NULL DEFAULT 0,
+            paid_at DATETIME NULL,
+            expires_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            UNIQUE KEY wa_pay_intents_open (open_key),
+            UNIQUE KEY wa_pay_intents_order (razorpay_order_id),
+            UNIQUE KEY wa_pay_intents_payment (payment_id),
+            KEY wa_pay_intents_ref (app_id, reference),
+            KEY wa_pay_intents_due (status, expires_at)"),
+        $table('wa_pay_refunds', "
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            intent_id CHAR(29) NOT NULL,
+            refund_reference VARCHAR(64) NOT NULL,
+            amount INT UNSIGNED NOT NULL,
+            reason VARCHAR(200) NULL,
+            razorpay_refund_id VARCHAR(40) NULL,
+            status VARCHAR(20) NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            UNIQUE KEY wa_pay_refunds_ref (intent_id, refund_reference),
+            UNIQUE KEY wa_pay_refunds_rzp (razorpay_refund_id)"),
+        // A signed callback to the app that owns an intent, kept until the app answers 2xx.
+        $table('wa_pay_callbacks', "
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            intent_id CHAR(29) NOT NULL,
+            event VARCHAR(30) NOT NULL,
+            body MEDIUMTEXT NOT NULL,
+            attempts INT UNSIGNED NOT NULL DEFAULT 0,
+            next_at DATETIME NOT NULL,
+            delivered_at DATETIME NULL,
+            last_error VARCHAR(200) NULL,
+            created_at DATETIME NOT NULL,
+            KEY wa_pay_callbacks_due (delivered_at, next_at)"),
+        // Razorpay webhook events already handled (Razorpay may send one more than once).
+        $table('wa_pay_events', "
+            event_id VARCHAR(64) NOT NULL PRIMARY KEY,
+            received_at DATETIME NOT NULL"),
     ];
 }
 

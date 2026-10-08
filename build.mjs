@@ -29,12 +29,14 @@ const lmsAddress = URL.canParse(config.lms.url) ? new URL(config.lms.url) : null
 if (lmsAddress?.protocol !== 'https:') throw new Error(`The Walnut LMS address must be an https URL (WALNUT_LMS_URL or lms.url in site.config.mjs): ${config.lms.url}`);
 config.lms.url = lmsAddress.origin;
 if (process.env.LMS_SSO === '1') config.lms.sso = true;
+// PAY=1: the payment gateway is set up on the server (the deploy script decides), so /pay/ is built.
+if (process.env.PAY === '1') config.payments = true;
 
 const { layout } = await import('./src/templates/layout.mjs');
 const { default: home } = await import('./src/templates/home.mjs');
 const { solutionsIndex, servicePage } = await import('./src/templates/solutions.mjs');
 const { default: configure } = await import('./src/templates/configure.mjs');
-const { partners, academy, courseMoved, about, contact, requestStatus, privacy, terms, notFound, serverError } = await import('./src/templates/pages.mjs');
+const { partners, academy, courseMoved, about, contact, requestStatus, privacy, terms, refundPolicy, deliveryPolicy, pay, notFound, serverError } = await import('./src/templates/pages.mjs');
 const { login, dashboard } = await import('./src/templates/account.mjs');
 const { areas } = await import('./src/data/services.mjs');
 const { lmsCourses, legacyRedirects } = await import('./src/data/lms.mjs');
@@ -69,6 +71,8 @@ config.assetVersion = createHash('sha256').update(css).update(Object.values(jsSo
 writeFileSync(join(dist, 'assets/css/site.css'), css);
 mkdirSync(join(dist, 'assets/js'), { recursive: true });
 for (const [file, source] of Object.entries(jsSources)) {
+  // The pay page's script (which loads Razorpay) is published only with the pay page.
+  if (file === 'pay.js' && !(config.accounts && config.payments)) continue;
   writeFileSync(join(dist, 'assets/js', file), source.replace(/((?:from\s+|import\()'\.\/[\w-]+\.js)'/g, `$1?v=${config.assetVersion}'`));
 }
 cpSync(join(src, 'assets/img'), join(dist, 'assets/img'), { recursive: true, filter: (p) => !p.endsWith('.json') });
@@ -102,8 +106,12 @@ const pages = [
   ['contact/', contact],
   ['privacy/', privacy],
   ['terms/', terms],
+  ['refund-policy/', refundPolicy],
+  ['delivery-policy/', deliveryPolicy],
   // The Walnut account: its login page and the signed-in dashboard.
   ...(config.accounts ? [['login/', login], ['dashboard/', dashboard]] : []),
+  // Where every Walnut product's buyers pay (the payment gateway, api/pay/).
+  ...(config.accounts && config.payments ? [['pay/', pay]] : []),
 ];
 const hidden = []; // pages search engines should not list
 

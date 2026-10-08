@@ -15,19 +15,22 @@ export const inlineScript =
 const sha256 = (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`;
 
 // Content-Security-Policy: only this site's own files plus the third parties it actually uses.
-export function contentSecurityPolicy(config) {
+// `payments` is for the pay page (/pay/) only: Razorpay's checkout script, its frame and its calls. Every
+// other page has no reason to load anything from Razorpay, so it cannot.
+export function contentSecurityPolicy(config, { payments = false } = {}) {
   const ga = Boolean(config.analytics?.gaMeasurementId);
+  const rzp = payments && 'https://*.razorpay.com';
   // Walnut LMS: /academy/ reads its public course feed to show the live catalogue.
   const lms = config.lms?.url ? new URL(config.lms.url).origin : null;
   const policy = {
     'default-src': ["'self'"],
-    'script-src': ["'self'", sha256(inlineScript), ga && 'https://www.googletagmanager.com'],
+    'script-src': ["'self'", sha256(inlineScript), ga && 'https://www.googletagmanager.com', rzp],
     'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // inline is needed for style="" attributes only
     'font-src': ["'self'", 'https://fonts.gstatic.com'],
     // Course images are kept in the Walnut LMS file store (see lms-catalogue.js).
-    'img-src': ["'self'", 'data:', THUMBNAIL_ORIGIN, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com'],
-    'connect-src': ["'self'", lms, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com'],
-    'frame-src': ['https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
+    'img-src': ["'self'", 'data:', THUMBNAIL_ORIGIN, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', rzp],
+    'connect-src': ["'self'", lms, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com', rzp],
+    'frame-src': ['https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com', rzp],
     'base-uri': ["'self'"],
     'form-action': ["'self'"],
     'object-src': ["'none'"],

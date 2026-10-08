@@ -6,7 +6,7 @@
 // Reads .env (see .env.example): FTP_HOST, FTP_USER, FTP_PASS, FTP_DIR, SITE_URL,
 // RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, TWILIO_API_KEY, TWILIO_API_SECRET, EMAIL_FROM, EMAIL_FROM_NAME, EMAIL_NOTIFY,
 // DB_HOST, DB_NAME, DB_USER, DB_PASS, ACCOUNT_SECRET, TWILIO_ACCOUNT_SID, SMS_FROM, WALNUT_SSO_SECRET_<APP>,
-// WALNUT_LMS_URL, WALNUT_LMS_INTEGRATION_SECRET, WALNUT_LMS_BACKFILL.
+// WALNUT_LMS_URL, WALNUT_LMS_INTEGRATION_SECRET, WALNUT_LMS_BACKFILL, RAZORPAY_WEBHOOK_SECRET, WALNUT_PAY_SECRET_<APP>.
 //
 // Order matters for safety: the API is uploaded first and checked to be executing as PHP, and only then
 // is the file holding the secrets (config.php) uploaded. The host loads a new config.php (and new PHP)
@@ -50,6 +50,11 @@ const hasLogin = hasOnboarding || hasAccounts;
 const lmsUrl = (env.WALNUT_LMS_URL || 'https://walnut-lms.vercel.app').replace(/\/+$/, '');
 const hasLms = Boolean(hasAccounts && env.WALNUT_LMS_INTEGRATION_SECRET);
 const hasLmsSso = Boolean(hasAccounts && env.WALNUT_SSO_SECRET_LMS);
+// The payment gateway (api/pay/): every Walnut product's payments, on this site. Its ledger is the account
+// database; each product (app) has its own secret, WALNUT_PAY_SECRET_<APP> → config pay_secret_<app>.
+const PAY_APPS = ['WALNUT_LMS'];
+const payApps = PAY_APPS.filter((k) => env[`WALNUT_PAY_SECRET_${k}`]);
+const hasPay = Boolean(hasAccounts && hasKeys && env.RAZORPAY_WEBHOOK_SECRET && payApps.length);
 // This deploy's config.php ID, and how long (in seconds) to wait for the host to load that file.
 const configId = randomBytes(8).toString('hex');
 const CONFIG_WAIT = 15 * 60;
@@ -163,7 +168,7 @@ if (config.accounts && !hasLogin) console.log('! `accounts` is on in site.config
 // so this never stops a deploy.
 spawnSync(process.execPath, ['scripts/fetch-catalogue.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, WALNUT_LMS_URL: lmsUrl } });
 // Enrol signs the person in to the LMS only when the LMS can receive that sign-in; otherwise it opens the course on the LMS.
-const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasLogin ? '1' : '', ACCOUNTS_OFF: hasLogin ? '' : '1', WALNUT_LMS_URL: lmsUrl, LMS_SSO: hasLmsSso ? '1' : '' } });
+const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl, ACCOUNTS: hasLogin ? '1' : '', ACCOUNTS_OFF: hasLogin ? '' : '1', WALNUT_LMS_URL: lmsUrl, LMS_SSO: hasLmsSso ? '1' : '', PAY: hasPay ? '1' : '' } });
 if (build.status !== 0) fail('The build failed.');
 const check = spawnSync(process.execPath, ['check.mjs'], { cwd: projectRoot, stdio: 'inherit', env: { ...process.env, SITE_URL: siteUrl } });
 if (check.status !== 0) fail('Link check failed — nothing was uploaded.');
@@ -246,6 +251,8 @@ if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
     ...(hasAccounts ? { lms_url: lmsUrl } : {}),
     ...(hasLms ? { lms_secret: env.WALNUT_LMS_INTEGRATION_SECRET } : {}),
     ...(hasLms && env.WALNUT_LMS_BACKFILL === '1' ? { lms_backfill: true } : {}),
+    // the payment gateway: Razorpay's webhook secret, each app's secret, and this site's address (pay links)
+    ...(hasPay ? { rzp_webhook_secret: env.RAZORPAY_WEBHOOK_SECRET, site_url: siteUrl, ...Object.fromEntries(payApps.map((k) => [`pay_secret_${k.toLowerCase()}`, env[`WALNUT_PAY_SECRET_${k}`]])) } : {}),
     // which deploy wrote this file (not a secret): health.php reports it once the server has loaded it
     config_id: configId,
   };
@@ -259,7 +266,7 @@ if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
 
   // The secrets must never be readable over the web.
   const probe = await fetch(`${siteUrl}/api/config.php?t=${Date.now()}`, { signal: AbortSignal.timeout(20_000) }).then((r) => r.text()).catch(() => '');
-  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', 'db_pass', 'account_secret', 'lms_secret', 'sso_lms', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY, env.DB_PASS, env.ACCOUNT_SECRET, env.WALNUT_LMS_INTEGRATION_SECRET, ...['ONBOARDING', 'COURSE_FINDER', 'LEADS', 'LMS'].map((k) => env[`WALNUT_SSO_SECRET_${k}`])].filter(Boolean).some((needle) => probe.includes(needle));
+  const leaked = ['key_secret', 'twilio_secret', 'onboarding_key', 'db_pass', 'account_secret', 'lms_secret', 'sso_lms', 'rzp_webhook_secret', 'pay_secret_', env.RAZORPAY_KEY_SECRET, env.TWILIO_API_SECRET, env.ONBOARDING_API_KEY, env.DB_PASS, env.ACCOUNT_SECRET, env.WALNUT_LMS_INTEGRATION_SECRET, env.RAZORPAY_WEBHOOK_SECRET, ...['ONBOARDING', 'COURSE_FINDER', 'LEADS', 'LMS'].map((k) => env[`WALNUT_SSO_SECRET_${k}`]), ...PAY_APPS.map((k) => env[`WALNUT_PAY_SECRET_${k}`])].filter(Boolean).some((needle) => probe.includes(needle));
   if (leaked) {
     curl([`url = ${q(ftpUrl(remoteDir))}`, `quote = ${q(`DELE ${remoteDir}api/config.php`)}`, 'list-only'], { quiet: true });
     fail('The server exposed api/config.php as text, so it was deleted again. Rotate the Razorpay, Twilio, database, Onboarding Tool and Walnut app (SSO and LMS) secrets and contact the host about PHP handling.');
@@ -281,6 +288,7 @@ if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
   if (hasOnboarding && !state.data?.onboarding) fail('The Onboarding Tool settings were uploaded but the API does not see them.');
   if (hasLms && !state.data?.lms) fail('The Walnut LMS settings were uploaded but the API does not see them. Check WALNUT_LMS_URL (a public https address) and WALNUT_LMS_INTEGRATION_SECRET in .env.');
   if (hasLmsSso && !state.data?.lms_sso) fail('WALNUT_SSO_SECRET_LMS was uploaded but the API does not see it.');
+  if (hasPay && !state.data?.pay) fail('The payment gateway settings were uploaded but the API does not see them (Razorpay keys, RAZORPAY_WEBHOOK_SECRET, WALNUT_PAY_SECRET_<APP>).');
   if (hasAccounts && !state.data?.accounts) fail('The account database settings were uploaded, but the server could not connect to the database. Check DB_HOST, DB_NAME, DB_USER and DB_PASS in .env, and that PHP has the pdo_mysql extension.');
   if (hasKeys) console.log(`✓ Razorpay connected in ${state.data.mode.toUpperCase()} mode`);
   if (hasEmail) console.log(`✓ Email connected — sending from ${env.EMAIL_FROM}, notifications to ${env.EMAIL_NOTIFY}`);
@@ -288,6 +296,7 @@ if (hasKeys || hasEmail || hasOnboarding || hasAccounts) {
   if (hasAccounts) console.log(`✓ Walnut accounts connected — database ${env.DB_NAME}, one-time codes by email${hasSms ? ' and SMS' : ''}`);
   if (hasLms) console.log(`✓ Walnut LMS connected at ${lmsUrl} — course progress on the dashboard${env.WALNUT_LMS_BACKFILL === '1' ? ', past website purchases handed to the LMS' : ''}`);
   if (hasLmsSso) console.log('✓ Walnut LMS sign-in connected — Enrol and Continue open the LMS signed in');
+  if (hasPay) console.log(`✓ Payment gateway open for ${state.data.pay_apps.join(', ')} — Razorpay in ${state.data.mode.toUpperCase()} mode; webhook ${siteUrl}/api/pay/webhook.php`);
 }
 
 // The API and its settings are in place, so now the pages that use them.

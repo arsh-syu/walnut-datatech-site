@@ -587,22 +587,26 @@ export function privacy({ root }) {
       <li><strong>Enquiries.</strong> When you use a contact form or the solution builder: your name, organisation, email address, phone number (optional), your message, and the services and modules you selected.</li>
       <li><strong>Courses.</strong> Courses are enrolled in and paid for on Walnut LMS (${lmsHost}), not on this website.${lmsSso ? ' When you open Walnut LMS with your Walnut account, we send it your name, email address, mobile number and the kind of Walnut account you hold, so it can sign you in.' : ''}</li>
       <li><strong>Earlier course purchases.</strong> If you bought a course on this website before courses moved to Walnut LMS, we keep the record of that purchase: your name, email address, phone number, the course and coupon you chose, and the payment reference issued by Razorpay.</li>
+      ${config.payments ? `<li><strong>Payments.</strong> When you pay for one of our products on this website, we keep a record of the payment: what you paid for and the amount, your name, email address and phone number as the product you are buying gave them to us, the kind of payment method you used (for example UPI or card), the date, and the payment references Razorpay issues. We never receive your card, UPI or bank details.</li>` : ''}
     </ul>
     <p>We do not ask for, and you should not send us, sensitive information such as identity documents or bank details through this website.</p>`],
       ['automatic', 'Information collected automatically', `<p>Like most websites, the servers that host this site record technical information about each request — such as your IP address, browser type, the page requested and the time — in standard server logs kept for security and troubleshooting.${ga ? ' With your consent we also use Google Analytics, described under “Cookies and similar technologies”.' : ' We do not use analytics, advertising or tracking tools on this website.'}</p>`],
       ['use', 'How we use your information', `<ul>
       <li>to respond to your enquiry and prepare a proposal, and to email you a copy of what you sent;</li>
       <li>to keep a record of the courses bought on this website, and to give their buyers access to them on Walnut LMS;</li>
+      ${config.payments ? '<li>to take payments for our products, confirm them to the product you bought from, and handle refunds;</li>' : ''}
       <li>to keep the website secure and working;</li>
       <li>to meet our legal, tax and accounting obligations.</li>
     </ul>
     <p>We do not sell your personal information, and we do not use it for automated decision-making.</p>`],
-      ['payments', 'Payments', `<p>This website no longer takes payments: courses are paid for on Walnut LMS. Courses bought on this website earlier were paid through Razorpay’s checkout, where your card, UPI or bank details were entered; they were never seen or stored by us. We keep the payment status and reference Razorpay returned to us. Razorpay handles your information under its own privacy policy.</p>`],
+      ['payments', 'Payments', config.payments
+        ? `<p>Payments for our products are made on this website through Razorpay’s checkout, where you enter your card, UPI or bank details; they go to Razorpay and are never seen or stored by us. We keep the record described under “Information you give us”, and Razorpay handles your payment information under its own privacy policy.</p>`
+        : `<p>This website no longer takes payments: courses are paid for on Walnut LMS. Courses bought on this website earlier were paid through Razorpay’s checkout, where your card, UPI or bank details were entered; they were never seen or stored by us. We keep the payment status and reference Razorpay returned to us. Razorpay handles your information under its own privacy policy.</p>`],
       ['sharing', 'Who we share information with', `<p>We share information only with service providers that help us run this website, and only as far as they need it:</p>
     <ul>
       <li><strong>${esc(config.email.provider)}</strong> — sends our emails: your enquiry is emailed to our team, and a confirmation is emailed to you.</li>
-      <li><strong>Walnut LMS</strong> — where courses are taken.${lmsSso ? ' It receives the details listed under “Courses” when you open it with your Walnut account.' : ''} For a course bought on this website earlier, it may receive the purchase record so you can take the course there.</li>
-      <li><strong>Razorpay</strong> — processed the payments for courses bought on this website earlier.</li>
+      <li><strong>Walnut LMS</strong> — where courses are taken.${lmsSso ? ' It receives the details listed under “Courses” when you open it with your Walnut account.' : ''}${config.payments ? ' When you pay for a course, it is told whether the payment went through, the amount and the payment references, so it can give you the course.' : ''} For a course bought on this website earlier, it may receive the purchase record so you can take the course there.</li>
+      <li><strong>Razorpay</strong> — ${config.payments ? 'processes the payments made on this website.' : 'processed the payments for courses bought on this website earlier.'}</li>
       <li><strong>Our hosting providers</strong> — serve the website and keep server logs.</li>
       <li><strong>Google Fonts</strong> — serves the typefaces; your browser requests them from Google, which receives your IP address.</li>
       <li><strong>Video platforms</strong> — if you choose to play a video, it is loaded from the platform that hosts it.</li>
@@ -618,7 +622,7 @@ export function privacy({ root }) {
     <p>This information stays on your device and is not sent to us.${ga ? ' If you accept, Google Analytics sets cookies to measure how the site is used; you can change your choice at any time through “Cookie settings” at the bottom of any page.' : ''}</p>`],
       ['retention', 'How long we keep it', `<p>${legal.retention ? `We keep enquiry and enrolment records ${esc(legal.retention)}.` : 'We keep enquiry and enrolment records only for as long as we need them for the purposes above, and for as long as the law requires us to keep financial records.'}</p>`],
       ['rights', 'Your choices and rights', `<p>You can ask us to tell you what information we hold about you, to correct it, or to delete it, and you can withdraw a consent you have given. To do so, ${contactLine(root)}. We will respond as required by applicable data-protection law.${legal.grievanceOfficer ? ` Complaints can be addressed to our grievance officer, ${esc(legal.grievanceOfficer)}.` : ''}</p>`],
-      ['security', 'Security', `<p>The website is served over an encrypted connection and does not take payments. No method of transmission or storage is completely secure, so we cannot guarantee absolute security.</p>`],
+      ['security', 'Security', `<p>The website is served over an encrypted connection${config.payments ? ', and payment details are entered only in Razorpay’s checkout, so they never reach our servers' : ' and does not take payments'}. No method of transmission or storage is completely secure, so we cannot guarantee absolute security.</p>`],
       ['changes', 'Changes to this policy', `<p>We may update this policy when the website or the law changes. The date at the top shows when it was last revised.</p>`],
     ],
   });
@@ -640,13 +644,18 @@ export function terms({ root }) {
       ['use', 'Using this website', `<p>You may use this website for lawful purposes only. You must not attempt to disrupt it, gain unauthorised access to it, or use it to send unlawful, misleading or harmful material. Information you submit must be accurate and must be your own, or sent with the permission of the person it belongs to.</p>`],
       ['services', 'Services for universities and institutions', `<p>The descriptions of our services on this website are for general information. Submitting an enquiry or a configuration through the solution builder is a request for a proposal — it is not an order and does not create a contract. Services are provided only under a separate written agreement between us and the institution, which sets out the scope, fees and terms.</p>`],
       ['courses', 'Courses and enrolment', `<ul>
-      <li>Courses are listed on this website and are enrolled in, paid for and taken on Walnut LMS (${lmsHost}). Each course’s page there describes what it covers, its level and whether it carries a certificate.</li>
-      <li>Fees are shown in Indian rupees, on this website and on Walnut LMS. The amount you are charged is the amount Walnut LMS shows when you pay.</li>
+      ${config.payments
+        ? `<li>Courses are listed on this website and taken on Walnut LMS (${lmsHost}). You pay for them on this website’s secure payment page. Each course’s page on Walnut LMS describes what it covers, its level and whether it carries a certificate.</li>
+      <li>Fees are shown in Indian rupees. The amount you are charged is the amount shown on our payment page when you pay. How courses are delivered is set out in our <a href="${root}delivery-policy/">shipping &amp; delivery policy</a>.</li>`
+        : `<li>Courses are listed on this website and are enrolled in, paid for and taken on Walnut LMS (${lmsHost}). Each course’s page there describes what it covers, its level and whether it carries a certificate.</li>
+      <li>Fees are shown in Indian rupees, on this website and on Walnut LMS. The amount you are charged is the amount Walnut LMS shows when you pay.</li>`}
       <li>A course bought on this website before courses moved to Walnut LMS remains yours. ${legal.courseAccess ? `Course access is delivered ${esc(legal.courseAccess)}.` : 'For anything about it, contact us with your payment reference.'}</li>
       <li>Course access is for the enrolled person only and may not be shared or resold.</li>
     </ul>`],
-      ['payments', 'Payments', `<p>Course payments are taken on Walnut LMS, not on this website. Courses bought on this website earlier were paid through Razorpay’s checkout, under Razorpay’s terms; if you have a question about one of those payments, contact us with your payment reference and we will resolve it.</p>`],
-      ['refunds', 'Refunds and cancellations', legal.refundPolicy ? `<p>${esc(legal.refundPolicy)}</p>` : `<p>To cancel an enrolment or ask for a refund, ${contactLine(root)} with your payment reference. Requests are handled in line with our refund policy and applicable consumer law.</p>`],
+      ['payments', 'Payments', config.payments
+        ? `<p>Payments for our products, including courses taken on Walnut LMS, are made on this website through Razorpay’s secure checkout, under Razorpay’s terms. You enter your card, UPI or bank details there; they are never seen or stored by us. If you have a question about a payment, contact us with your order or payment reference and we will resolve it.</p>`
+        : `<p>Course payments are taken on Walnut LMS, not on this website. Courses bought on this website earlier were paid through Razorpay’s checkout, under Razorpay’s terms; if you have a question about one of those payments, contact us with your payment reference and we will resolve it.</p>`],
+      ['refunds', 'Refunds and cancellations', legal.refundPolicy ? `<p>${esc(legal.refundPolicy)} Read our <a href="${root}refund-policy/">cancellation &amp; refund policy</a> for the details.</p>` : `<p>To cancel an enrolment or ask for a refund, ${contactLine(root)} with your payment reference. Requests are handled in line with our refund policy and applicable consumer law.</p>`],
       ['partners', 'Partner applications and external links', `<p>Walnut LMS is Walnut Data Tech’s own learning platform, where courses are sold and taken; it opens on its own website. Partner Onboarding, Course Finder and Online Leads are separate applications that open on their own websites and have their own terms. This website may also link to other third-party sites. We are not responsible for the content or practices of websites we do not operate.</p>`],
       ['ip', 'Intellectual property', `<p>The content of this website — including text, design, graphics, logos and course materials — belongs to ${esc(config.company.legalName)} or its licensors. You may view it for your own use. You may not copy, republish or use it commercially without our written permission.</p>`],
       ['liability', 'Availability and liability', `<p>We work to keep this website accurate and available, but we provide it “as is” and cannot promise that it will always be available or free of errors. To the extent the law allows, we are not liable for indirect or consequential loss arising from your use of the website. Nothing in these terms limits any right you have under law that cannot be excluded.</p>`],
@@ -661,6 +670,88 @@ export function terms({ root }) {
     description: `The terms that apply to using the ${config.company.name} website, enquiring about our services and enrolling in our courses.`,
     body,
     bodyClass: 'page-legal',
+  };
+}
+
+// The refund rule is the business's (site.config.mjs → legal: refundDays, refundMaxCompleted); this page
+// explains it, and how a refund is asked for and paid back.
+export function refundPolicy({ root }) {
+  const days = legal.refundDays;
+  const share = legal.refundMaxCompleted;
+  const body = legalPage({
+    title: 'Cancellation &amp; refund policy',
+    intro: `<p>This policy explains when you can cancel a purchase from ${esc(config.company.legalName)} (“${config.company.name}”, “we”, “us”) and get your money back, and how. It covers courses bought from us, which are taken on Walnut LMS, our learning platform.</p>`,
+    sections: [
+      ['cancel', 'Cancelling before you pay', `<p>Nothing is charged until you complete a payment. If you close the payment window or leave the payment page, no money is taken, and there is nothing to cancel.</p>`],
+      ['refund', 'Refunds on courses', `<p>You can have a <strong>full refund</strong> of a course if both of these are true:</p>
+    <ul>
+      <li>you ask for it within <strong>${days} days</strong> of paying; and</li>
+      <li>you have completed <strong>less than ${share}%</strong> of the course on Walnut LMS.</li>
+    </ul>
+    <p>After ${days} days, or once you have completed ${share}% of the course or more, the course is not refundable. Courses marked “Upcoming” cannot be bought until they open, so there is nothing to refund on them.</p>`],
+      ['errors', 'Payments taken in error', `<p>If a payment failed but money was deducted, you were charged twice for the same purchase, or you were charged an amount other than the one shown when you paid, we refund the amount taken in error in full, whenever you tell us.</p>`],
+      ['ask', 'How to ask for a refund', `<p>Please ${contactLine(root)} from the email address you paid with, and give your order or payment reference and the course. We check the request against this policy and reply to you by email.</p>`],
+      ['paid', 'How refunds are paid', `<p>An approved refund is paid back to the payment method you used — your card, UPI account, bank account or wallet — through Razorpay, our payment provider. It usually reaches you within 5–7 working days of approval; how soon it shows depends on your bank. Once a course is refunded, its access on Walnut LMS ends.</p>`],
+      ['law', 'Your rights', `<p>Nothing in this policy limits a right you have under the law that cannot be excluded.${legal.grievanceOfficer ? ` Complaints can be addressed to our grievance officer, ${esc(legal.grievanceOfficer)}.` : ''}</p>`],
+      ['contact', 'Contact', `<p>${esc(config.company.legalName)}${legal.registeredAddress ? `, ${esc(legal.registeredAddress)}` : ''}. To ask about a refund, ${contactLine(root)}.</p>`],
+    ],
+  });
+  return {
+    title: 'Cancellation & refund policy',
+    description: `When and how you can cancel a purchase from ${config.company.name} and get a refund: within ${days} days of paying, with less than ${share}% of the course completed.`,
+    body,
+    bodyClass: 'page-legal',
+  };
+}
+
+// Everything Walnut sells is digital: this page says how and when it is delivered (payment providers ask
+// for it under the name "shipping and delivery policy").
+export function deliveryPolicy({ root }) {
+  const body = legalPage({
+    title: 'Shipping &amp; delivery policy',
+    intro: `<p>${esc(config.company.legalName)} (“${config.company.name}”) sells digital products only. This policy explains how they are delivered.</p>`,
+    sections: [
+      ['shipping', 'Nothing is shipped', `<p>We do not sell or ship physical goods, so there are no shipping charges and nothing is sent by post or courier.</p>`],
+      ['courses', 'Courses', `<p>Courses are delivered online, on Walnut LMS (${lmsHost}), our learning platform. You get access ${esc(legal.courseAccess || 'once your payment is confirmed')} — usually within minutes. Sign in to Walnut LMS with the email address you paid with${lmsSso ? ', or with your Walnut account' : ''}, and the course is there. Walnut LMS also emails you a receipt.</p>`],
+      ['missing', 'If your course does not appear', `<p>If you have paid and cannot see your course within 24 hours, please ${contactLine(root)} with your order or payment reference, and we will put it right. If a payment failed but money was deducted, see our <a href="${root}refund-policy/">refund policy</a>.</p>`],
+      ['contact', 'Contact', `<p>${esc(config.company.legalName)}${legal.registeredAddress ? `, ${esc(legal.registeredAddress)}` : ''}. For anything about delivery, ${contactLine(root)}.</p>`],
+    ],
+  });
+  return {
+    title: 'Shipping & delivery policy',
+    description: `How ${config.company.name}'s digital products are delivered: courses on Walnut LMS, as soon as payment is confirmed. Nothing is shipped.`,
+    body,
+    bodyClass: 'page-legal',
+  };
+}
+
+/* ---------- /pay/ — the payment gateway's page ---------- */
+
+// Where the buyer of any Walnut product pays. What is being paid for, and how much, comes from the gateway
+// (api/pay/checkout.php) for the intent in the link; the page holds nothing about any payment itself.
+export function pay({ root }) {
+  const body = `
+<section class="section pay-section">
+  <div class="wrap">
+    <div class="pay-card">
+      <p class="eyebrow">Secure payment</p>
+      <h1 class="pay-title">Complete your payment</h1>
+      <div class="pay-body" id="pay" data-root="${esc(root)}" aria-live="polite">
+        <p class="pay-note">Loading your payment…</p>
+        <noscript><p class="pay-note">Paying needs JavaScript. Please turn it on and reload this page.</p></noscript>
+      </div>
+    </div>
+    <p class="pay-trust">Payments are processed by Razorpay: UPI, cards, netbanking and wallets. Your card and bank details go to Razorpay, never to us. ${esc(config.company.legalName)} · <a href="${root}refund-policy/">Refund policy</a> · <a href="${root}terms/">Terms</a> · <a href="${root}privacy/">Privacy</a></p>
+  </div>
+</section>`;
+  return {
+    title: 'Secure payment',
+    description: `Pay for a ${config.company.name} product securely, through Razorpay: UPI, cards, netbanking and wallets.`,
+    body,
+    bodyClass: 'page-pay',
+    scripts: ['pay.js'],
+    noindex: true,
+    payments: true,
   };
 }
 
