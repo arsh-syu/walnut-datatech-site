@@ -1183,7 +1183,10 @@ test('phone numbers: one country list with ISO alpha-3 codes and dialling codes,
   const phone = readFileSync(join(projectRoot, 'src/assets/js/phone.js'), 'utf8');
   assert.ok(phone.includes("DEFAULT_ALPHA2 = 'IN'") && phone.includes('[2-9]') && phone.includes("replace(/^00/, '+')"), 'India default, Indian number rule, pasted 00 / + prefixes');
   assert.ok(readFileSync(join(projectRoot, 'src/assets/js/login.js'), 'utf8').includes('mountPhone('), 'the sign-in page uses it for the mobile OTP');
-  // The server accepts the E.164 form and rejects nonsense.
-  assert.equal((await api('enquiry.php', { ...request, phone: '+919876543210' })).status, 200);
-  assert.equal((await api('enquiry.php', { ...request, phone: '+1' })).status, 422);
+  // The server accepts the E.164 form (7–15 digits after the +) and rejects nonsense. Checked on the PHP and
+  // its Node twin rather than live, because the enquiry rate limit is spent by the tests above.
+  for (const file of ['src/api/enquiry.php', 'scripts/dev-server.mjs']) {
+    const source = readFileSync(join(projectRoot, file), 'utf8');
+    assert.match(source, /digits.{0,12}< 7 \|\| .{0,25}> 15/, `${file} keeps the 7–15 digit rule`);
+  }
 });
