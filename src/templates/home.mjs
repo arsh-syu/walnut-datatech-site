@@ -92,11 +92,11 @@ export default function home({ root }) {
 
   const body = `
 <section class="hero">
-  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="hero-glow" aria-hidden="true" data-speed="0.75"></div>
   <div class="wrap hero-in">
-    ${mark('hero-mark')}
+    ${mark('hero-mark').replace('<svg ', '<svg data-speed="clamp(0.9)" ')}
     <p class="eyebrow hero-fade" style="--d:.5s">Technology · Learning · Partnerships</p>
-    <h1 class="display">${splitWords('The technology ecosystem behind')} <span class="hero-hl">${splitWords('online education.', 4)}</span></h1>
+    <h1 class="display">${splitWords('The technology ecosystem behind')} <span class="hero-hl" data-tech-text>${splitWords('online education.', 4)}</span></h1>
     <p class="lede hero-fade" style="--d:.75s">Walnut Data Tech runs online programmes for universities, teaches career skills through short courses, and gives education partners the tools to grow.</p>
     <div class="actions center hero-fade" style="--d:.9s">
       ${button({ href: '#start', label: 'Find your path', size: 'lg', arrow: true })}
@@ -168,6 +168,8 @@ ${clientele(root)}
       'Walnut Data Tech powers online education: technology and services for universities, short certification courses for learners, and applications for education partners.',
     body,
     bodyClass: 'page-home',
+    smooth: true, // GSAP ScrollSmoother (assets/js/smooth.js): the page eases after the scrollbar
+    scripts: ['smooth.js', 'tech-text.js'],
     jsonLd: [
       {
         '@context': 'https://schema.org',

@@ -1160,13 +1160,50 @@ test('certificate checks are rate-limited per visitor', async () => {
   assert.equal(last.status, 429);
 });
 
-test('"LMS Login" points at Walnut LMS from the header and the footer, inside the navigation', () => {
+test('"LMS Login" is a footer link to Walnut LMS; the header keeps its sign-in links as before', () => {
   const home = readFileSync(join(dist, 'index.html'), 'utf8');
   const lms = config.lms.url.replace(/\/+$/, '');
-  assert.match(home, new RegExp(`<a class="nav-login nav-lms" href="${lms.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}" rel="noopener" data-track="lms_login">[\\s\\S]*?<span>LMS Login</span></a>`));
-  assert.ok(home.includes('>LMS Login <svg'), 'footer link');
-  assert.ok(home.indexOf('nav-lms') < home.indexOf('data-menu-btn'), 'the link sits inside the navigation, so the mobile menu carries it too');
-  assert.ok(!home.includes('Student Login'), 'one sign-in link, not two');
+  assert.ok(home.includes(`<a class="footer-lms" href="${lms}" target="_blank" rel="noopener" data-track="lms_login">LMS Login <svg`), 'footer link');
+  assert.ok(!home.includes('nav-lms') && !/<header[\s\S]*LMS Login[\s\S]*<\/header>/.test(home), 'not in the header');
+  assert.ok(!home.includes('Student Login'), 'the header shows Student Login only when links.studentLogin is set');
+});
+
+test('the home page scrolls smoothly with GSAP (pinned, hashed, allowed there only); other pages are untouched', () => {
+  const home = readFileSync(join(dist, 'index.html'), 'utf8');
+  for (const file of ['gsap.min.js', 'ScrollTrigger.min.js', 'ScrollSmoother.min.js']) {
+    assert.match(home, new RegExp(`<script src="https://cdn\\.jsdelivr\\.net/npm/gsap@3\\.15\\.0/dist/${file.replace('.', '\\.')}" integrity="sha384-[A-Za-z0-9+/=]{64}" crossorigin="anonymous" defer></script>`), file);
+  }
+  assert.ok(home.indexOf('ScrollSmoother.min.js') < home.indexOf('<script type="module" src="assets/js/main.js'), 'GSAP is on the page before the site\'s own scripts');
+  assert.ok(home.includes('assets/js/smooth.js') && home.includes('<div id="smooth-wrapper"><div id="smooth-content">'), 'wrapper and script');
+  assert.ok(home.indexOf('</header>') < home.indexOf('id="smooth-wrapper"') && home.includes('</footer>\n</div></div>'), 'the header stays outside the smoothed content; the footer moves with it');
+  assert.match(home, /script-src 'self' 'sha256-[^']+' https:\/\/cdn\.jsdelivr\.net[ ;]/, 'the policy allows the CDN on the home page');
+  assert.ok(home.includes('data-speed="clamp(0.9)"') && home.includes('data-speed="0.75"'), 'the hero mark and glow drift at their own pace');
+  for (const page of ['academy', 'contact', 'about']) {
+    const html = readFileSync(join(dist, page, 'index.html'), 'utf8');
+    assert.ok(!html.includes('jsdelivr') && !html.includes('smooth-wrapper'), `${page} loads no GSAP and is not wrapped`);
+  }
+  const smooth = readFileSync(join(projectRoot, 'src/assets/js/smooth.js'), 'utf8');
+  assert.ok(smooth.includes('prefers-reduced-motion') && smooth.includes('smoothTouch: 0') && smooth.includes('smoother.scrollTo('), 'reduced motion, native touch scrolling, in-page links through the smoother');
+});
+
+test('the hero\'s "online education." is drawn as TechText: the words stay in the heading, the drawing is an enhancement', () => {
+  const home = readFileSync(join(dist, 'index.html'), 'utf8');
+  assert.match(home, /<h1 class="display">[\s\S]*<span class="hero-hl" data-tech-text><span class="w"><span style="--i:4">online<\/span><\/span> <span class="w"><span style="--i:5">education\.<\/span><\/span><\/span><\/h1>/);
+  assert.ok(home.includes('assets/js/tech-text.js'));
+  const tt = readFileSync(join(projectRoot, 'src/assets/js/tech-text.js'), 'utf8');
+  for (const needle of ["reveal: 'letter'", 'dashLength: 4', 'dashGap: 2', 'specks: 15', 'reach: 200', 'softness: 0.7', 'strokeWidth: 1.5', 'speed: 1', "lineStyle: 'dashed'", 'sweep: true', 'fontWeight: 600', 'prefers-reduced-motion', "className = 'sr-only'", 'ResizeObserver']) {
+    assert.ok(tt.includes(needle), needle);
+  }
+  const css = readFileSync(join(dist, 'assets/css/site.css'), 'utf8');
+  assert.ok(css.includes('.tt-l {') && css.includes('.is-off .tt-specks circle { animation-play-state: paused; }'), 'letters are styled and the specks rest off screen');
+});
+
+test('course pictures: one 16:9 frame, inset from the card, rounded; odd ratios are shown whole', () => {
+  const css = readFileSync(join(dist, 'assets/css/site.css'), 'utf8');
+  assert.match(css, /\.course-media \{[^}]*aspect-ratio: 16 \/ 9;[^}]*margin: var\(--card-inset\) var\(--card-inset\) 0;[^}]*border-radius: calc\(var\(--r-xl\) - var\(--card-inset\)\)/);
+  assert.ok(css.includes('.course-card { --card-inset: 14px; }') && css.includes('.course-card { --card-inset: 12px; }'), '14px on desktop, 12px on small phones');
+  assert.ok(css.includes('.course-media img.is-contain { object-fit: contain; }'));
+  assert.ok(readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8').includes('fitCourseImages(box)'), 'pictures are fitted again when the live catalogue redraws');
 });
 
 test('phone numbers: one country list with ISO alpha-3 codes and dialling codes, India first by default', async () => {

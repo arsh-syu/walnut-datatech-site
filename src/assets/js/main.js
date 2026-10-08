@@ -55,6 +55,22 @@ addEventListener('keydown', (e) => {
 });
 matchMedia('(min-width: 1101px)').addEventListener('change', () => setMenu(false));
 
+/* ---------- course pictures ---------- */
+
+// Every course picture sits in a 16:9 frame. One that is not 16:9 itself (a tall poster, a wide banner) is
+// shown whole on the frame's background rather than cropped; the rest fill the frame.
+function fitCourseImages(root = document) {
+  for (const img of root.querySelectorAll('.course-media img')) {
+    const check = () => {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      img.classList.toggle('is-contain', Math.abs(img.naturalWidth / img.naturalHeight - 16 / 9) > 0.25);
+    };
+    if (img.complete) check();
+    else img.addEventListener('load', check, { once: true });
+  }
+}
+fitCourseImages();
+
 /* ---------- scroll reveal ---------- */
 
 const revealer = new IntersectionObserver(
@@ -519,6 +535,7 @@ async function refreshCourses(boxes) {
     // A list the visitor has already seen is swapped in place, not hidden and slid in again.
     const shown = box.querySelector('[data-reveal].in') !== null;
     box.innerHTML = picks ? list.map((c) => renderCard(c, { ...opts, reveal: false })).join('') : renderCatalogue(list, opts);
+    fitCourseImages(box);
     box.dataset.lmsKey = key;
     box.dataset.updated = updatedAt;
     $$('[data-reveal]', box).forEach((el) => (shown ? el.classList.add('in') : revealer.observe(el)));

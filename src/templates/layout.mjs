@@ -154,14 +154,14 @@ export function accountPrompt(root, type, text = 'Track everything in one place.
   return `<p class="account-prompt">${text} <a href="${root}login/?type=${type}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${root}login/" data-track="account_sign_in">sign in</a>.</p>`;
 }
 
-// "LMS Login": Walnut LMS (`lms.url` in site.config.mjs), where courses are taken; `links.studentLogin` overrides it.
-const lmsUrl = config.links.studentLogin || config.lms.url || '';
+// Walnut LMS (`lms.url` in site.config.mjs), where courses are taken: linked from the footer.
+const lmsUrl = config.lms.url || '';
 
 function header(root, path) {
   // The script swaps "Sign in" for the person's name (and a link to their profile) once they are signed in.
   const login =
     (config.accounts ? `<a class="nav-login" href="${root}login/" data-account-link data-profile="${root}dashboard/" data-track="account_sign_in">${icon('user')}<span>Sign in</span></a>` : '') +
-    (lmsUrl ? `<a class="nav-login nav-lms" href="${esc(lmsUrl)}" rel="noopener" data-track="lms_login">${icon('cap')}<span>LMS Login</span></a>` : '');
+    (config.links.studentLogin ? `<a class="nav-login" href="${esc(config.links.studentLogin)}" rel="noopener">${icon('user')}<span>Student Login</span></a>` : '');
   return `<header class="site-header" data-header>
   <div class="wrap header-in">
     <a class="brand" href="${root || './'}" aria-label="Walnut Data Tech — home">
@@ -214,7 +214,7 @@ function footer(root) {
           ${featuredCourses(3).map((c) => `<li><a href="${esc(courseLinks(c, lmsOptions(root)).page)}" rel="noopener">${esc(c.title)} ${icon('external')}<span class="sr-only"> (on Walnut LMS)</span></a></li>`).join('')}
           <li><a href="${root}academy/">All courses</a></li>
           <li><a href="${root}verify-certificate/">Verify a certificate</a></li>
-          ${lmsUrl ? `<li><a href="${esc(lmsUrl)}" rel="noopener">LMS Login ${icon('external')}${newTab}</a></li>` : ''}
+          ${lmsUrl ? `<li><a class="footer-lms" href="${esc(lmsUrl)}" target="_blank" rel="noopener" data-track="lms_login">LMS Login ${icon('external')}${newTab}</a></li>` : ''}
         </ul>
       </nav>
       <nav class="footer-col" aria-label="For partners">
@@ -277,7 +277,17 @@ function consentBanner(root) {
 
 // `redirect` ({ href, canonical }) makes a page that forwards at once to `href` (a moved page); it is never indexed.
 // `payments` is for the pay page only: it lets Razorpay's checkout load there (see security.mjs).
-export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null, payments = false }) {
+// GSAP, for the home page's smooth scrolling (see assets/js/smooth.js). Pinned to one version and checked
+// against these hashes, so the CDN can serve nothing else; the policy allows the CDN on that page only.
+const GSAP = [
+  ['gsap.min.js', 'sha384-XmJ9SoHtVOHoQUcKvFAzVXwdkKo1Ie3bhmSoIAkcdsHGaIrVJIkmozyq0FJeb/Ly'],
+  ['ScrollTrigger.min.js', 'sha384-wl5TeDVvOWt30Pbf8aSo2ZrzsOjddu3avOBvHe+p+OhJt9gP6w9YXmDkN5DK2/dF'],
+  ['ScrollSmoother.min.js', 'sha384-UBrN+CoHHGgqL39pifrs8DrCpDnJh1YKy4iyhEEV/4e9lLCaStS9toSKHYVYcZlT'],
+];
+export const GSAP_CDN = 'https://cdn.jsdelivr.net';
+const gsapScripts = () => GSAP.map(([file, hash]) => `<script src="${GSAP_CDN}/npm/gsap@3.15.0/dist/${file}" integrity="${hash}" crossorigin="anonymous" defer></script>`).join('\n');
+
+export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null, payments = false, smooth = false }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
   const clientConfig = JSON.stringify({
@@ -293,7 +303,7 @@ export function layout({ title, description, path, root, body, bodyClass = '', j
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config, { payments })}">
+<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config, { payments, gsap: smooth })}">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
 ${config.noindex || noindex || redirect ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}
@@ -318,14 +328,17 @@ ${jsonLd.map((j) => `<script type="application/ld+json">${JSON.stringify(j).repl
 <body class="${bodyClass}">
 <a class="skip" href="#main">Skip to content</a>
 ${header(root, path)}
+${smooth ? '<div id="smooth-wrapper"><div id="smooth-content">' : ''}
 <main id="main">
 ${body}
 </main>
 ${footer(root)}
+${smooth ? '</div></div>' : ''}
 ${sticky ? `<a class="sticky-cta" href="${sticky.href}" data-sticky-cta><span>${sticky.label}</span>${icon('arrow')}</a>` : ''}
 ${dialogs()}
 ${consentBanner(root)}
 <script type="application/json" id="site-config">${clientConfig}</script>
+${smooth ? gsapScripts() : ''}
 <script type="module" src="${root}assets/js/main.js${v}"></script>
 ${scripts.map((s) => `<script type="module" src="${root}assets/js/${s}${v}"></script>`).join('\n')}
 </body>
