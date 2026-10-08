@@ -30,6 +30,7 @@ export function login() {
     description: 'Login to your Walnut account with a one-time code sent to your email or mobile number — for universities, learners and partners.',
     body,
     bodyClass: 'page-contact',
+    smooth: false, // sign-in and the dashboard: forms, one-time codes, native scrolling
     scripts: ['login.js'],
   };
 }
@@ -49,6 +50,7 @@ export function dashboard() {
     description: 'Your Walnut dashboard: your profile, requests, courses and applications.',
     body,
     bodyClass: 'page-account',
+    smooth: false, // sign-in and the dashboard: forms, one-time codes, native scrolling
     scripts: ['account.js'],
     noindex: true,
   };

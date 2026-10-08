@@ -1168,7 +1168,7 @@ test('"LMS Login" is a footer link to Walnut LMS; the header keeps its sign-in l
   assert.ok(!home.includes('Student Login'), 'the header shows Student Login only when links.studentLogin is set');
 });
 
-test('the home page scrolls smoothly with GSAP (pinned, hashed, allowed there only); other pages are untouched', () => {
+test('content pages scroll smoothly with GSAP (pinned, hashed, allowed there only); app-like pages keep native scrolling', () => {
   const home = readFileSync(join(dist, 'index.html'), 'utf8');
   for (const file of ['gsap.min.js', 'ScrollTrigger.min.js', 'ScrollSmoother.min.js']) {
     assert.match(home, new RegExp(`<script src="https://cdn\\.jsdelivr\\.net/npm/gsap@3\\.15\\.0/dist/${file.replace('.', '\\.')}" integrity="sha384-[A-Za-z0-9+/=]{64}" crossorigin="anonymous" defer></script>`), file);
@@ -1178,12 +1178,19 @@ test('the home page scrolls smoothly with GSAP (pinned, hashed, allowed there on
   assert.ok(home.indexOf('</header>') < home.indexOf('id="smooth-wrapper"') && home.includes('</footer>\n</div></div>'), 'the header stays outside the smoothed content; the footer moves with it');
   assert.match(home, /script-src 'self' 'sha256-[^']+' https:\/\/cdn\.jsdelivr\.net[ ;]/, 'the policy allows the CDN on the home page');
   assert.ok(home.includes('data-speed="clamp(0.9)"') && home.includes('data-speed="0.75"'), 'the hero mark and glow drift at their own pace');
-  for (const page of ['academy', 'contact', 'about']) {
+  for (const page of ['academy', 'contact', 'about', 'solutions/infrastructure', 'partners', 'verify-certificate']) {
     const html = readFileSync(join(dist, page, 'index.html'), 'utf8');
-    assert.ok(!html.includes('jsdelivr') && !html.includes('smooth-wrapper'), `${page} loads no GSAP and is not wrapped`);
+    assert.ok(html.includes('ScrollSmoother.min.js') && html.includes('<div id="smooth-wrapper"><div id="smooth-content">') && html.includes('assets/js/smooth.js'), `${page} is smoothed`);
+    assert.match(html, /script-src 'self' 'sha256-[^']+' https:\/\/cdn\.jsdelivr\.net[ ;]/, `${page}: policy`);
+  }
+  for (const file of ['configure/index.html', '404.html', 'academy/online-programme-course/index.html']) {
+    const html = readFileSync(join(dist, file), 'utf8');
+    assert.ok(!html.includes('jsdelivr') && !html.includes('smooth-wrapper'), `${file} keeps native scrolling and loads no GSAP`);
   }
   const smooth = readFileSync(join(projectRoot, 'src/assets/js/smooth.js'), 'utf8');
   assert.ok(smooth.includes('prefers-reduced-motion') && smooth.includes('smoothTouch: 0') && smooth.includes('smoother.scrollTo('), 'reduced motion, native touch scrolling, in-page links through the smoother');
+  assert.ok(smooth.includes("cs.position === 'sticky'") && smooth.includes('pin: true') && smooth.includes('pinSpacing: false'), 'sticky panels are pinned with their own offsets');
+  assert.ok(readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8').includes('window.walnutScrollTo'), 'main.js scrolls through the smoother when there is one');
 });
 
 test('the hero\'s "online education." is drawn as TechText: the words stay in the heading, the drawing is an enhancement', () => {
@@ -1204,6 +1211,19 @@ test('course pictures: one 16:9 frame, inset from the card, rounded; odd ratios 
   assert.ok(css.includes('.course-card { --card-inset: 14px; }') && css.includes('.course-card { --card-inset: 12px; }'), '14px on desktop, 12px on small phones');
   assert.ok(css.includes('.course-media img.is-contain { object-fit: contain; }'));
   assert.ok(readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8').includes('fitCourseImages(box)'), 'pictures are fitted again when the live catalogue redraws');
+});
+
+test('HoloCard and CodeSlots: the mounts and adapters are in place, and no stand-in effect is applied', () => {
+  const academy = readFileSync(join(dist, 'academy/index.html'), 'utf8');
+  assert.match(academy, /<div class="course-holo" data-holo data-holo-card="[a-z0-9-]+" data-holo-image="[^"]*" data-holo-alt="[^"]+ course cover" data-holo-preset="bursts" data-holo-foil="#e2e6ec" data-holo-intensity="0.85" data-holo-scale="1" data-holo-edge-sparkle="0.8" data-holo-frame="4" data-holo-glare="0.5" data-holo-tilt-max="14" data-holo-hover-scale="1.04" data-holo-radius="14" data-holo-idle data-holo-shadow><div class="course-media">/);
+  assert.equal((academy.match(/class="course-holo"/g) || []).length, (academy.match(/<article class="course-card/g) || []).length, 'every card has a mount');
+  const holo = readFileSync(join(projectRoot, 'src/assets/js/holo-card.js'), 'utf8');
+  assert.ok(holo.includes('window.HoloCard') && holo.includes("holoState = 'pending'") && holo.includes('reduced: reduceMotion || coarsePointer'), 'the component is used only when present; touch and reduced motion are flagged');
+  const slots = readFileSync(join(projectRoot, 'src/assets/js/code-slots.js'), 'utf8');
+  for (const needle of ['window.CodeSlots?.create', 'slotSize: 44', 'gap: 8', 'radius: 12', 'bounce: 0.2', 'settle: 0.3', 'rise: 8', 'cascade: 20', "outcome: 'accept'", "setStatus('idle')"]) assert.ok(slots.includes(needle), needle);
+  const otp = readFileSync(join(projectRoot, 'src/assets/js/otp.js'), 'utf8');
+  assert.ok(otp.includes('createCodeSlots(') && otp.includes('await verify(current.challengeId, slots.value())') && otp.includes("slots.setStatus('success')") && otp.includes("slots.setStatus('error')"), 'success and error come from the server only');
+  assert.ok(otp.includes('if (busy || dead || slots.value().length !== length) return;'), 'one verification in flight');
 });
 
 test('phone numbers: one country list with ISO alpha-3 codes and dialling codes, India first by default', async () => {

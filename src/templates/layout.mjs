@@ -277,8 +277,8 @@ function consentBanner(root) {
 
 // `redirect` ({ href, canonical }) makes a page that forwards at once to `href` (a moved page); it is never indexed.
 // `payments` is for the pay page only: it lets Razorpay's checkout load there (see security.mjs).
-// GSAP, for the home page's smooth scrolling (see assets/js/smooth.js). Pinned to one version and checked
-// against these hashes, so the CDN can serve nothing else; the policy allows the CDN on that page only.
+// GSAP, for smooth scrolling on the content pages (see assets/js/smooth.js). Pinned to one version and checked
+// against these hashes, so the CDN can serve nothing else; the policy allows the CDN on those pages only.
 const GSAP = [
   ['gsap.min.js', 'sha384-XmJ9SoHtVOHoQUcKvFAzVXwdkKo1Ie3bhmSoIAkcdsHGaIrVJIkmozyq0FJeb/Ly'],
   ['ScrollTrigger.min.js', 'sha384-wl5TeDVvOWt30Pbf8aSo2ZrzsOjddu3avOBvHe+p+OhJt9gP6w9YXmDkN5DK2/dF'],
@@ -287,7 +287,7 @@ const GSAP = [
 export const GSAP_CDN = 'https://cdn.jsdelivr.net';
 const gsapScripts = () => GSAP.map(([file, hash]) => `<script src="${GSAP_CDN}/npm/gsap@3.15.0/dist/${file}" integrity="${hash}" crossorigin="anonymous" defer></script>`).join('\n');
 
-export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null, payments = false, smooth = false }) {
+export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null, payments = false, smooth = true }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
   const clientConfig = JSON.stringify({
@@ -340,6 +340,7 @@ ${consentBanner(root)}
 <script type="application/json" id="site-config">${clientConfig}</script>
 ${smooth ? gsapScripts() : ''}
 <script type="module" src="${root}assets/js/main.js${v}"></script>
+${smooth ? `<script type="module" src="${root}assets/js/smooth.js${v}"></script>` : ''}
 ${scripts.map((s) => `<script type="module" src="${root}assets/js/${s}${v}"></script>`).join('\n')}
 </body>
 </html>

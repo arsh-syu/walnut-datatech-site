@@ -162,3 +162,11 @@
   .acct-mobile, .acct-ready { grid-template-columns: minmax(0, 1fr); }
   .acct-tabs { gap: var(--s-4); }
 }
+/* code slots: the provisional entry (code-slots.js) marks the outcome the server gave */
+.code-slots { gap: var(--slot-gap, 8px); }
+.code-slots .otp-box { border-radius: var(--slot-radius, 12px); }
+.code-slots.is-error .otp-box { border-color: var(--danger); animation: slot-shake .35s var(--ease); }
+.code-slots.is-success .otp-box { border-color: var(--ok); background: rgba(23, 178, 106, .08); }
+.code-slots.is-pending .otp-box { opacity: .7; }
+@keyframes slot-shake { 20% { translate: -3px 0; } 40% { translate: 3px 0; } 60% { translate: -2px 0; } 80% { translate: 2px 0; } }
+@media (prefers-reduced-motion: reduce) { .code-slots.is-error .otp-box { animation: none; } }

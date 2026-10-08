@@ -168,8 +168,7 @@ ${clientele(root)}
       'Walnut Data Tech powers online education: technology and services for universities, short certification courses for learners, and applications for education partners.',
     body,
     bodyClass: 'page-home',
-    smooth: true, // GSAP ScrollSmoother (assets/js/smooth.js): the page eases after the scrollbar
-    scripts: ['smooth.js', 'tech-text.js'],
+    scripts: ['tech-text.js'],
     jsonLd: [
       {
         '@context': 'https://schema.org',

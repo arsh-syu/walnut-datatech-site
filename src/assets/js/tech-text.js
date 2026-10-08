@@ -1,7 +1,11 @@
-// "TechText": the hero's highlighted words are drawn as dashed technical strokes, letter by letter, and
-// then filled by a sweep of light; a scatter of specks glints around them, and the strokes brighten as
-// the pointer comes near. Settings follow the supplied TechText configuration; the colours take the
-// heading's own violet-to-ink gradient, because white would vanish on this light hero.
+// "TechText" — PROVISIONAL. The requester's TechText component (React) was not supplied, only its settings.
+// This is a stand-in built from those settings in the site's own vanilla JS: dashed technical strokes drawn
+// letter by letter, a sweep of light that fills the word, a scatter of specks, and strokes that brighten
+// near the pointer. It is NOT the original animation and does not claim to match it; when the original
+// source arrives, its reveal, sweep, dashed strokes, particles and pointer interaction are to be ported
+// here (same mount: `[data-tech-text] .w > span`, same SETTINGS object), replacing the drawing below.
+// Colours: the heading's violet-to-ink gradient stands in for the supplied white, which would vanish
+// on this light hero.
 //
 // Accessibility and layout: the real words stay in the <h1> (visually hidden), the drawing is an SVG
 // sized to exactly the box each word already occupies, so nothing shifts and nothing is read twice.

@@ -351,6 +351,7 @@ export function courseMoved({ root }, course) {
       : `${course.name} is no longer offered by ${config.company.name}. See the courses available now on Walnut LMS.`,
     body,
     bodyClass: 'page-system',
+    smooth: false, // a redirect or error page: nothing to ease
     noindex: true,
     redirect: { href, canonical: away ? course.target : config.siteUrl ? `${config.siteUrl}/academy/` : '' },
   };
@@ -788,6 +789,7 @@ export function pay({ root }) {
     description: `Pay for a ${config.company.name} product securely, through Razorpay: UPI, cards, netbanking and wallets.`,
     body,
     bodyClass: 'page-pay',
+    smooth: false, // Razorpay's checkout and the payment steps: native scrolling
     scripts: ['pay.js'],
     noindex: true,
     payments: true,
@@ -819,6 +821,7 @@ export function notFound({ root }) {
     description: 'This page could not be found.',
     body: systemPage(root, { code: '404', heading: 'This page isn’t here.', text: 'The link may be old, or the page may have moved.' }),
     bodyClass: 'page-system',
+    smooth: false, // a redirect or error page: nothing to ease
     noindex: true,
   };
 }
@@ -830,6 +833,7 @@ export function serverError({ root }) {
     description: 'The page could not be loaded.',
     body: systemPage(root, { code: 'Error', heading: 'Something went wrong.', text: 'The problem is on our side. Please try again in a moment.' }),
     bodyClass: 'page-system',
+    smooth: false, // a redirect or error page: nothing to ease
     noindex: true,
   };
 }

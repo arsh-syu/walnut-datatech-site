@@ -326,3 +326,6 @@
 .pay-state { font-size: 1.15rem; font-weight: 600; }
 .pay-note { color: var(--muted); }
 .pay-trust { max-width: 520px; margin: var(--s-4) auto 0; color: var(--muted); font-size: .8125rem; text-align: center; }
+
+/* HoloCard mount: the component (when integrated) tilts the picture inside; the frame and inset stay */
+.course-holo { position: relative; perspective: 1000px; transform-style: preserve-3d; }
