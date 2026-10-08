@@ -9,9 +9,9 @@
       "duration_hours": 29,
       "modules": 23,
       "lessons": 111,
-      "price_paise": 0,
-      "price_label": "Free",
-      "is_free": true,
+      "price_paise": 200,
+      "price_label": "₹2",
+      "is_free": false,
       "is_featured": true,
       "availability": "available",
       "certificate_title": "Certified Online Programme Counsellor - Foundation",
@@ -194,5 +194,5 @@
       "enrol_url": "https://walnutdatatech.com/api/sso.php?app=walnut-lms&next=%2Fcourses%2Fcybersecurity-essentials-for-teams"
     }
   ],
-  "updated_at": "2026-10-08T11:21:01.183Z"
+  "updated_at": "2026-10-08T11:33:06.518Z"
 }
