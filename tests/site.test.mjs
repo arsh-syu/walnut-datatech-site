@@ -13,7 +13,9 @@ import { join } from 'node:path';
 import { projectRoot } from '../scripts/env.mjs';
 import { waitForConfig, describeState } from '../scripts/wait-config.mjs';
 import { legacyCourses } from '../src/data/courses.mjs';
-import { validCourse, parseFeed, renderCard, renderCatalogue, esc, featured, catalogueKey } from '../src/assets/js/lms-catalogue.js';
+import { validCourse, parseFeed, renderCard, renderCatalogue, esc, featured, catalogueKey, previewEmbed, THUMBNAIL_ORIGIN } from '../src/assets/js/lms-catalogue.js';
+import { contentSecurityPolicy } from '../src/security.mjs';
+import config from '../site.config.mjs';
 import { externalApps, audiences } from '../src/data/site.mjs';
 import { areas } from '../src/data/services.mjs';
 import { questions, questionsFor } from '../src/data/questions.mjs';
@@ -31,10 +33,13 @@ const outbox = async () => (await (await fetch(`http://localhost:${PORT}/api/_ou
 // Walnut LMS, as the build sees it: the default address and the catalogue snapshot the pages are built from.
 const LMS = 'https://walnut-lms.vercel.app';
 const snapshot = parseFeed(JSON.parse(readFileSync(join(projectRoot, 'src/data/lms-catalogue.json'), 'utf8')));
-// The courses as /academy/ shows them: grouped by category, categories in the order they first appear.
-const grouped = [...new Set(snapshot.courses.map((c) => c.category))].flatMap((category) => snapshot.courses.filter((c) => c.category === category));
+// The courses with an Enrol button on their card, as /academy/ shows them: open for enrolment, in catalogue
+// order (an upcoming course has none).
+const grouped = snapshot.courses.filter((c) => !c.upcoming);
 const catalogueOf = (html) => html.slice(html.indexOf('data-lms-catalogue'), html.indexOf('id="lms-icons"'));
-const enrolLinks = (html) => [...html.matchAll(/<a class="btn btn-primary" href="([^"]+)"[^>]*data-track="course_enrol" data-track-item="([^"]+)"/g)].map((m) => [m[2], m[1]]);
+// What a visitor sees on the cards: each card's <template> (its "i" details) is left out.
+const cardsOf = (html) => html.replace(/<template data-course-details>[\s\S]*?<\/template>/g, '');
+const enrolLinks = (html) => [...cardsOf(html).matchAll(/<a class="btn btn-primary" href="([^"]+)"[^>]*data-track="course_enrol" data-track-item="([^"]+)"/g)].map((m) => [m[2], m[1]]);
 
 // A second dev server wired to a stand-in Onboarding Tool, to test where University requests go.
 const TOOL_PORT = 4393;
@@ -97,19 +102,21 @@ test('courses are sold on Walnut LMS: no price list, checkout or course pages of
   assert.ok(snapshot.courses.some((c) => c.slug === 'online-counselling-course'), 'the course the old address forwards to is in the catalogue');
 });
 
-test('/academy/ lists every course of the Walnut LMS catalogue, grouped by category, linked to the LMS', () => {
+test('/academy/ lists every course of the Walnut LMS catalogue, open ones first, linked to the LMS', () => {
   assert.ok(snapshot.courses.length > 0 && snapshot.rejected === 0, 'the snapshot is valid as it stands');
   const html = readFileSync(join(dist, 'academy/index.html'), 'utf8');
   const catalogue = catalogueOf(html);
   assert.ok(catalogue.includes(`data-lms-url="${LMS}"`) && catalogue.includes('data-lms-sso="0"'), 'the browser refreshes it from the same LMS');
-  // Each group: its category heading, then exactly the courses of that category, in catalogue order.
-  const expected = [...new Set(snapshot.courses.map((c) => c.category))].map((category) => [esc(category), snapshot.courses.filter((c) => c.category === category).map((c) => c.slug)]);
-  const groups = catalogue.split('<div class="track"').slice(1).map((group) => [group.match(/<h3>([^<]*)<\/h3>/)[1], [...group.matchAll(/data-track="course_select" data-track-item="([^"]+)"/g)].map((m) => m[1])]);
+  // The courses open for enrolment, then the upcoming ones; a group that would be empty is left out.
+  const expected = [['Open for enrolment', snapshot.courses.filter((c) => !c.upcoming)], ['Upcoming courses', snapshot.courses.filter((c) => c.upcoming)]]
+    .filter(([, list]) => list.length)
+    .map(([heading, list]) => [heading, list.map((c) => c.slug)]);
+  const groups = cardsOf(catalogue).split('<div class="course-group"').slice(1).map((group) => [group.match(/<h3>([^<]*)<\/h3>/)[1], [...group.matchAll(/data-track="course_select" data-track-item="([^"]+)"/g)].map((m) => m[1])]);
   assert.deepEqual(groups, expected);
   for (const course of snapshot.courses) {
     const page = `${LMS}/courses/${course.slug}`;
     assert.ok(catalogue.includes(`<a href="${page}" rel="noopener" data-track="course_select" data-track-item="${course.slug}">${esc(course.title)}`), `${course.slug}: the title links to the LMS course page`);
-    assert.ok(catalogue.includes(esc(course.priceLabel)), `${course.slug}: the price is shown`);
+    assert.ok(catalogue.includes(course.upcoming ? 'Opening soon' : esc(course.priceLabel)), `${course.slug}: the price, or opening soon, is shown`);
   }
   // Without the LMS sign-in, Enrol opens the course on Walnut LMS, never this site's sign-in.
   assert.deepEqual(enrolLinks(catalogue), grouped.map((c) => [c.slug, `${LMS}/courses/${c.slug}`]));
@@ -140,17 +147,66 @@ test('old course addresses forward: to the same course on Walnut LMS, or to /aca
   assert.match(academy, /<p class="account-prompt" id="bought-here">Bought a course on this website before it moved to Walnut LMS\? <a href="\.\.\/contact\/">Contact us<\/a> with your payment reference\.<\/p>/);
 });
 
-test('each catalogue group says who it is for, and course cards keep their price row at the foot', () => {
-  const icon = () => '';
-  const course = (category) => validCourse({ slug: 'a-course', title: 'A course', subtitle: '', category, level: 'BEGINNER', duration_hours: 2, lessons: 4, price_label: 'Free', is_free: true, is_featured: false, certificate_title: null });
-  assert.ok(renderCatalogue([course('Data and analytics')], { icon, lmsUrl: LMS }).includes('<p>For analysts and engineers who turn raw data into answers a business can use.</p>'));
-  for (const category of ['Something new', 'constructor', '__proto__']) {
-    const head = renderCatalogue([course(category)], { icon, lmsUrl: LMS }).match(/<header class="track-head">[\s\S]*?<\/header>/)[0];
-    assert.equal((head.match(/<p/g) || []).length, 2, `${category}: the levels line and the count only`);
+test('course cards: no icons, a picture, the "i" with details and preview, and upcoming courses not for sale', () => {
+  // Icons are drawn as <svg data-ico="name">, so the test can see which ones a card carries.
+  const icon = (name) => `<svg data-ico="${name}"></svg>`;
+  const base = { slug: 'a-course', title: 'A course', subtitle: 'What it is.', category: 'Data and analytics', level: 'BEGINNER', duration_hours: 2, lessons: 40, modules: 5, price_label: '₹999', is_free: false, is_featured: false, certificate_title: 'Certificate of completion' };
+  const card = (extra) => renderCard(validCourse({ ...base, ...extra }), { icon, lmsUrl: LMS });
+  const face = (html) => cardsOf(html);
+  const details = (html) => html.match(/<template data-course-details>([\s\S]*?)<\/template>/)[1];
+  const icons = (html) => [...html.matchAll(/data-ico="([^"]+)"/g)].map((m) => m[1]);
+
+  // No icons on the card; the only one is the play icon on Preview, and only with a preview video.
+  assert.deepEqual(icons(face(card({}))), []);
+  assert.deepEqual(icons(face(card({ preview_video_url: 'https://youtu.be/lvggJuV6amU' }))), ['play']);
+  // Its details, line by line, with no visible lesson count on the card (modules instead).
+  const plain = face(card({}));
+  assert.ok(plain.includes('<li>2 hours</li><li>5 modules</li><li>Certificate</li>') && !plain.includes('lesson'));
+  assert.ok(plain.includes('aria-label="About A course"') && plain.includes('data-course-info'));
+
+  // A picture: the LMS's own image when it comes from its thumbnails folder, otherwise a cover naming the category.
+  const thumb = `${THUMBNAIL_ORIGIN}/lms-uploads/public/thumbnails/sql-101.webp`;
+  assert.ok(face(card({ thumbnail_url: thumb })).includes(`<img src="${thumb}" alt=""`));
+  for (const bad of [`${THUMBNAIL_ORIGIN}/lms-uploads/private/x.png`, `${THUMBNAIL_ORIGIN}/lms-uploads/public/thumbnails/../../x.png`, `${THUMBNAIL_ORIGIN}/lms-uploads/public/thumbnails/a.png?x=1`, 'https://evil.example/lms-uploads/public/thumbnails/a.png', 'javascript:alert(1)', 42]) {
+    const html = card({ thumbnail_url: bad });
+    assert.ok(!html.includes('<img') && html.includes('class="course-cover"'), String(bad));
   }
-  // Every category in the snapshot has its line.
-  const academy = catalogueOf(readFileSync(join(dist, 'academy/index.html'), 'utf8'));
-  assert.equal((academy.match(/<p>For [^<]+<\/p>/g) || []).length, new Set(snapshot.courses.map((c) => c.category)).size);
+
+  // Preview videos: only YouTube and Vimeo, played from the address built here.
+  assert.equal(previewEmbed('https://youtu.be/lvggJuV6amU'), 'https://www.youtube-nocookie.com/embed/lvggJuV6amU');
+  assert.equal(previewEmbed('https://www.youtube.com/watch?v=lvggJuV6amU&t=3'), 'https://www.youtube-nocookie.com/embed/lvggJuV6amU');
+  assert.equal(previewEmbed('https://vimeo.com/123456'), 'https://player.vimeo.com/video/123456');
+  for (const bad of ['http://youtu.be/lvggJuV6amU', 'https://youtu.be/short', 'https://youtu.be/lvggJuV6amU"><script>', 'https://evil.example/watch?v=lvggJuV6amU', 'https://vimeo.com/x', null, 7]) assert.equal(previewEmbed(bad), null, String(bad));
+  const withVideo = card({ preview_video_url: 'https://youtu.be/lvggJuV6amU' });
+  assert.ok(face(withVideo).includes('data-video="https://www.youtube-nocookie.com/embed/lvggJuV6amU"') && details(withVideo).includes('Watch the preview'));
+
+  // Upcoming: a badge, "Opening soon" instead of price and Enrol, on the card and in its details.
+  const soon = card({ availability: 'upcoming' });
+  assert.ok(face(soon).includes('class="course-card spot is-upcoming"') && face(soon).includes('>Upcoming<') && face(soon).includes('Opening soon'));
+  assert.ok(!soon.includes('course_enrol') && !soon.includes('₹999') && details(soon).includes('Announced when the course opens'));
+  assert.ok(face(card({ availability: 'sold-out' })).includes('data-track="course_enrol"'), 'anything but "upcoming" is open');
+
+  // The details: escaped, highlights (at most 6, plain text), no heading or id in the template (outline, ids).
+  const hostile = card({ title: 'A <b>course</b>', highlights: ['One', '<img src=x onerror=alert(1)>', 42, 'x'.repeat(121), 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'] });
+  const d = details(hostile);
+  assert.ok(d.includes('A &lt;b&gt;course&lt;/b&gt;') && d.includes('&lt;img src=x onerror=alert(1)&gt;') && !d.includes('<img src=x'));
+  assert.equal((d.match(/<li>/g) || []).length, 6, 'six highlights');
+  assert.ok(!/<h[1-6]/.test(d) && !/\sid="/.test(d) && d.includes('data-course-heading'));
+
+  // The catalogue: open first, then upcoming; a group of one is shown as a wide card.
+  const open = validCourse(base);
+  const later = validCourse({ ...base, slug: 'later', availability: 'upcoming' });
+  const catalogue = renderCatalogue([open, later], { icon, lmsUrl: LMS });
+  assert.ok(catalogue.indexOf('Open for enrolment') < catalogue.indexOf('Upcoming courses') && (catalogue.match(/course-grid is-single/g) || []).length === 2);
+  assert.deepEqual(parseFeed({ courses: [{ ...base, slug: 'z', availability: 'upcoming', is_featured: true }, { ...base, slug: 'y' }] }).courses.map((c) => c.slug), ['y', 'z'], 'open before featured');
+
+  // The browser opens the details in the site's dialog, with the title made its heading there.
+  const main = readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8');
+  assert.ok(main.includes("const info = e.target.closest('[data-course-info]');") && main.includes("heading.id = 'course-modal-title';") && main.includes("$('template[data-course-details]', card)"));
+  assert.ok(readFileSync(join(dist, 'index.html'), 'utf8').includes('<dialog class="modal modal-course" id="course-modal" aria-labelledby="course-modal-title">'));
+  // Course images may load from the LMS's file store, and nowhere else new.
+  assert.match(contentSecurityPolicy(config), new RegExp(`img-src 'self' data: ${THUMBNAIL_ORIGIN.replace(/\./g, '\\.')}`));
+
   // Cards in a row grow to the same height; the price and Enrol row is pushed to the foot of each.
   const css = readFileSync(join(projectRoot, 'src/assets/css/journeys.css'), 'utf8');
   assert.match(css, /\.course-card \{\s+display: flex; flex-direction: column;/);
@@ -174,7 +230,11 @@ test('prices stay the same as on Walnut LMS wherever courses are shown', () => {
   const grid = home.match(/<div class="course-grid" data-lms-featured[^>]*>/)[0];
   assert.ok(grid.includes('data-count="3"') && grid.includes(`data-lms-key="${catalogueKey(picks)}"`) && grid.includes('data-lms-url="https://walnut-lms.vercel.app"'));
   assert.ok(/<script type="application\/json" id="lms-icons">\{/.test(home), 'the home page has the icons to redraw its cards');
-  for (const c of picks) assert.ok(home.includes(`data-track-item="${c.slug}"`) && home.includes(esc(c.priceLabel)), `${c.slug} shown at its LMS price`);
+  // At its LMS price — or, while it is upcoming (not for sale on the LMS either), with no price at all.
+  for (const c of picks) {
+    const card = cardsOf(home).match(new RegExp(`<article class="course-card[^"]*"[^>]*>(?:(?!</article>)[\\s\\S])*?data-track-item="${c.slug}"[\\s\\S]*?</article>`))[0];
+    assert.ok(c.upcoming ? card.includes('Opening soon') && !card.includes('course-price') : card.includes(esc(c.priceLabel)), `${c.slug} shown at its LMS price, or as opening soon`);
+  }
   // featured(): featured courses first, else the first courses.
   assert.deepEqual(featured([{ slug: 'a' }, { slug: 'b', isFeatured: true }, { slug: 'c' }], 2).map((c) => c.slug), ['b']);
   assert.deepEqual(featured([{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }], 2).map((c) => c.slug), ['a', 'b']);

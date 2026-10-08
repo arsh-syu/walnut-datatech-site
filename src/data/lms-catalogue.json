@@ -13,8 +13,18 @@
       "price_label": "Free",
       "is_free": true,
       "is_featured": true,
+      "availability": "available",
       "certificate_title": "Certified Online Programme Counsellor - Foundation",
-      "thumbnail_url": null,
+      "thumbnail_url": "https://onboarding.walnutdatatech.com/lms-uploads/public/thumbnails/online-counselling-course-cover.jpg",
+      "preview_video_url": "https://youtu.be/lvggJuV6amU",
+      "highlights": [
+        "Explain Online, ODL/Distance and Regular education and the Four-Quadrant model.",
+        "Verify programme entitlement for an academic session, and tell recognition, accreditation and ranking apart.",
+        "Describe a programme and its syllabus in terms of the learner's goal.",
+        "Profile a learner and identify their needs before recommending a programme.",
+        "Compare universities on identical parameters and demonstrate the LMS.",
+        "Explain total fees, payment options, admission steps and documents."
+      ],
       "course_url": "https://walnut-lms.vercel.app/courses/online-counselling-course",
       "enrol_url": "https://walnutdatatech.com/api/sso.php?app=walnut-lms&next=%2Fcourses%2Fonline-counselling-course"
     },
@@ -31,8 +41,18 @@
       "price_label": "₹4,999",
       "is_free": false,
       "is_featured": true,
+      "availability": "upcoming",
       "certificate_title": "Certificate of completion",
-      "thumbnail_url": null,
+      "thumbnail_url": "https://onboarding.walnutdatatech.com/lms-uploads/public/thumbnails/applied-sql-for-analytics-cover.jpg",
+      "preview_video_url": null,
+      "highlights": [
+        "Explain the logical order in which a SQL query is evaluated",
+        "Filter, sort and aggregate data, handling NULL values correctly",
+        "Combine tables with inner, left and anti joins without duplicating rows",
+        "Structure long queries with common table expressions",
+        "Use window functions for rankings, running totals and period-over-period change",
+        "Build a monthly revenue report that a finance team can rely on"
+      ],
       "course_url": "https://walnut-lms.vercel.app/courses/applied-sql-for-analytics",
       "enrol_url": "https://walnutdatatech.com/api/sso.php?app=walnut-lms&next=%2Fcourses%2Fapplied-sql-for-analytics"
     },
@@ -49,8 +69,18 @@
       "price_label": "₹12,999",
       "is_free": false,
       "is_featured": true,
+      "availability": "upcoming",
       "certificate_title": "Certificate of completion",
-      "thumbnail_url": null,
+      "thumbnail_url": "https://onboarding.walnutdatatech.com/lms-uploads/public/thumbnails/machine-learning-in-production-cover.jpg",
+      "preview_video_url": null,
+      "highlights": [
+        "Explain what changes when a model moves from a notebook to production",
+        "Package a model with a reproducible environment and serve it behind an API",
+        "Prevent train–serve skew with shared feature code",
+        "Choose evaluation metrics that reflect the real cost of errors",
+        "Monitor data drift and model performance after launch",
+        "Roll out new models with shadow and canary releases, and roll back quickly"
+      ],
       "course_url": "https://walnut-lms.vercel.app/courses/machine-learning-in-production",
       "enrol_url": "https://walnutdatatech.com/api/sso.php?app=walnut-lms&next=%2Fcourses%2Fmachine-learning-in-production"
     },
@@ -67,8 +97,18 @@
       "price_label": "₹6,999",
       "is_free": false,
       "is_featured": false,
+      "availability": "upcoming",
       "certificate_title": "Certificate of completion",
-      "thumbnail_url": null,
+      "thumbnail_url": "https://onboarding.walnutdatatech.com/lms-uploads/public/thumbnails/python-for-data-engineering-cover.jpg",
+      "preview_video_url": null,
+      "highlights": [
+        "Structure a pipeline project with configuration kept out of the code",
+        "Read and write files safely and handle time zones correctly",
+        "Clean, join and aggregate data with pandas",
+        "Validate data before it reaches your warehouse",
+        "Design idempotent loads that are safe to re-run",
+        "Add logging and retries so failures are visible and recoverable"
+      ],
       "course_url": "https://walnut-lms.vercel.app/courses/python-for-data-engineering",
       "enrol_url": "https://walnutdatatech.com/api/sso.php?app=walnut-lms&next=%2Fcourses%2Fpython-for-data-engineering"
     },
@@ -85,8 +125,17 @@
       "price_label": "₹8,999",
       "is_free": false,
       "is_featured": false,
+      "availability": "upcoming",
       "certificate_title": "Certificate of completion",
-      "thumbnail_url": null,
+      "thumbnail_url": "https://onboarding.walnutdatatech.com/lms-uploads/public/thumbnails/aws-cloud-practitioner-bootcamp-cover.jpg",
+      "preview_video_url": null,
+      "highlights": [
+        "Explain cloud computing, Regions and Availability Zones in plain language",
+        "Describe the shared responsibility model and apply it to real services",
+        "Choose between core compute, storage and networking services",
+        "Set up IAM users, roles and policies with least privilege",
+        "Estimate costs and control spending with budgets and the right pricing model"
+      ],
       "course_url": "https://walnut-lms.vercel.app/courses/aws-cloud-practitioner-bootcamp",
       "enrol_url": "https://walnutdatatech.com/api/sso.php?app=walnut-lms&next=%2Fcourses%2Faws-cloud-practitioner-bootcamp"
     },
@@ -103,8 +152,17 @@
       "price_label": "Free",
       "is_free": true,
       "is_featured": false,
+      "availability": "upcoming",
       "certificate_title": "Certificate of completion",
-      "thumbnail_url": null,
+      "thumbnail_url": "https://onboarding.walnutdatatech.com/lms-uploads/public/thumbnails/power-bi-for-business-reporting-cover.jpg",
+      "preview_video_url": null,
+      "highlights": [
+        "Import and shape data with Power Query",
+        "Model data as a star schema with fact and dimension tables",
+        "Write DAX measures and understand filter context",
+        "Use time intelligence for year-to-date and year-on-year figures",
+        "Design a report page that answers its main question in seconds"
+      ],
       "course_url": "https://walnut-lms.vercel.app/courses/power-bi-for-business-reporting",
       "enrol_url": "https://walnutdatatech.com/api/sso.php?app=walnut-lms&next=%2Fcourses%2Fpower-bi-for-business-reporting"
     },
@@ -121,11 +179,20 @@
       "price_label": "₹3,999",
       "is_free": false,
       "is_featured": false,
+      "availability": "upcoming",
       "certificate_title": "Certificate of completion",
-      "thumbnail_url": null,
+      "thumbnail_url": "https://onboarding.walnutdatatech.com/lms-uploads/public/thumbnails/cybersecurity-essentials-for-teams-cover.jpg",
+      "preview_video_url": null,
+      "highlights": [
+        "Recognise phishing emails, messages and calls",
+        "Protect accounts with a password manager and multi-factor authentication",
+        "Keep laptops and phones updated, encrypted and locked",
+        "Handle personal and confidential data in line with good practice and Indian law",
+        "Report a suspected incident quickly, with the right information"
+      ],
       "course_url": "https://walnut-lms.vercel.app/courses/cybersecurity-essentials-for-teams",
       "enrol_url": "https://walnutdatatech.com/api/sso.php?app=walnut-lms&next=%2Fcourses%2Fcybersecurity-essentials-for-teams"
     }
   ],
-  "updated_at": "2026-10-07T14:20:22.454Z"
+  "updated_at": "2026-10-08T11:21:01.183Z"
 }

@@ -2,6 +2,7 @@
 // so what is tested locally is what production serves.
 
 import { createHash } from 'node:crypto';
+import { THUMBNAIL_ORIGIN } from './assets/js/lms-catalogue.js';
 
 // The only inline script on the site. Before first paint it:
 //   - marks the document as JS-capable (scroll-reveal and tabs depend on it);
@@ -23,7 +24,8 @@ export function contentSecurityPolicy(config) {
     'script-src': ["'self'", sha256(inlineScript), ga && 'https://www.googletagmanager.com'],
     'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // inline is needed for style="" attributes only
     'font-src': ["'self'", 'https://fonts.gstatic.com'],
-    'img-src': ["'self'", 'data:', ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com'],
+    // Course images are kept in the Walnut LMS file store (see lms-catalogue.js).
+    'img-src': ["'self'", 'data:', THUMBNAIL_ORIGIN, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com'],
     'connect-src': ["'self'", lms, ga && 'https://www.googletagmanager.com', ga && 'https://*.google-analytics.com', ga && 'https://*.analytics.google.com'],
     'frame-src': ['https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
     'base-uri': ["'self'"],

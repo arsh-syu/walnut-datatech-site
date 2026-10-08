@@ -246,6 +246,10 @@ function dialogs() {
   return `<dialog class="modal modal-video" id="video-modal" aria-label="Video">
   <button class="modal-close" type="button" data-modal-close aria-label="Close">${icon('close')}</button>
   <div class="video-frame" data-video-frame></div>
+</dialog>
+<dialog class="modal modal-course" id="course-modal" aria-labelledby="course-modal-title">
+  <button class="modal-close" type="button" data-modal-close aria-label="Close">${icon('close')}</button>
+  <div data-course-modal-body></div>
 </dialog>`;
 }
 

@@ -175,13 +175,20 @@ ${ctaBand(root, {
 // the catalogue, and the browser swaps in the live catalogue when it has changed (see main.js).
 export function academy({ root }) {
   const courses = lmsCourses;
-  const free = courses.filter((c) => c.isFree);
+  // Only courses open for enrolment can be taken (or taken free); the rest are announced as upcoming.
+  const open = courses.filter((c) => !c.upcoming);
+  const soon = courses.length - open.length;
+  const free = open.filter((c) => c.isFree);
   const certified = courses.filter((c) => c.certificateTitle).length;
   const hours = courses.map((c) => c.durationHours).filter((h) => h > 0);
   const levels = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].filter((l) => courses.some((c) => c.level === l)).map((l) => l.toLowerCase());
   const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
   const list = (items) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : items[0]);
-  const freeLine = free.length ? `${free.length === courses.length ? 'all' : free.length} free` : '';
+  const freeLine = free.length ? `${free.length === open.length ? (open.length === 1 ? 'free' : 'all free') : `${free.length} free`}` : '';
+  // "7 online courses, 2 free" while all are open; "1 course open now (free) and 6 upcoming" otherwise.
+  const offer = soon
+    ? `${plural(open.length, 'course')} open now${freeLine ? ` (${freeLine})` : ''} and ${soon} upcoming`
+    : `${plural(courses.length, 'online course')}${freeLine ? `, ${freeLine}` : ''}`;
 
   const included = [
     ['screen', `${plural(lmsCategories.length, 'subject')} to choose from`, `${list(lmsCategories)}.`],
@@ -212,7 +219,7 @@ export function academy({ root }) {
   <div class="wrap">
     <p class="eyebrow hero-fade">For counsellors, students and professionals</p>
     <h1 class="display display-md">${splitWords('Upgrade your skills.')}</h1>
-    <p class="lede hero-fade" style="--d:.4s">${plural(courses.length, 'online course')} from Walnut Data Tech${freeLine ? `, ${freeLine}` : ''}, taught on Walnut LMS. ${lmsSso ? 'Choose a course, sign in with your Walnut account and start learning.' : 'Choose a course here, then enrol and learn on Walnut LMS.'}</p>
+    <p class="lede hero-fade" style="--d:.4s">${soon ? `Online courses from Walnut Data Tech, taught on Walnut LMS: ${offer}.` : `${offer} from Walnut Data Tech, taught on Walnut LMS.`} ${lmsSso ? 'Choose a course, sign in with your Walnut account and start learning.' : 'Choose a course here, then enrol and learn on Walnut LMS.'}</p>
     <div class="actions hero-fade" style="--d:.55s">
       ${button({ href: '#courses', label: 'Explore courses', size: 'lg', arrow: true })}
       ${button({ href: '#how', label: 'How enrolling works', variant: 'ghost', size: 'lg' })}
@@ -226,9 +233,9 @@ export function academy({ root }) {
     ${sectionHead({
       eyebrow: 'The catalogue',
       title: 'Choose your course.',
-      text: `${plural(courses.length, 'course')} across ${plural(lmsCategories.length, 'subject')}${freeLine ? `, ${freeLine}` : ''}. Open a course to see it on Walnut LMS, or enrol straight from its card.`,
+      text: `${plural(courses.length, 'course')} across ${plural(lmsCategories.length, 'subject')}${soon ? `: ${open.length} open now, ${soon} upcoming` : freeLine ? `, ${freeLine}` : ''}. Press i on a course for its details${courses.some((c) => c.preview) ? ' and preview' : ''}.`,
     })}
-    <div class="tracks" data-lms-catalogue data-lms-url="${esc(lmsUrl)}" data-lms-sso="${lmsSso ? 1 : 0}" data-root="${esc(root)}" data-updated="${esc(lmsUpdatedAt)}" data-lms-key="${lmsKey}" data-level="3">
+    <div class="course-groups" data-lms-catalogue data-lms-url="${esc(lmsUrl)}" data-lms-sso="${lmsSso ? 1 : 0}" data-root="${esc(root)}" data-updated="${esc(lmsUpdatedAt)}" data-lms-key="${lmsKey}" data-level="3">
       ${renderCatalogue(courses, { ...lmsOptions(root), level: 3 })}
     </div>
     <script type="application/json" id="lms-icons">${lmsIconsJson()}</script>
@@ -287,7 +294,7 @@ ${ctaBand(root, {
 `;
   return {
     title: 'Courses — upgrade your skills',
-    description: `${plural(courses.length, 'online course')} from Walnut Data Tech across ${plural(lmsCategories.length, 'subject')}${freeLine ? `, ${freeLine}` : ''}. Choose a course here, then enrol and learn on Walnut LMS.`,
+    description: `${plural(courses.length, 'online course')} from Walnut Data Tech across ${plural(lmsCategories.length, 'subject')}${soon ? `: ${open.length} open now, ${soon} upcoming` : freeLine ? `, ${freeLine}` : ''}. Choose a course here, then enrol and learn on Walnut LMS.`,
     body,
     bodyClass: 'page-academy',
     sticky: { href: '#courses', label: 'Explore courses' },

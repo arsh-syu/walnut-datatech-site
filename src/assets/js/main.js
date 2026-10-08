@@ -119,9 +119,33 @@ function openVideo(url, title) {
 }
 videoModal.addEventListener('close', () => videoFrame.replaceChildren());
 
+// The "i" on a course card: the course's details, from the <template> on the card, in a dialog. Its title
+// becomes the dialog's heading here (a heading in every card's template would break the page's outline).
+const courseModal = $('#course-modal');
+const courseBody = $('[data-course-modal-body]');
+function openCourse(card) {
+  const details = $('template[data-course-details]', card);
+  if (!details || !courseModal) return;
+  const content = details.content.cloneNode(true);
+  const title = $('[data-course-heading]', content);
+  if (title) {
+    const heading = document.createElement('h2');
+    heading.className = title.className;
+    heading.id = 'course-modal-title';
+    heading.append(...title.childNodes);
+    title.replaceWith(heading);
+  }
+  courseBody.replaceChildren(content);
+  courseModal.showModal();
+}
+courseModal?.addEventListener('close', () => courseBody.replaceChildren());
+
 document.addEventListener('click', (e) => {
   const video = e.target.closest('[data-video]');
   if (video) return openVideo(video.dataset.video, video.dataset.videoTitle);
+
+  const info = e.target.closest('[data-course-info]');
+  if (info) return openCourse(info.closest('.course-card'));
 
   const closer = e.target.closest('[data-modal-close]');
   if (closer) return closer.closest('dialog').close();

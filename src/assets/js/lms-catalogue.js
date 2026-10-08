@@ -3,39 +3,19 @@
 // the feed, and main.js uses it again in the browser to refresh that snapshot from the live feed, so both
 // always produce the same markup. It has no imports, so it runs unchanged in Node and in the browser.
 //
-// Nothing in the feed is trusted: every value is checked, every text is escaped, and the feed's own URLs
-// (course_url, enrol_url, thumbnail_url) are ignored. Every link is built here from the course slug.
+// Nothing in the feed is trusted: every value is checked and every text is escaped. The feed's links to
+// the course (course_url, enrol_url) are ignored and built here from the slug; a course image is used only
+// from the LMS's own thumbnails folder, and a preview video only as an embed built here from its ID.
 
 const LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 
-// Category → icon (by keywords in the category's name), for the head of each group. Anything else gets `cap`.
-const CATEGORY_ICONS = [
-  [/counsel|admission/i, 'counselling'],
-  [/\bai\b|artificial|machine|intelligen/i, 'automation'],
-  [/data|analytic/i, 'compliance'],
-  [/cloud|devops|infrastructure/i, 'infrastructure'],
-  [/secur/i, 'lock'],
-  [/business|career|management/i, 'careers'],
-  [/marketing/i, 'marketing'],
-  [/content|design|media/i, 'content'],
-];
+// Course images live in the Walnut LMS file store, in its public thumbnails folder; nothing else is shown.
+// The site's Content-Security-Policy allows images from this origin (src/security.mjs).
+export const THUMBNAIL_ORIGIN = 'https://onboarding.walnutdatatech.com';
+const THUMBNAIL = /^https:\/\/onboarding\.walnutdatatech\.com\/lms-uploads\/public\/thumbnails\/[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
 
 // Every icon the renderer can ask for, so the page can hand the browser exactly these (see #lms-icons).
-export const catalogueIcons = [...new Set(['external', 'arrow', 'clock', 'screen', 'cap', 'certificate', ...CATEGORY_ICONS.map(([, name]) => name)])];
-
-export const categoryIcon = (category) => CATEGORY_ICONS.find(([test]) => test.test(category))?.[1] ?? 'cap';
-
-// Who each subject is for, by the category's exact name on Walnut LMS. A category added there later shows
-// its levels only until a line is written for it here.
-const CATEGORY_LINES = {
-  'Counselling and admissions': 'For anyone who advises students, from the first enquiry to the admission decision.',
-  'Data and analytics': 'For analysts and engineers who turn raw data into answers a business can use.',
-  'AI and machine learning': 'For engineers who take models beyond the notebook and keep them working.',
-  'Cloud and DevOps': 'For anyone starting out with cloud services, or preparing for a first certification.',
-  'Business technology': 'For teams who report on their own numbers and want reports people trust.',
-  'Cybersecurity': 'For everyone in an organisation, not only IT: the habits that stop common attacks.',
-};
-export const categoryLine = (category) => (Object.hasOwn(CATEGORY_LINES, category) ? CATEGORY_LINES[category] : '');
+export const catalogueIcons = ['play'];
 
 export const esc = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -50,8 +30,30 @@ function text(value, max) {
 
 const count = (n) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
 
+// A YouTube or Vimeo link → the address this site plays it at (YouTube's no-cookie player), or null for
+// anything else. Only the video's ID is taken from the link.
+export function previewEmbed(url) {
+  if (typeof url !== 'string' || url.length > 300) return null;
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:') return null;
+  const host = u.hostname.replace(/^(www|m)\./, '');
+  if (['youtu.be', 'youtube.com', 'youtube-nocookie.com'].includes(host)) {
+    const id = host === 'youtu.be' ? u.pathname.slice(1) : u.pathname === '/watch' ? u.searchParams.get('v') : (u.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)$/) || [])[1];
+    return /^[A-Za-z0-9_-]{11}$/.test(id ?? '') ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+  }
+  const vimeo = host === 'vimeo.com' ? u.pathname.match(/^\/(\d{1,12})$/) : host === 'player.vimeo.com' ? u.pathname.match(/^\/video\/(\d{1,12})$/) : null;
+  return vimeo ? `https://player.vimeo.com/video/${vimeo[1]}` : null;
+}
+
 // One course from the feed, checked field by field. Returns the course as the site uses it, or null
 // when anything is missing or out of range (that course is then left out, never shown half-broken).
+// The later additions (modules, availability, image, preview video, highlights) are optional: a missing
+// or malformed one is left out, never the course.
 export function validCourse(c) {
   if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
   if (typeof c.slug !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(c.slug)) return null;
@@ -71,22 +73,27 @@ export function validCourse(c) {
     level: c.level,
     durationHours: c.duration_hours,
     lessons: c.lessons,
-    // Added to the feed later, so it is optional: a missing or malformed count is left out, not the course.
     modules: Number.isInteger(c.modules) && c.modules >= 0 ? c.modules : null,
     priceLabel,
     isFree: c.is_free === true,
     isFeatured: c.is_featured === true,
     certificateTitle: certificate || null,
+    // Shown but not yet open for enrolment, on Walnut LMS as here. Anything but "upcoming" is open.
+    upcoming: c.availability === 'upcoming',
+    image: typeof c.thumbnail_url === 'string' && THUMBNAIL.test(c.thumbnail_url) ? c.thumbnail_url : null,
+    preview: previewEmbed(c.preview_video_url),
+    highlights: Array.isArray(c.highlights) ? c.highlights.map((h) => text(h, 120)).filter(Boolean).slice(0, 6) : [],
   };
 }
 
-// The whole feed: the courses that pass, featured first (otherwise in the feed's order), and when it was updated.
+// The whole feed: the courses that pass — open ones first, featured first within that, otherwise in the
+// feed's order — and when it was updated.
 export function parseFeed(feed) {
   const list = Array.isArray(feed?.courses) ? feed.courses : [];
   const courses = list.map(validCourse).filter(Boolean);
   const seen = new Set();
   const unique = courses.filter((c) => !seen.has(c.slug) && seen.add(c.slug));
-  unique.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
+  unique.sort((a, b) => Number(a.upcoming) - Number(b.upcoming) || Number(b.isFeatured) - Number(a.isFeatured));
   const updatedAt = typeof feed?.updated_at === 'string' && /^[0-9TZ:.+-]{10,40}$/.test(feed.updated_at) ? feed.updated_at : '';
   return { courses: unique, updatedAt, rejected: list.length - unique.length };
 }
@@ -119,58 +126,105 @@ export function courseLinks(course, { lmsUrl, root = '', sso = false }) {
 
 const sentence = (level) => level.charAt(0) + level.slice(1).toLowerCase();
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+// One of four violet shades for a course without an image, the same for every course in a category.
+const tone = (category) => [...category].reduce((h, ch) => (h * 31 + ch.codePointAt(0)) >>> 0, 7) % 4;
 
-// `level` is the card's heading level. `eyebrow` is 'category' where cards stand alone (the home page),
-// or 'level' inside a catalogue group that already names the category. `reveal: false` is for cards
-// inside a container that already animates in.
-export function renderCard(course, { icon, lmsUrl, root = '', sso = false, level = 3, eyebrow = 'category', reveal = true, i = 0 }) {
+// The picture at the top of a card and of its details: the course's image from Walnut LMS, or a cover
+// drawn here naming the category. Decorative either way (the title says what the course is).
+function media(course, { icon, video }) {
+  const picture = course.image
+    ? `<img src="${esc(course.image)}" alt="" width="1600" height="900" loading="lazy" decoding="async">`
+    : `<span class="course-cover" data-tone="${tone(course.category)}" aria-hidden="true"><span>${esc(course.category)}</span></span>`;
+  return `${picture}
+      ${course.upcoming ? '<span class="course-badge">Upcoming</span>' : ''}
+      ${video && course.preview ? `<button class="course-play" type="button" data-video="${esc(course.preview)}" data-video-title="${esc(course.title)} — preview" data-track="course_preview" data-track-item="${esc(course.slug)}">${icon('play')}<span>Preview</span></button>` : ''}`;
+}
+
+// What the "i" on a card opens: everything known about the course, its preview video when it has one,
+// and the way in. Kept in a <template> on the card, so it costs nothing until it is opened; main.js makes
+// its title the dialog's <h2> then (a heading in every card's template would break the page's outline).
+export function renderCourseDetails(course, { icon, lmsUrl, root = '', sso = false }) {
   const { page, enrol } = courseLinks(course, { lmsUrl, root, sso });
+  const title = esc(course.title);
+  // The short facts share a row; the certificate's name is long, so it gets a row of its own.
+  const facts = [
+    ['Level', sentence(course.level)],
+    course.durationHours > 0 ? ['Length', plural(course.durationHours, 'hour')] : null,
+    course.modules > 0 ? ['Modules', course.lessons > 0 ? `${plural(course.modules, 'module')}, ${plural(course.lessons, 'lesson')}` : plural(course.modules, 'module')] : course.lessons > 0 ? ['Lessons', plural(course.lessons, 'lesson')] : null,
+    ['Price', course.upcoming ? 'Announced when the course opens' : course.priceLabel],
+    course.certificateTitle ? ['Certificate', course.certificateTitle, 'is-wide'] : null,
+  ].filter(Boolean);
+  return `<div class="course-detail">
+    <div class="course-media">
+      ${media(course, { icon, video: false })}
+    </div>
+    <div class="course-detail-body">
+      <p class="eyebrow">${esc(course.category)}</p>
+      <p class="course-detail-title" data-course-heading>${title}</p>
+      ${course.subtitle ? `<p class="course-detail-lede">${esc(course.subtitle)}</p>` : ''}
+      <dl class="course-facts">${facts.map(([k, v, wide]) => `<div${wide ? ` class="${wide}"` : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+      ${course.highlights.length ? `<p class="course-learn-head">What you will learn</p><ul class="course-learn">${course.highlights.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
+      <div class="course-detail-actions">
+        ${course.preview ? `<button class="btn btn-ghost" type="button" data-video="${esc(course.preview)}" data-video-title="${title} — preview" data-track="course_preview" data-track-item="${esc(course.slug)}">${icon('play')}<span>Watch the preview</span></button>` : ''}
+        ${course.upcoming
+          ? '<p class="course-soon">Opening soon</p>'
+          : `<a class="btn btn-primary" href="${esc(enrol)}"${sso ? '' : ' rel="noopener"'} data-track="course_enrol" data-track-item="${esc(course.slug)}"><span>Enrol</span><span class="sr-only"> in ${title}${sso ? '' : ' on Walnut LMS'}</span></a>`}
+        <a class="link-arrow" href="${esc(page)}" rel="noopener" data-track="course_select" data-track-item="${esc(course.slug)}"><span>View on Walnut LMS</span></a>
+      </div>
+    </div>
+  </div>`;
+}
+
+// `level` is the card's heading level. `reveal: false` is for cards inside a container that already
+// animates in. The title links to the course on Walnut LMS and covers the card; the "i", the preview and
+// Enrol sit above it.
+export function renderCard(course, { icon, lmsUrl, root = '', sso = false, level = 3, reveal = true, i = 0 }) {
+  const { page, enrol } = courseLinks(course, { lmsUrl, root, sso });
+  const title = esc(course.title);
   const meta = [
-    eyebrow === 'level' ? null : ['cap', sentence(course.level)],
-    course.durationHours > 0 ? ['clock', plural(course.durationHours, 'hour')] : null,
+    course.durationHours > 0 ? plural(course.durationHours, 'hour') : null,
     // Modules are what a learner works through; the LMS's lesson count includes every reading, PDF and
     // self-check, so it is shown only when the feed gives no module count.
-    course.modules > 0 ? ['screen', plural(course.modules, 'module')] : course.lessons > 0 ? ['screen', plural(course.lessons, 'lesson')] : null,
+    course.modules > 0 ? plural(course.modules, 'module') : course.lessons > 0 ? plural(course.lessons, 'lesson') : null,
+    course.certificateTitle ? 'Certificate' : null,
   ].filter(Boolean);
-  const title = esc(course.title);
-  return `<article class="course-card spot"${reveal ? ` data-reveal style="--d:${(i * 0.1).toFixed(1)}s"` : ''}>
-    <p class="eyebrow">${esc(eyebrow === 'level' ? sentence(course.level) : course.category)}</p>
-    <h${level} class="course-card-title"><a href="${esc(page)}" rel="noopener" data-track="course_select" data-track-item="${esc(course.slug)}">${title}${icon('external')}<span class="sr-only"> (on Walnut LMS)</span></a></h${level}>
-    ${course.subtitle ? `<p class="course-card-tagline">${esc(course.subtitle)}</p>` : ''}
-    ${meta.length ? `<ul class="course-meta">${meta.map(([ico, value]) => `<li>${icon(ico)}${esc(value)}</li>`).join('')}</ul>` : ''}
-    ${course.certificateTitle ? `<p class="course-cert">${icon('certificate')}<span>${esc(course.certificateTitle)}</span></p>` : ''}
-    <div class="course-buy">
-      <p class="course-price${course.isFree ? ' is-free' : ''}"><span class="sr-only">Price: </span>${esc(course.priceLabel)}</p>
-      <a class="btn btn-primary" href="${esc(enrol)}"${sso ? '' : ' rel="noopener"'} data-track="course_enrol" data-track-item="${esc(course.slug)}"><span>Enrol</span><span class="sr-only"> in ${title}${sso ? '' : ' on Walnut LMS'}</span>${icon(sso ? 'arrow' : 'external')}</a>
+  return `<article class="course-card spot${course.upcoming ? ' is-upcoming' : ''}"${reveal ? ` data-reveal style="--d:${(i * 0.08).toFixed(2)}s"` : ''}>
+    <div class="course-media">
+      ${media(course, { icon, video: true })}
     </div>
+    <div class="course-body">
+      <p class="eyebrow">${esc(course.category)} · ${sentence(course.level)}</p>
+      <h${level} class="course-card-title"><a href="${esc(page)}" rel="noopener" data-track="course_select" data-track-item="${esc(course.slug)}">${title}<span class="sr-only"> (on Walnut LMS)</span></a></h${level}>
+      ${course.subtitle ? `<p class="course-card-tagline">${esc(course.subtitle)}</p>` : ''}
+      ${meta.length ? `<ul class="course-meta">${meta.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>` : ''}
+      <div class="course-buy">
+        ${course.upcoming
+          ? '<p class="course-soon">Opening soon</p>'
+          : `<p class="course-price${course.isFree ? ' is-free' : ''}"><span class="sr-only">Price: </span>${esc(course.priceLabel)}</p>
+        <a class="btn btn-primary" href="${esc(enrol)}"${sso ? '' : ' rel="noopener"'} data-track="course_enrol" data-track-item="${esc(course.slug)}"><span>Enrol</span><span class="sr-only"> in ${title}${sso ? '' : ' on Walnut LMS'}</span></a>`}
+      </div>
+    </div>
+    <button class="course-info" type="button" data-course-info aria-haspopup="dialog" aria-label="About ${title}" data-track="course_info" data-track-item="${esc(course.slug)}"><span aria-hidden="true">i</span></button>
+    <template data-course-details>${renderCourseDetails(course, { icon, lmsUrl, root, sso })}</template>
   </article>`;
 }
 
-// "Beginner level", "Beginner and intermediate levels", … for the head of a group.
-function levelsLine(list) {
-  const levels = LEVELS.filter((l) => list.some((c) => c.level === l)).map((l) => l.toLowerCase());
-  const named = levels.length > 1 ? `${levels.slice(0, -1).join(', ')} and ${levels.at(-1)} levels` : `${levels[0]} level`;
-  const free = list.filter((c) => c.isFree).length;
-  const freeNote = !free ? '' : free === list.length ? (list.length === 1 ? ' · free' : ' · all free') : ` · ${free} free`;
-  return named.charAt(0).toUpperCase() + named.slice(1) + freeNote;
-}
-
-// The catalogue, grouped by category in the order categories first appear (so featured courses lead).
-// `level` is the heading level of each group; its course cards sit one level below.
+// The catalogue: the courses open for enrolment, then the upcoming ones. `level` is the heading level of
+// each group; its course cards sit one level below. A group of one course shows it as a wide card.
 export function renderCatalogue(courses, { icon, lmsUrl, root = '', sso = false, level = 3 }) {
-  const groups = new Map();
-  for (const c of courses) groups.set(c.category, [...(groups.get(c.category) ?? []), c]);
-  return [...groups]
+  return [
+    ['Open for enrolment', 'Enrol today and start learning on Walnut LMS.', courses.filter((c) => !c.upcoming)],
+    ['Upcoming courses', 'These courses are being prepared, and open for enrolment on Walnut LMS soon.', courses.filter((c) => c.upcoming)],
+  ]
+    .filter(([, , list]) => list.length)
     .map(
-      ([category, list]) => `<div class="track" data-reveal>
-        <header class="track-head">
-          <span class="area-ico">${icon(categoryIcon(category))}</span>
-          <h${level}>${esc(category)}</h${level}>
-          ${categoryLine(category) ? `<p>${esc(categoryLine(category))}</p>` : ''}
-          <p class="track-levels">${esc(levelsLine(list))}</p>
-          <p class="track-count">${plural(list.length, 'course')}</p>
+      ([heading, line, list]) => `<div class="course-group" data-reveal>
+        <header class="course-group-head">
+          <h${level}>${heading}</h${level}>
+          <p>${line}</p>
+          <p class="course-group-count">${plural(list.length, 'course')}</p>
         </header>
-        <div class="course-grid">${list.map((c, i) => renderCard(c, { icon, lmsUrl, root, sso, level: level + 1, eyebrow: 'level', i })).join('')}</div>
+        <div class="course-grid${list.length === 1 ? ' is-single' : ''}">${list.map((c, i) => renderCard(c, { icon, lmsUrl, root, sso, level: level + 1, i })).join('')}</div>
       </div>`
     )
     .join('\n      ');
