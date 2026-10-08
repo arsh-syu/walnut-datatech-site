@@ -7,6 +7,17 @@ require __DIR__ . '/pay-lib.php';
 
 $config = load_config();
 $configured = !empty($config['key_id']) && !empty($config['key_secret']);
+// When Razorpay's webhook last delivered a correctly signed event (only those carry an event ID that is
+// recorded), so it can be seen from outside that the webhook and its secret work. A time, nothing more.
+$webhookLast = null;
+if (pay_configured($config) && accounts_configured($config) && ($db = account_db($config))) {
+    try {
+        $last = db_row($db, 'SELECT MAX(received_at) AS t FROM wa_pay_events')['t'] ?? null;
+        $webhookLast = $last ? iso($last) : null;
+    } catch (Throwable $e) {
+        $webhookLast = null;
+    }
+}
 
 respond(200, [
     'ok' => true,
@@ -26,6 +37,7 @@ respond(200, [
     // never their secrets.
     'pay' => pay_configured($config),
     'pay_apps' => array_keys(pay_apps($config)),
+    'pay_webhook_last' => $webhookLast,
     'mode' => $configured ? (strpos($config['key_id'], 'rzp_live_') === 0 ? 'live' : 'test') : null,
     // A random value the deploy writes into each new config.php (not a secret). The host loads a new
     // config.php only minutes after it is uploaded, so the deploy waits until this shows its value.

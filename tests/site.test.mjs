@@ -602,7 +602,10 @@ test('the gateway: signed calls from registered apps, a ledger that cannot pay t
   assert.ok(lib.includes('const PAY_RETRY = [60, 120, 300, 900, 1800, 3600, 7200, 21600];') && lib.includes('const PAY_RETRY_FOR = 7 * 86400;'));
   // The library is never served, health says whether the gateway is set up, and nothing else.
   assert.match(readFileSync(join(dist, 'api/.htaccess'), 'utf8'), /account-lib\|pay-lib\)\\\.php/);
-  assert.ok(readFileSync(join(projectRoot, 'src/api/health.php'), 'utf8').includes("'pay' => pay_configured($config),"));
+  const health = readFileSync(join(projectRoot, 'src/api/health.php'), 'utf8');
+  assert.ok(health.includes("'pay' => pay_configured($config),"));
+  // When Razorpay's webhook last got through (a time only), so the webhook's secret can be checked from outside.
+  assert.ok(health.includes("'pay_webhook_last' => $webhookLast,") && health.includes("SELECT MAX(received_at) AS t FROM wa_pay_events"));
   for (const name of ['intents', 'intent', 'refund', 'checkout', 'confirm', 'webhook']) assert.ok(existsSync(join(dist, 'api/pay', `${name}.php`)), name);
 
   // The deploy: the gateway only with accounts, keys, the webhook secret and an app; its secrets go to the server only.
