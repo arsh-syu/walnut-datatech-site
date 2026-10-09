@@ -94,7 +94,7 @@ export default function home({ root }) {
 <section class="hero">
   <div class="hero-glow" aria-hidden="true" data-speed="0.75"></div>
   <div class="wrap hero-in">
-    ${mark('hero-mark').replace('<svg ', '<svg data-speed="clamp(0.9)" ')}
+    ${mark('hero-mark')}
     <p class="eyebrow hero-fade" style="--d:.5s">Technology · Learning · Partnerships</p>
     <h1 class="display">${splitWords('The technology ecosystem behind')} <span class="hero-hl" data-tech-text>${splitWords('online education.', 4)}</span></h1>
     <p class="lede hero-fade" style="--d:.75s">Walnut Data Tech runs online programmes for universities, teaches career skills through short courses, and gives education partners the tools to grow.</p>

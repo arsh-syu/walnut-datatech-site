@@ -1177,7 +1177,7 @@ test('content pages scroll smoothly with GSAP (pinned, hashed, allowed there onl
   assert.ok(home.includes('assets/js/smooth.js') && home.includes('<div id="smooth-wrapper"><div id="smooth-content">'), 'wrapper and script');
   assert.ok(home.indexOf('</header>') < home.indexOf('id="smooth-wrapper"') && home.includes('</footer>\n</div></div>'), 'the header stays outside the smoothed content; the footer moves with it');
   assert.match(home, /script-src 'self' 'sha256-[^']+' https:\/\/cdn\.jsdelivr\.net[ ;]/, 'the policy allows the CDN on the home page');
-  assert.ok(home.includes('data-speed="clamp(0.9)"') && home.includes('data-speed="0.75"'), 'the hero mark and glow drift at their own pace');
+  assert.ok(home.includes('data-speed="0.75"') && !/class="mark hero-mark"[^>]*data-speed/.test(home), 'the hero glow drifts; the mark keeps its CSS spin (no parallax hook on it)');
   for (const page of ['academy', 'contact', 'about', 'solutions/infrastructure', 'partners', 'verify-certificate']) {
     const html = readFileSync(join(dist, page, 'index.html'), 'utf8');
     assert.ok(html.includes('ScrollSmoother.min.js') && html.includes('<div id="smooth-wrapper"><div id="smooth-content">') && html.includes('assets/js/smooth.js'), `${page} is smoothed`);

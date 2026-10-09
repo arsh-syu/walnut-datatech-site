@@ -163,3 +163,7 @@ button { font: inherit; color: inherit; }
   .js [data-reveal]:not(.in) { opacity: 1; transform: none; }
   @view-transition { navigation: none; }
 }
+
+/* phones: entrance animations that slide content in from the side (configurator steps, reveals) must not widen the
+   layout viewport at first paint, which would zoom the page out and let it pan sideways; clip keeps sticky bars working */
+main { overflow-x: clip; }
