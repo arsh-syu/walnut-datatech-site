@@ -318,6 +318,8 @@ ${hasOg && config.siteUrl ? `<meta property="og:image" content="${config.siteUrl
 <meta name="theme-color" content="#ffffff">
 <script>${inlineScript}</script>
 <link rel="icon" href="${root}assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="${root}assets/img/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="${root}assets/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lexend:wght@500&display=swap">

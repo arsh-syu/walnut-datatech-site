@@ -74,6 +74,8 @@ export default {
   clients: [
     { name: 'Savitribai Phule Pune University', place: 'Pune, Maharashtra', logo: 'client-sppu.webp', width: 360, height: 346 },
     { name: 'Guru Ghasidas Vishwavidyalaya', place: 'Bilaspur, Chhattisgarh', logo: 'client-ggv.webp', width: 360, height: 353 },
+    { name: 'Profi University', place: '', logo: 'client-profi.webp', width: 512, height: 213 },
+    { name: 'MIT Art, Design and Technology University', place: 'Pune, Maharashtra', logo: 'client-mitadt.webp', width: 534, height: 285 },
   ],
 
   // { name, detail } — e.g. { name: 'ISO 27001', detail: 'Information security management' }
