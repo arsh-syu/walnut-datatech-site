@@ -300,6 +300,34 @@ export function mountTechText(container, initial = {}) {
       ctx.globalAlpha = 1;
     };
 
+    const labels = new Map();
+    const labelSprite = (text, accent) => {
+      const key = `${text}|${accent}|${dpr}`;
+      const cached = labels.get(key);
+      if (cached) return cached;
+      const image = document.createElement('canvas');
+      const c = image.getContext('2d');
+      c.font = LABEL_FONT;
+      const m = c.measureText(text);
+      const width = Math.ceil(m.width) + 4;
+      const ascent = 10;
+      const height = 14;
+      image.width = Math.ceil(width * dpr);
+      image.height = Math.ceil(height * dpr);
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.font = LABEL_FONT;
+      c.textAlign = 'left';
+      c.textBaseline = 'alphabetic';
+      c.lineJoin = 'round';
+      c.lineWidth = 3;
+      c.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      c.strokeText(text, 2, ascent);
+      c.fillStyle = rgba(accent, 0.8);
+      c.fillText(text, 2, ascent);
+      const made = { image, width, height, ascent };
+      labels.set(key, made);
+      return made;
+    };
     const crisp = (value) => (Math.round(value * dpr) + 0.5) / dpr;
 
     const perimeterPoint = (distance, w, h) => {
@@ -415,16 +443,16 @@ export function mountTechText(container, initial = {}) {
       }
 
       if (!s.labels) return;
-      ctx.font = LABEL_FONT;
-      if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'bottom';
-      ctx.fillStyle = rgba(s.accentColor, 0.62 * a);
       const label =
         moved > 1
           ? `${signed(Math.round(glyph.offset.x))}, ${signed(Math.round(-glyph.offset.y))}`
           : `${glyph.char}  ${Math.round(glyph.box.x2 - glyph.box.x1)} × ${Math.round(glyph.box.y2 - glyph.box.y1)}`;
-      ctx.fillText(label, Math.round(frame.x1), Math.round(frame.y1) - 7);
+      // The label is drawn on its own small canvas — a fresh context with no letter spacing or other text state
+      // from the glyph work, in every browser — with a soft light halo, so it stays legible over the specks.
+      const sprite = labelSprite(label, s.accentColor);
+      ctx.globalAlpha = a;
+      ctx.drawImage(sprite.image, Math.round(frame.x1) - 2, Math.round(frame.y1) - 7 - sprite.ascent, sprite.width, sprite.height);
+      ctx.globalAlpha = 1;
     };
 
     const tick = (now) => {
@@ -556,6 +584,7 @@ export function mountTechText(container, initial = {}) {
       width = Math.max(1, container.clientWidth);
       height = Math.max(1, container.clientHeight);
       dpr = Math.min(window.devicePixelRatio || 1, 2);
+      labels.clear();
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       layoutKey = '';
