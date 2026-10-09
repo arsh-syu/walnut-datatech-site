@@ -6,6 +6,8 @@
 
 import { esc } from './session.js';
 import { createCodeSlots } from './code-slots.js';
+import { createStatusMark } from './status-mark.js';
+import { mountClickSpark } from './click-spark.js';
 
 const DEAD = ['OTP_EXPIRED', 'OTP_INVALIDATED'];
 
@@ -75,8 +77,21 @@ export function otpStep(box, { challenge, length = 6, verify, resend, onChange, 
       clearTimeout(timer);
       slots.setStatus('success'); // the server said yes: the slots show it, then the tick takes over
       await new Promise((r) => setTimeout(r, 450));
-      box.innerHTML = `<div class="otp-done" role="status"><span class="success-check" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><h2 class="login-title">Verified</h2><p class="login-sub">${esc(typeof doneText === 'function' ? doneText() : doneText)}</p></div>`;
-      setTimeout(onDone, 800);
+      // The verified moment: React Bits' StatusMark spins as a violet arc, settles, fills and draws its check in
+      // Walnut green while ClickSpark bursts around it; then the words rise in. Nothing here is a status in
+      // itself — the server has already said yes.
+      box.innerHTML = `<div class="otp-done" role="status"><div class="otp-done-stage" aria-hidden="true"><div class="otp-done-mark" data-mark></div></div><h2 class="login-title">Verified</h2><p class="login-sub">${esc(typeof doneText === 'function' ? doneText() : doneText)}</p></div>`;
+      const done = box.querySelector('.otp-done');
+      const stage = box.querySelector('.otp-done-stage');
+      const mark = createStatusMark({ status: 'running', size: 112, strokeWidth: 1.6, dashes: 10, color: '#7d62ff', doneColor: '#17b26a', drawDuration: 420, fillOpacity: 0.1, spinDuration: 900 });
+      box.querySelector('[data-mark]').append(mark.element);
+      const spark = mountClickSpark(stage, { sparkColor: '#7d62ff', sparkSize: 22, sparkRadius: 66, sparkCount: 14, duration: 850, onClick: false });
+      await new Promise((r) => setTimeout(r, 520));
+      mark.setStatus('done');
+      done.classList.add('is-done');
+      spark.burst(stage.clientWidth / 2, stage.clientHeight / 2);
+      setTimeout(() => spark.burst(stage.clientWidth / 2, stage.clientHeight / 2), 140);
+      setTimeout(onDone, 1900);
     } catch (err) {
       dead = DEAD.includes(err.reason); // expired or invalidated: only a resend can continue
       status.textContent = err.message; // the server's own words: wrong code, attempts left, rate limit, or no connection
