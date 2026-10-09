@@ -47,6 +47,9 @@ if (wrapper && content && gsap && ScrollTrigger && ScrollSmoother && !reduceMoti
     const top = parseFloat(getComputedStyle(el).top) || 0;
     if (top <= headerHeight() + 1) underHeader.push(el);
     el.style.position = 'relative'; // sticky would never engage here; relative keeps its ::before in place
+    // The pin moves the panel with a transform on every frame; a reveal transition on transform (.8s) would
+    // ease each of those moves and the panel bounces when the page stops. Everything else keeps its transition.
+    el.style.transitionProperty = 'opacity, translate, box-shadow, border-color, background-color';
     ScrollTrigger.create({
       trigger: el,
       pin: true,

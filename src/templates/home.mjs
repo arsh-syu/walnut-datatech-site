@@ -96,7 +96,7 @@ export default function home({ root }) {
   <div class="wrap hero-in">
     ${mark('hero-mark')}
     <p class="eyebrow hero-fade" style="--d:.5s">Technology · Learning · Partnerships</p>
-    <h1 class="display">${splitWords('The technology ecosystem behind')} <span class="hero-hl" data-tech-text>${splitWords('online education.', 4)}</span></h1>
+    <h1 class="display">${splitWords('The technology ecosystem behind')} <span class="hero-hl gradient-text" data-gradient-text style="--i:4"><span class="gradient-text__inner"><span class="gradient-text__content">online education.</span><span class="gradient-text__glow" aria-hidden="true">online education.</span></span></span></h1>
     <p class="lede hero-fade" style="--d:.75s">Walnut Data Tech runs online programmes for universities, teaches career skills through short courses, and gives education partners the tools to grow.</p>
     <div class="actions center hero-fade" style="--d:.9s">
       ${button({ href: '#start', label: 'Find your path', size: 'lg', arrow: true })}
@@ -168,7 +168,7 @@ ${clientele(root)}
       'Walnut Data Tech powers online education: technology and services for universities, short certification courses for learners, and applications for education partners.',
     body,
     bodyClass: 'page-home',
-    scripts: ['tech-text.js'],
+    scripts: ['gradient-text.js'],
     jsonLd: [
       {
         '@context': 'https://schema.org',

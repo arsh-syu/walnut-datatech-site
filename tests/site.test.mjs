@@ -715,7 +715,7 @@ test('the site speaks of partners, names its clients and carries the company det
   const home = page('');
   assert.ok(home.includes('support@walnutdatatech.com') && home.includes('Sector 62, Noida') && home.includes('GSTIN 09AADCW6322K1Z1'), 'the footer carries the address, email and GSTIN');
   assert.ok(page('contact').includes('mailto:support@walnutdatatech.com') && page('privacy').includes('Walnut DataTech Private Limited'));
-  assert.ok(home.includes('class="hero-hl"'), 'the headline carries its highlight');
+  assert.ok(home.includes('class="hero-hl gradient-text"'), 'the headline carries its highlight');
 });
 
 test('login asks existing or new once, and a profile can hold a mobile number either way', () => {
@@ -1193,17 +1193,16 @@ test('content pages scroll smoothly with GSAP (pinned, hashed, allowed there onl
   assert.ok(readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8').includes('window.walnutScrollTo'), 'main.js scrolls through the smoother when there is one');
 });
 
-test('the hero\'s "online education." is drawn as TechText: the words stay in the heading, the drawing is an enhancement', () => {
-  const home = readFileSync(join(dist, 'index.html'), 'utf8');
-  assert.match(home, /<h1 class="display">[\s\S]*<span class="hero-hl" data-tech-text><span class="w"><span style="--i:4">online<\/span><\/span> <span class="w"><span style="--i:5">education\.<\/span><\/span><\/span><\/h1>/);
-  assert.ok(home.includes('assets/js/tech-text.js'));
-  const tt = readFileSync(join(projectRoot, 'src/assets/js/tech-text.js'), 'utf8');
-  // the original React Bits engine (MIT + Commons Clause), with the hero's settings in Walnut violet
-  for (const needle of ['React Bits', 'export function mountTechText', 'drawSpecks', 'perimeterPoint', 'glyphAt', 'prefers-reduced-motion', "reveal: 'letter'", 'dashLength: 4', 'dashGap: 2', 'specks: 15', 'reach: 200', 'softness: 0.7', 'strokeWidth: 1.5', 'sweep: true', 'speed: 0.55', "COLOR = '#6a4df5'", 'ResizeObserver']) {
-    assert.ok(tt.includes(needle), needle);
+test('the hero\'s "online education." is React Bits\' GradientText: the words stay in the heading, the gradient is painted by the script', () => {
+  const home = readFileSync(join(projectRoot, 'dist/index.html'), 'utf8');
+  assert.match(home, /<h1 class="display">[\s\S]*<span class="hero-hl gradient-text" data-gradient-text style="--i:4"><span class="gradient-text__inner"><span class="gradient-text__content">online education\.<\/span><span class="gradient-text__glow" aria-hidden="true">online education\.<\/span><\/span><\/span><\/h1>/);
+  assert.ok(home.includes('assets/js/gradient-text.js') && !home.includes('tech-text.js'));
+  const gt = readFileSync(join(projectRoot, 'src/assets/js/gradient-text.js'), 'utf8');
+  for (const needle of ['React Bits', 'export function mountGradientText', "variant: 'flow'", 'animationSpeed: 8', 'glow: 0.4', 'radial-gradient(ellipse', 'repeating-conic-gradient', 'prefers-reduced-motion', 'IntersectionObserver', "'#5b3fe6'", "'#7d62ff'"]) {
+    assert.ok(gt.includes(needle), `gradient-text.js keeps ${needle}`);
   }
-  const css = readFileSync(join(dist, 'assets/css/site.css'), 'utf8');
-  assert.ok(css.includes('.tech-host-text { visibility: hidden; }') && css.includes('.tech-text-canvas'), 'the words stay in the heading, hidden; the canvas is styled');
+  const css = readFileSync(join(projectRoot, 'src/assets/css/sections.css'), 'utf8');
+  assert.ok(css.includes('.gradient-text__content {') && css.includes('background-clip: text') && css.includes('.gradient-text__glow {'), 'the component CSS is present');
 });
 
 test('course pictures: one 16:9 frame, inset from the card, rounded; odd ratios are shown whole', () => {
