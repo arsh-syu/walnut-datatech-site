@@ -1198,11 +1198,12 @@ test('the hero\'s "online education." is drawn as TechText: the words stay in th
   assert.match(home, /<h1 class="display">[\s\S]*<span class="hero-hl" data-tech-text><span class="w"><span style="--i:4">online<\/span><\/span> <span class="w"><span style="--i:5">education\.<\/span><\/span><\/span><\/h1>/);
   assert.ok(home.includes('assets/js/tech-text.js'));
   const tt = readFileSync(join(projectRoot, 'src/assets/js/tech-text.js'), 'utf8');
-  for (const needle of ["reveal: 'letter'", 'dashLength: 4', 'dashGap: 2', 'specks: 15', 'reach: 200', 'softness: 0.7', 'strokeWidth: 1.5', 'speed: 1', "lineStyle: 'dashed'", 'sweep: true', 'fontWeight: 600', 'prefers-reduced-motion', "className = 'sr-only'", 'ResizeObserver']) {
+  // the original React Bits engine (MIT + Commons Clause), with the hero's settings in Walnut violet
+  for (const needle of ['React Bits', 'export function mountTechText', 'drawSpecks', 'perimeterPoint', 'glyphAt', 'prefers-reduced-motion', "reveal: 'letter'", 'dashLength: 4', 'dashGap: 2', 'specks: 15', 'reach: 200', 'softness: 0.7', 'strokeWidth: 1.5', 'sweep: true', 'speed: 1', "COLOR = '#6a4df5'", 'ResizeObserver']) {
     assert.ok(tt.includes(needle), needle);
   }
   const css = readFileSync(join(dist, 'assets/css/site.css'), 'utf8');
-  assert.ok(css.includes('.tt-l {') && css.includes('.is-off .tt-specks circle { animation-play-state: paused; }'), 'letters are styled and the specks rest off screen');
+  assert.ok(css.includes('.tech-host-text { visibility: hidden; }') && css.includes('.tech-text-canvas'), 'the words stay in the heading, hidden; the canvas is styled');
 });
 
 test('course pictures: one 16:9 frame, inset from the card, rounded; odd ratios are shown whole', () => {
