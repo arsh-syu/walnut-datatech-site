@@ -1199,7 +1199,7 @@ test('the hero\'s "online education." is drawn as TechText: the words stay in th
   assert.ok(home.includes('assets/js/tech-text.js'));
   const tt = readFileSync(join(projectRoot, 'src/assets/js/tech-text.js'), 'utf8');
   // the original React Bits engine (MIT + Commons Clause), with the hero's settings in Walnut violet
-  for (const needle of ['React Bits', 'export function mountTechText', 'drawSpecks', 'perimeterPoint', 'glyphAt', 'prefers-reduced-motion', "reveal: 'letter'", 'dashLength: 4', 'dashGap: 2', 'specks: 15', 'reach: 200', 'softness: 0.7', 'strokeWidth: 1.5', 'sweep: true', 'speed: 1', "COLOR = '#6a4df5'", 'ResizeObserver']) {
+  for (const needle of ['React Bits', 'export function mountTechText', 'drawSpecks', 'perimeterPoint', 'glyphAt', 'prefers-reduced-motion', "reveal: 'letter'", 'dashLength: 4', 'dashGap: 2', 'specks: 15', 'reach: 200', 'softness: 0.7', 'strokeWidth: 1.5', 'sweep: true', 'speed: 0.55', "COLOR = '#6a4df5'", 'ResizeObserver']) {
     assert.ok(tt.includes(needle), needle);
   }
   const css = readFileSync(join(dist, 'assets/css/site.css'), 'utf8');

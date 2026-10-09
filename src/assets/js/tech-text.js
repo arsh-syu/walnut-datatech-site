@@ -8,7 +8,7 @@
 // (visibility hidden) and the canvas is sized from the heading's own font, baseline and ink box, in Walnut's
 // violet instead of the demo's white.
 
-export const DEFAULTS = { text: 'React Bits', fontFamily: '', fontWeight: 600, fontSize: 150, letterSpacing: -0.05, color: '#ffffff', accentColor: '#ffffff', reach: 200, softness: 0.7, dashLength: 4, dashGap: 2, strokeWidth: 1.5, lineStyle: 'dashed', reveal: 'letter', specks: 15, selection: true, labels: true, draggable: true, sweep: true, speed: 1 };
+export const DEFAULTS = { text: 'React Bits', fontFamily: '', fontWeight: 600, fontSize: 150, letterSpacing: -0.05, color: '#ffffff', accentColor: '#ffffff', reach: 200, softness: 0.7, dashLength: 4, dashGap: 2, strokeWidth: 1.5, lineStyle: 'dashed', reveal: 'letter', specks: 15, selection: true, labels: true, draggable: true, sweep: true, speed: 0.55 };
 
 const LABEL_FONT = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 const FALLOFF_STEPS = 8;
@@ -416,6 +416,7 @@ export function mountTechText(container, initial = {}) {
 
       if (!s.labels) return;
       ctx.font = LABEL_FONT;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
       ctx.fillStyle = rgba(s.accentColor, 0.62 * a);
