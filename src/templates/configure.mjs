@@ -76,6 +76,7 @@ export default function configure({ root }) {
     description: 'Request empanelment with Walnut Data Tech: choose the services your university needs for its online programmes, tell us your requirements and submit your request.',
     body,
     bodyClass: 'page-configure',
+    smooth: false, // an app-like form with a sticky summary and a bottom bar: native scrolling
     scripts: ['configure.js'],
   };
 }

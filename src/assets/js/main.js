@@ -1,11 +1,15 @@
 // Site-wide interactions. Everything here is progressive enhancement: the pages are complete without it.
 
 import { initForms } from './forms.js';
+import { initPhones } from './phone.js';
 import { initAnalytics, track } from './analytics.js';
 import { paintHeader } from './session.js';
 import { keepExclusive } from './roles.js';
+import { mountHoloCards } from './holo-card.js';
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Brings an element into view: through the smooth scroller when the page has one (assets/js/smooth.js), else natively.
+const bringIntoView = (el, smooth = !reduceMotion) => (window.walnutScrollTo ? window.walnutScrollTo(el, smooth) : el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }));
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -53,6 +57,23 @@ addEventListener('keydown', (e) => {
   }
 });
 matchMedia('(min-width: 1101px)').addEventListener('change', () => setMenu(false));
+
+/* ---------- course pictures ---------- */
+
+// Every course picture sits in a 16:9 frame. One that is not 16:9 itself (a tall poster, a wide banner) is
+// shown whole on the frame's background rather than cropped; the rest fill the frame.
+function fitCourseImages(root = document) {
+  for (const img of root.querySelectorAll('.course-media img')) {
+    const check = () => {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      img.classList.toggle('is-contain', Math.abs(img.naturalWidth / img.naturalHeight - 16 / 9) > 0.25);
+    };
+    if (img.complete) check();
+    else img.addEventListener('load', check, { once: true });
+  }
+  mountHoloCards(root); // the HoloCard mounts around the pictures (assets/js/holo-card.js)
+}
+fitCourseImages();
 
 /* ---------- scroll reveal ---------- */
 
@@ -348,7 +369,7 @@ $$('[data-tabs]').forEach((root) => {
   // On small screens the panel can sit below the fold: bring the choice and its result into view.
   function revealStage() {
     if (stage && stage.getBoundingClientRect().top > innerHeight - 120) {
-      tabs[0].parentElement.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      bringIntoView(tabs[0].parentElement);
     }
   }
 
@@ -382,9 +403,9 @@ $$('[data-tabs]').forEach((root) => {
     const i = fromHash();
     if (i < 0) return;
     select(i);
-    root.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    bringIntoView(root);
   });
-  if (fromHash() >= 0) root.scrollIntoView({ block: 'start' });
+  if (fromHash() >= 0) bringIntoView(root, false);
 });
 
 /* ---------- application launcher: each choice shows its own action; University cannot be combined ---------- */
@@ -518,6 +539,7 @@ async function refreshCourses(boxes) {
     // A list the visitor has already seen is swapped in place, not hidden and slid in again.
     const shown = box.querySelector('[data-reveal].in') !== null;
     box.innerHTML = picks ? list.map((c) => renderCard(c, { ...opts, reveal: false })).join('') : renderCatalogue(list, opts);
+    fitCourseImages(box);
     box.dataset.lmsKey = key;
     box.dataset.updated = updatedAt;
     $$('[data-reveal]', box).forEach((el) => (shown ? el.classList.add('in') : revealer.observe(el)));
@@ -530,5 +552,6 @@ try {
 } catch {}
 
 initForms();
+initPhones();
 initAnalytics();
 paintHeader(); // "Sign in" becomes the person's name once they are signed in

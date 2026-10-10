@@ -131,6 +131,30 @@ const tone = (category) => [...category].reduce((h, ch) => (h * 31 + ch.codePoin
 
 // The picture at the top of a card and of its details: the course's image from Walnut LMS, or a cover
 // drawn here naming the category. Decorative either way (the title says what the course is).
+// The HoloCard mount around a card's picture (assets/js/holo-card.js): the requester's settings travel as
+// data attributes, the component reads them when it is integrated; until then the mount is inert.
+function holoMount(course, title) {
+  const attrs = {
+    'data-holo': '',
+    'data-holo-card': course.slug,
+    'data-holo-image': course.image || '',
+    'data-holo-alt': `${title} course cover`,
+    'data-holo-preset': 'bursts',
+    'data-holo-foil': '#e2e6ec',
+    'data-holo-intensity': '0.85',
+    'data-holo-scale': '1',
+    'data-holo-edge-sparkle': '0.8',
+    'data-holo-frame': '4',
+    'data-holo-glare': '0.5',
+    'data-holo-tilt-max': '14',
+    'data-holo-hover-scale': '1.04',
+    'data-holo-radius': '14',
+    'data-holo-idle': '',
+    'data-holo-shadow': '',
+  };
+  return `<div class="course-holo" ${Object.entries(attrs).map(([k, v]) => (v === '' ? k : `${k}="${esc(v)}"`)).join(' ')}>`;
+}
+
 function media(course, { icon, video }) {
   const picture = course.image
     ? `<img src="${esc(course.image)}" alt="" width="1600" height="900" loading="lazy" decoding="async">`
@@ -189,9 +213,9 @@ export function renderCard(course, { icon, lmsUrl, root = '', sso = false, level
     course.certificateTitle ? 'Certificate' : null,
   ].filter(Boolean);
   return `<article class="course-card spot${course.upcoming ? ' is-upcoming' : ''}"${reveal ? ` data-reveal style="--d:${(i * 0.08).toFixed(2)}s"` : ''}>
-    <div class="course-media">
+    ${holoMount(course, title)}<div class="course-media">
       ${media(course, { icon, video: true })}
-    </div>
+    </div></div>
     <div class="course-body">
       <p class="eyebrow">${esc(course.category)} · ${sentence(course.level)}</p>
       <h${level} class="course-card-title"><a href="${esc(page)}" rel="noopener" data-track="course_select" data-track-item="${esc(course.slug)}">${title}<span class="sr-only"> (on Walnut LMS)</span></a></h${level}>

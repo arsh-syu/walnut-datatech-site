@@ -6,6 +6,7 @@ import { portal, siteRoot, esc, call, restore, signOut, paintHeader } from './se
 import { otpStep } from './otp.js';
 import { isShown, fieldHtml, readAnswer, display, bindFields } from './questions.js';
 import { setError } from './forms.js';
+import { initPhones } from './phone.js';
 
 const box = document.getElementById('account');
 const day = (iso) => {
@@ -187,12 +188,12 @@ function profilePanel() {
         // is still saved to the profile, as the number Walnut can reach the person on.
         p.mobileCodes === false
           ? `<form class="acct-mobile" data-phone-form novalidate>
-        <div class="field"><label for="profile-phone">${p.phone ? 'Change mobile number' : 'Add mobile number'}</label><input id="profile-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+91 98765 43210" value="${esc(p.phone ?? '')}"></div>
+        <div class="field"><label for="profile-phone">${p.phone ? 'Change mobile number' : 'Add mobile number'}</label><input id="profile-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" value="${esc(p.phone ?? '')}" data-phone></div>
         <button class="btn btn-ghost" type="submit"><span>Save number</span></button>
         <p class="field-help">Login with a mobile OTP is not switched on yet, so for now you login with your email. Your number is kept on your profile.</p>
       </form>`
           : `<form class="acct-mobile" data-mobile-form novalidate>
-        <div class="field"><label for="profile-mobile">${p.mobile ? 'Change mobile number' : 'Add mobile number'}</label><input id="profile-mobile" name="mobile" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+91 98765 43210"></div>
+        <div class="field"><label for="profile-mobile">${p.mobile ? 'Change mobile number' : 'Add mobile number'}</label><input id="profile-mobile" name="mobile" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" data-phone></div>
         <button class="btn btn-ghost" type="submit"><span>Send OTP</span></button>
         <p class="field-help">We send a one-time code to the number. Once verified, you can login with it.</p>
       </form>`
@@ -264,6 +265,7 @@ function paint() {
       </div>
     </div>
   </div>`;
+  initPhones(box); // the mobile number fields get the country picker
 }
 
 async function load() {
@@ -381,20 +383,22 @@ box.addEventListener('submit', async (e) => {
       note.textContent = err.message;
     }
   } else if (form.matches('[data-mobile-form]')) {
-    const input = form.elements.mobile;
-    if (input.value.replace(/\D/g, '').length < 8) return setError(input, 'Please enter a valid mobile number.');
+    const input = form.querySelector('input[type="tel"]');
+    const mobile = form.elements.mobile.value.trim(); // E.164 from the picker
+    if (!mobile || !input.validity.valid) return setError(input, input.validationMessage || 'Please enter a valid mobile number.');
     setError(input, '');
     busy(true);
     try {
-      await verifyContact('mobile', input.value.trim(), box.querySelector('[data-verify-box]'));
+      await verifyContact('mobile', mobile, box.querySelector('[data-verify-box]'));
     } catch (err) {
       setError(input, err.message);
     }
     busy(false);
   } else if (form.matches('[data-phone-form]')) {
-    const input = form.elements.phone;
-    const phone = input.value.trim();
-    if (!/^[0-9+ ()\-]{7,20}$/.test(phone) || phone.replace(/\D/g, '').length < 8) return setError(input, 'Please enter a valid mobile number.');
+    // The visible field is the national number; `phone` is the hidden E.164 value the picker keeps.
+    const input = form.querySelector('input[type="tel"]');
+    const phone = form.elements.phone.value.trim();
+    if (!phone || !input.validity.valid) return setError(input, input.validationMessage || 'Please enter a valid mobile number.');
     setError(input, '');
     busy(true);
     try {

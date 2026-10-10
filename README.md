@@ -61,6 +61,22 @@ Courses are sold and taken on Walnut LMS (`lms.url` in `site.config.mjs`, https:
 - **Testing the LMS calls locally.** Our server calls the LMS over https only, with the certificate checked. To point it at a local mock, give the mock a certificate for `127.0.0.1` and start PHP with `-d curl.cainfo=<that certificate>.pem`.
 - **Old course pages.** The courses this site used to sell (`src/data/courses.mjs`) keep their addresses: `/academy/online-programme-course/` forwards to `online-counselling-course` on Walnut LMS, and `/academy/agentic-ai/` (which has no LMS course) to `/academy/`. The server answers both with a 301 (`dist/.htaccess`); the small noindex pages built at those paths forward everywhere else. They are not in the sitemap.
 
+## Learning platform (LMS) and certificates
+
+- **LMS Login** — the header and footer show *LMS Login* pointing at Walnut LMS (`lms.url` in `site.config.mjs`; `links.studentLogin` overrides it with another sign-in address). It sits inside the navigation, so the mobile menu carries it too.
+- **Verify a certificate** (`verify-certificate/`) — a visitor enters a Certificate ID (`?id=…` on the link printed on a certificate fills it in). `api/verify-certificate.php` asks Walnut LMS, the only record of certificates, and returns just the public fields (holder, course, issue date, status). The LMS endpoint and key are `CERT_VERIFY_URL` / `CERT_VERIFY_KEY` in `.env`, uploaded to the server only. Until they are set the page says verification is not available yet; when the LMS does not answer, the page says so rather than guessing. The endpoint is same-origin JSON only and rate-limited (10 checks per 10 minutes per visitor).
+
+## Home page motion
+
+- **Smooth scrolling** — every content page uses GSAP ScrollSmoother: the layout wraps the page in `#smooth-wrapper`/`#smooth-content`, loads GSAP 3.15.0 from jsDelivr with integrity hashes (allowed by the policy on those pages alone) and runs `assets/js/smooth.js`. The header is fixed above the eased content; `data-speed` on the home hero's mark and glow gives them parallax; in-page links glide to their section. Sticky panels (a service page's sub-navigation and stage headings, the journey intro) are pinned by ScrollTrigger at the same offsets, because `position: sticky` cannot work inside a container moved by a transform. The app-like pages — the solution configurator, sign-in, the dashboard, the pay page, redirects and error pages — pass `smooth: false` and keep native scrolling. Reduced motion, touch devices and browsers without the scripts scroll natively.
+- **GradientText** — the hero's "online education." is painted by React Bits' GradientText (`assets/js/gradient-text.js`, settings at the top of the file): soft blobs of Walnut violet drift through the letters with a faint glow (variant flow, one cycle every 8 s). The words stay in the `<h1>` for readers and search engines; reduced motion holds the gradient still.
+- **HoloCard (pending)** — every course card's picture sits in a `.course-holo` mount that carries the agreed settings as `data-holo-*` attributes; `assets/js/holo-card.js` hands each mount to `window.HoloCard.mount()` once the component is integrated. Until then the mount is inert: no stand-in hover effect.
+- **CodeSlots (pending)** — every one-time code step builds its entry with `createCodeSlots()` in `assets/js/code-slots.js`, which uses `window.CodeSlots.create()` once the component is integrated and the site's existing boxes until then. `otp.js` keeps the server check, single flight, expiry, resend and lockout handling either way.
+
+## Phone numbers
+
+Every phone field (contact and enquiry forms, login and the profile) is one international field: a searchable country picker with the flag and dialling code (India, +91, by default) beside the national number. The number is validated for the chosen country (an Indian mobile is 10 digits starting 6–9) and submitted as one E.164 value, `+919876543210`. Pasting a full number (`+44 7700 900123`, `0091…`) switches the country automatically. The country list — names, ISO 3166-1 alpha-2 and alpha-3 codes, dialling codes — lives in `src/data/countries.mjs`; the build generates `assets/js/countries.js` from it.
+
 ## Email
 
 The site sends five emails through Twilio, all from the address in `EMAIL_FROM`:
