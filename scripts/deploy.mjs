@@ -95,9 +95,10 @@ const list = (dir) => curl([`url = ${q(ftpUrl(dir))}`, 'list-only'], { quiet: tr
 
 function connect() {
   // Prefer verified TLS, then TLS without certificate verification (common when connecting by IP), then plain FTP.
-  // Windows' curl (Schannel) breaks FTP uploads larger than one TLS 1.3 record, leaving an empty file
-  // on the server; TLS 1.2 works.
-  const tls = process.platform === 'win32' ? ['ssl-reqd', 'tls-max = "1.2"'] : ['ssl-reqd'];
+  // TLS 1.2 everywhere: Windows' curl (Schannel) breaks FTP uploads larger than one TLS 1.3 record, and on macOS
+  // (SecureTransport) this host takes a 1.3 upload and then never answers it ("FTP response timeout" on the
+  // second file, 11 October 2026); 1.2 is what the deploys that went through used.
+  const tls = ['ssl-reqd', 'tls-max = "1.2"'];
   const modes = [
     ['verified TLS', tls],
     ['TLS (certificate not verified)', [...tls, 'insecure']],
