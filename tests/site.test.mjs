@@ -853,7 +853,8 @@ test('nothing secret is published', () => {
 });
 
 test('every page ships the security policy and no placeholders', () => {
-  const check = spawnSync(process.execPath, ['check.mjs'], { cwd: projectRoot, encoding: 'utf8' });
+  // the same production shape the suite builds (check.mjs would otherwise expect the mirror's noindex under NOINDEX)
+  const check = spawnSync(process.execPath, ['check.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, NOINDEX: '', SITE_URL: 'https://walnutdatatech.com' } });
   assert.equal(check.status, 0, check.stdout + check.stderr);
 });
 
