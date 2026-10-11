@@ -167,9 +167,16 @@ function media(course, { icon, video }) {
 // What the "i" on a card opens: everything known about the course, its preview video when it has one,
 // and the way in. Kept in a <template> on the card, so it costs nothing until it is opened; main.js makes
 // its title the dialog's <h2> then (a heading in every card's template would break the page's outline).
+// Sample certificates kept on this site (certificates/<course>/ holds the template and the renders), shown in
+// the details of the course they belong to. Keyed by the LMS slug; the path is relative to the site root.
+export const CERTIFICATE_SPECIMENS = {
+  'online-counselling-course': { src: 'assets/img/certificate-online-counselling-specimen.webp', width: 1200, height: 848 },
+};
+
 export function renderCourseDetails(course, { icon, lmsUrl, root = '', sso = false }) {
   const { page, enrol } = courseLinks(course, { lmsUrl, root, sso });
   const title = esc(course.title);
+  const specimen = CERTIFICATE_SPECIMENS[course.slug] || null;
   // The short facts share a row; the certificate's name is long, so it gets a row of its own.
   const facts = [
     ['Level', sentence(course.level)],
@@ -188,6 +195,7 @@ export function renderCourseDetails(course, { icon, lmsUrl, root = '', sso = fal
       ${course.subtitle ? `<p class="course-detail-lede">${esc(course.subtitle)}</p>` : ''}
       <dl class="course-facts">${facts.map(([k, v, wide]) => `<div${wide ? ` class="${wide}"` : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
       ${course.highlights.length ? `<p class="course-learn-head">What you will learn</p><ul class="course-learn">${course.highlights.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
+      ${specimen ? `<figure class="course-cert"><p class="course-learn-head">Your certificate</p><img src="${esc(root + specimen.src)}" alt="Specimen of the ${title} certificate" width="${specimen.width}" height="${specimen.height}" loading="lazy" decoding="async"><figcaption>A specimen. Yours carries your name, the date and a certificate number you can verify on this site, once you have completed the course and passed its assessment.</figcaption></figure>` : ''}
       <div class="course-detail-actions">
         ${course.preview ? `<button class="btn btn-ghost" type="button" data-video="${esc(course.preview)}" data-video-title="${title} — preview" data-track="course_preview" data-track-item="${esc(course.slug)}">${icon('play')}<span>Watch the preview</span></button>` : ''}
         ${course.upcoming
