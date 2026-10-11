@@ -10,7 +10,9 @@
 import { track } from './analytics.js';
 import { accountApi, portal, siteRoot, esc, call, adopt, restore, AccountError } from './session.js';
 import { otpStep } from './otp.js';
-import { UNIVERSITY, UNIVERSITY_ONLY, canCombine, keepExclusive } from './roles.js';
+import { mountPhone } from './phone.js';
+import { COUNTRIES } from './countries.js';
+import { UNIVERSITY, UNIVERSITY_ONLY, canCombine } from './roles.js';
 
 const box = document.getElementById('login');
 // Where to go once signed in: the dashboard, or — when sign-in was needed to open another Walnut app —
@@ -19,11 +21,15 @@ const resume = new URLSearchParams(location.search).get('continue') || '';
 const profile = /^\/api\/sso\.php\?app=[a-z-]{2,30}(&next=[A-Za-z0-9%._~\-]{0,600})?$/.test(resume) ? resume : `${siteRoot}dashboard/`;
 const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 // Dialling codes offered beside the mobile field; the service's default is selected.
-const COUNTRIES = [['+91', 'India'], ['+971', 'UAE'], ['+1', 'US / Canada'], ['+44', 'UK'], ['+65', 'Singapore'], ['+61', 'Australia'], ['+977', 'Nepal'], ['+880', 'Bangladesh'], ['+94', 'Sri Lanka']];
+// The country picker (flag + dialling code, searchable) comes from phone.js; India is the default.
+const alpha2Of = (dial) => ({ '+1': 'US', '+7': 'RU', '+44': 'GB', '+61': 'AU' })[dial] || COUNTRIES.find((c) => c.dial === dial)?.alpha2 || 'IN';
+// The three kinds of account, worded and drawn like the home page's "What brings you to Walnut?" selector.
+// One is chosen; University is a flow of its own (roles.js), so a single choice also keeps the server's rule.
+const ICON = (d) => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`;
 const PURPOSES = [
-  ['UNIVERSITY', 'University / Institution', 'Work with Walnut on your online programmes.'],
-  ['STUDENT', 'Learn / Upgrade Career', 'Take our short courses.'],
-  ['AGENT', 'Become a Partner', 'Partner with Walnut.'],
+  ['UNIVERSITY', 'Work with Walnut', 'I’m from a university or institution', 'Technology and services to launch, run and grow your online programmes.', '<path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6M9 11h.01M15 11h.01"/>'],
+  ['STUDENT', 'Upgrade your skills', 'I want to learn and upgrade my career', 'Short online courses for counsellors, students and professionals.', '<path d="M2 9l10-5 10 5-10 5zM6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5M22 9v5"/>'],
+  ['AGENT', 'Join Walnut', 'I want to become a Walnut partner', 'Onboard as a partner and use Walnut’s applications to grow.', '<path d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 19a5.5 5.5 0 0 1 11 0M13.5 15.2A5.5 5.5 0 0 1 21.5 19"/>'],
 ];
 // ?type=university,student — what the person chose before signing in; each becomes a tab of their dashboard.
 // University is a flow of its own: asked for together with anything else, it is the only one kept.
@@ -66,25 +72,54 @@ function choice() {
 
 /* ---------- 2. a new user: what do you need, and your name ---------- */
 
-const purposeBoxes = (chosen) =>
-  `<div class="login-purposes">${PURPOSES.map(([id, label, line]) => `<label class="login-purpose"><input class="sr-only" type="checkbox" name="accountType" value="${id}"${chosen.includes(id) ? ' checked' : ''}><span><strong>${label}</strong><small>${line}</small></span></label>`).join('')}</div>
-   <p class="login-note" data-exclusive-note role="status"></p>
+const purposeBoxes = (chosen) => {
+  const picked = PURPOSES.some(([id]) => chosen.includes(id)) ? chosen[0] : null;
+  return `<div class="login-types" role="tablist" aria-label="What brings you to Walnut?">${PURPOSES.map(
+    ([id, title, who, , path]) => `<button class="login-type${picked === id ? ' is-active' : ''}" type="button" role="tab" aria-selected="${picked === id}" tabindex="${picked === id || (!picked && id === PURPOSES[0][0]) ? 0 : -1}" data-type="${id}">
+      <span class="login-type-top"><span class="login-type-ico">${ICON(path)}</span><span class="check-badge" aria-hidden="true">${ICON('<path d="M5 12.5l4.5 4.5L19 7.5"/>')}</span></span>
+      <span class="login-type-who">${who}</span><span class="login-type-title">${title}</span></button>`
+  ).join('')}</div>
+   <input type="hidden" name="accountType" value="${picked || ''}">
+   <p class="login-note" data-type-line role="status">${picked ? PURPOSES.find(([id]) => id === picked)[3] : 'Choose one to continue. A university account is used for the university only.'}</p>
    <p class="field-error" data-error="accountType" role="alert"></p>`;
-// University cannot be ticked together with the others.
-const exclusive = (form) =>
-  keepExclusive(form, () => [...form.querySelectorAll('[name="accountType"]')], (message) => {
-    form.querySelector('[data-exclusive-note]').textContent = message;
-    if (message) fieldError('accountType', '');
+};
+// Clicking a tab (or moving with the arrow keys) picks that account type; the line under the bar describes it.
+const exclusive = (form) => {
+  const tabs = () => [...form.querySelectorAll('.login-type')];
+  const pick = (tab) => {
+    tabs().forEach((t) => {
+      const on = t === tab;
+      t.classList.toggle('is-active', on);
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+    });
+    form.querySelector('[name="accountType"]').value = tab.dataset.type;
+    form.querySelector('[data-type-line]').textContent = PURPOSES.find(([id]) => id === tab.dataset.type)[3];
+    fieldError('accountType', '');
+  };
+  form.addEventListener('click', (e) => {
+    const tab = e.target.closest('.login-type');
+    if (tab) pick(tab);
   });
-const chosenTypes = (form) => [...form.querySelectorAll('[name="accountType"]:checked')].map((input) => input.value);
-const typesProblem = (types) => (!types.length ? 'Please choose at least one.' : canCombine(types) ? '' : UNIVERSITY_ONLY);
+  form.addEventListener('keydown', (e) => {
+    const tab = e.target.closest('.login-type');
+    if (!tab || !['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    e.preventDefault();
+    const all = tabs();
+    const next = all[(all.indexOf(tab) + (['ArrowRight', 'ArrowDown'].includes(e.key) ? 1 : all.length - 1)) % all.length];
+    pick(next);
+    next.focus();
+  });
+};
+const chosenTypes = (form) => [form.querySelector('[name="accountType"]').value].filter(Boolean);
+const typesProblem = (types) => (!types.length ? 'Please choose what brings you to Walnut.' : canCombine(types) ? '' : UNIVERSITY_ONLY);
 
 function details() {
   state.mode = 'new';
   box.innerHTML = `<h2 class="login-title">Create your Walnut account</h2>
     <p class="login-sub">How can we help you? You are asked this once — it is saved with your account.</p>
     <form class="login-setup" data-details novalidate>
-      <fieldset class="field field-set"><legend class="login-legend">Choose what you need. A university account is used for the university only.</legend>
+      <fieldset class="field field-set"><legend class="login-legend">What brings you to Walnut?</legend>
         ${purposeBoxes(state.types)}
       </fieldset>
       <div class="field"><label for="setup-name">Full name</label><input id="setup-name" name="name" type="text" autocomplete="name" maxlength="120" value="${esc(state.name)}"><p class="field-error" data-error="name" role="alert"></p></div>
@@ -124,10 +159,7 @@ function start() {
       ${
         state.method === 'mobile'
           ? `<div class="field"><label for="login-mobile">Mobile Number</label>
-              <div class="login-phone">
-                <select name="dial" aria-label="Country code">${COUNTRIES.map(([code, name]) => `<option value="${code}" title="${name}"${code === state.dial ? ' selected' : ''}>${code}</option>`).join('')}</select>
-                <input id="login-mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Enter mobile number" maxlength="20" value="${esc(state.mobile)}">
-              </div>
+              <input id="login-mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Enter mobile number" maxlength="20" value="${esc(state.mobile)}" required>
               <p class="field-error" data-error="mobile" role="alert"></p></div>`
           : `<div class="field"><label for="login-email">Email Address</label>
               <input id="login-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="Enter your email address" maxlength="254" value="${esc(state.email)}">
@@ -140,6 +172,8 @@ function start() {
         ? '<p class="login-alt"><button class="text-btn" type="button" data-mode="new">Back</button> · Already have an account? <button class="text-btn" type="button" data-mode="existing">Login</button></p>'
         : `<p class="login-alt">New to Walnut? <button class="text-btn" type="button" data-mode="new">Create an account</button>${state.password ? ' · <button class="text-btn" type="button" data-password>Use a password</button>' : ''}</p>`
     }`;
+  const tel = box.querySelector('#login-mobile');
+  if (tel) state.phone = mountPhone(tel, { defaultAlpha2: alpha2Of(state.dial), onChange: ({ country }) => (state.dial = country.dial) });
   box.querySelector(state.method === 'mobile' ? '#login-mobile' : '#login-email')?.focus({ preventScroll: true });
 }
 
@@ -162,8 +196,7 @@ box.addEventListener('click', (e) => {
 });
 box.addEventListener('input', (e) => {
   if (e.target.name === 'email') (state.email = e.target.value), fieldError('email', '');
-  if (e.target.name === 'mobile') (state.mobile = e.target.value), fieldError('mobile', '');
-  if (e.target.name === 'dial') state.dial = e.target.value;
+  if (e.target.id === 'login-mobile') (state.mobile = e.target.value), fieldError('mobile', '');
 });
 
 box.addEventListener('submit', async (e) => {
@@ -172,8 +205,9 @@ box.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (state.sending) return; // one request at a time
   const channel = state.method;
-  const destination = channel === 'email' ? state.email.trim() : `${state.dial}${state.mobile.replace(/\D/g, '').replace(/^0+/, '')}`;
-  const problem = channel === 'email' ? (EMAIL.test(destination) ? '' : 'Please enter a valid email address.') : /^\+\d{8,15}$/.test(destination) ? '' : 'Please enter a valid mobile number.';
+  // The mobile number is the E.164 value the picker keeps (+919876543210), validated for its country.
+  const destination = channel === 'email' ? state.email.trim() : state.phone?.value ?? '';
+  const problem = channel === 'email' ? (EMAIL.test(destination) ? '' : 'Please enter a valid email address.') : destination ? '' : form.querySelector('#login-mobile')?.validationMessage || 'Please enter a valid mobile number.';
   fieldError(channel, problem);
   if (problem) return;
   const button = form.querySelector('[type="submit"]');
@@ -248,7 +282,7 @@ function setup(proof, notFound = false, problem = '') {
   box.innerHTML = `<h2 class="login-title">${notFound ? 'No account yet' : 'Almost done'}</h2>
     <p class="login-sub">${notFound ? `There is no Walnut account for this ${byMobile ? 'mobile number' : 'email address'} yet. Tell us a little about yourself to create it.` : 'You are verified. Confirm your details to create your Walnut account.'}</p>
     <form class="login-setup" novalidate>
-      <fieldset class="field field-set"><legend class="login-legend">How can we help you? A university account is used for the university only.</legend>
+      <fieldset class="field field-set"><legend class="login-legend">What brings you to Walnut?</legend>
         ${purposeBoxes(state.types)}
       </fieldset>
       <div class="field"><label for="setup-name">Full name</label><input id="setup-name" name="name" type="text" autocomplete="name" maxlength="120" value="${esc(state.name)}"><p class="field-error" data-error="name" role="alert"></p></div>
@@ -257,6 +291,7 @@ function setup(proof, notFound = false, problem = '') {
       <p class="form-status is-error" role="alert">${esc(problem)}</p>
     </form>`;
   const form = box.querySelector('.login-setup');
+  exclusive(form);
   form.addEventListener('input', (e) => fieldError(e.target.name, ''));
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

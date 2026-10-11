@@ -104,7 +104,7 @@ export function enquiryForm({ id, topic, orgLabel = 'University or organisation'
     </div>
     <div class="field">
       <label for="${f('phone')}">Phone <span class="optional">optional</span></label>
-      <input id="${f('phone')}" name="phone" type="tel" autocomplete="tel" inputmode="tel">
+      <input id="${f('phone')}" name="phone" type="tel" autocomplete="tel" inputmode="tel" data-phone>
     </div>
     <div class="field field-wide">
       <label for="${f('message')}">${messageLabel} <span class="optional">optional</span></label>
@@ -153,6 +153,9 @@ export function accountPrompt(root, type, text = 'Track everything in one place.
   if (!config.accounts) return '';
   return `<p class="account-prompt">${text} <a href="${root}login/?type=${type}" data-track="account_create" data-track-item="${type}">Create your Walnut account</a> or <a href="${root}login/" data-track="account_sign_in">sign in</a>.</p>`;
 }
+
+// Walnut LMS (`lms.url` in site.config.mjs), where courses are taken: linked from the footer.
+const lmsUrl = config.lms.url || '';
 
 function header(root, path) {
   // The script swaps "Sign in" for the person's name (and a link to their profile) once they are signed in.
@@ -210,6 +213,8 @@ function footer(root) {
         <ul>
           ${featuredCourses(3).map((c) => `<li><a href="${esc(courseLinks(c, lmsOptions(root)).page)}" rel="noopener">${esc(c.title)} ${icon('external')}<span class="sr-only"> (on Walnut LMS)</span></a></li>`).join('')}
           <li><a href="${root}academy/">All courses</a></li>
+          <li><a href="${root}verify-certificate/">Verify a certificate</a></li>
+          ${lmsUrl ? `<li><a class="footer-lms" href="${esc(lmsUrl)}" target="_blank" rel="noopener" data-track="lms_login">LMS Login ${icon('external')}${newTab}</a></li>` : ''}
         </ul>
       </nav>
       <nav class="footer-col" aria-label="For partners">
@@ -272,7 +277,17 @@ function consentBanner(root) {
 
 // `redirect` ({ href, canonical }) makes a page that forwards at once to `href` (a moved page); it is never indexed.
 // `payments` is for the pay page only: it lets Razorpay's checkout load there (see security.mjs).
-export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null, payments = false }) {
+// GSAP, for smooth scrolling on the content pages (see assets/js/smooth.js). Pinned to one version and checked
+// against these hashes, so the CDN can serve nothing else; the policy allows the CDN on those pages only.
+const GSAP = [
+  ['gsap.min.js', 'sha384-XmJ9SoHtVOHoQUcKvFAzVXwdkKo1Ie3bhmSoIAkcdsHGaIrVJIkmozyq0FJeb/Ly'],
+  ['ScrollTrigger.min.js', 'sha384-wl5TeDVvOWt30Pbf8aSo2ZrzsOjddu3avOBvHe+p+OhJt9gP6w9YXmDkN5DK2/dF'],
+  ['ScrollSmoother.min.js', 'sha384-UBrN+CoHHGgqL39pifrs8DrCpDnJh1YKy4iyhEEV/4e9lLCaStS9toSKHYVYcZlT'],
+];
+export const GSAP_CDN = 'https://cdn.jsdelivr.net';
+const gsapScripts = () => GSAP.map(([file, hash]) => `<script src="${GSAP_CDN}/npm/gsap@3.15.0/dist/${file}" integrity="${hash}" crossorigin="anonymous" defer></script>`).join('\n');
+
+export function layout({ title, description, path, root, body, bodyClass = '', jsonLd = [], scripts = [], sticky = null, hasOg = false, noindex = false, redirect = null, payments = false, smooth = true }) {
   const fullTitle = path === '' ? title : `${title} — ${config.company.name}`;
   const url = config.siteUrl ? `${config.siteUrl}/${path}` : '';
   const clientConfig = JSON.stringify({
@@ -288,7 +303,7 @@ export function layout({ title, description, path, root, body, bodyClass = '', j
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config, { payments })}">
+<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(config, { payments, gsap: smooth })}">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
 ${config.noindex || noindex || redirect ? '<meta name="robots" content="noindex">' : url ? `<link rel="canonical" href="${url}">` : ''}
@@ -303,6 +318,8 @@ ${hasOg && config.siteUrl ? `<meta property="og:image" content="${config.siteUrl
 <meta name="theme-color" content="#ffffff">
 <script>${inlineScript}</script>
 <link rel="icon" href="${root}assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="${root}assets/img/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="${root}assets/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lexend:wght@500&display=swap">
@@ -313,15 +330,19 @@ ${jsonLd.map((j) => `<script type="application/ld+json">${JSON.stringify(j).repl
 <body class="${bodyClass}">
 <a class="skip" href="#main">Skip to content</a>
 ${header(root, path)}
+${smooth ? '<div id="smooth-wrapper"><div id="smooth-content">' : ''}
 <main id="main">
 ${body}
 </main>
 ${footer(root)}
+${smooth ? '</div></div>' : ''}
 ${sticky ? `<a class="sticky-cta" href="${sticky.href}" data-sticky-cta><span>${sticky.label}</span>${icon('arrow')}</a>` : ''}
 ${dialogs()}
 ${consentBanner(root)}
 <script type="application/json" id="site-config">${clientConfig}</script>
+${smooth ? gsapScripts() : ''}
 <script type="module" src="${root}assets/js/main.js${v}"></script>
+${smooth ? `<script type="module" src="${root}assets/js/smooth.js${v}"></script>` : ''}
 ${scripts.map((s) => `<script type="module" src="${root}assets/js/${s}${v}"></script>`).join('\n')}
 </body>
 </html>

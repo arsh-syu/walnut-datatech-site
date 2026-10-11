@@ -17,14 +17,15 @@ const sha256 = (text) => `'sha256-${createHash('sha256').update(text).digest('ba
 // Content-Security-Policy: only this site's own files plus the third parties it actually uses.
 // `payments` is for the pay page (/pay/) only: Razorpay's checkout script, its frame and its calls. Every
 // other page has no reason to load anything from Razorpay, so it cannot.
-export function contentSecurityPolicy(config, { payments = false } = {}) {
+// `gsap` is for the home page only: its smooth scrolling loads GSAP from jsDelivr (pinned, with integrity hashes).
+export function contentSecurityPolicy(config, { payments = false, gsap = false } = {}) {
   const ga = Boolean(config.analytics?.gaMeasurementId);
   const rzp = payments && 'https://*.razorpay.com';
   // Walnut LMS: /academy/ reads its public course feed to show the live catalogue.
   const lms = config.lms?.url ? new URL(config.lms.url).origin : null;
   const policy = {
     'default-src': ["'self'"],
-    'script-src': ["'self'", sha256(inlineScript), ga && 'https://www.googletagmanager.com', rzp],
+    'script-src': ["'self'", sha256(inlineScript), gsap && 'https://cdn.jsdelivr.net', ga && 'https://www.googletagmanager.com', rzp],
     'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // inline is needed for style="" attributes only
     'font-src': ["'self'", 'https://fonts.gstatic.com'],
     // Course images are kept in the Walnut LMS file store (see lms-catalogue.js).

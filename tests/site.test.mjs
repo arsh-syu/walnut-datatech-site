@@ -45,7 +45,7 @@ const enrolLinks = (html) => [...cardsOf(html).matchAll(/<a class="btn btn-prima
 const TOOL_PORT = 4393;
 const LINKED_PORT = 4392;
 const TOOL_KEY = 'test-onboarding-key-0123456789abcdef';
-const tool = { received: [], status: 201 };
+const tool = { received: [], lms: [], status: 201 };
 const linked = (body, endpoint = 'enquiry.php') => fetch(`http://localhost:${LINKED_PORT}/api/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const linkedOutbox = async () => (await (await fetch(`http://localhost:${LINKED_PORT}/api/_outbox`)).json()).emails;
 const started = (child) => new Promise((resolve, reject) => {
@@ -68,6 +68,13 @@ before(async () => {
     const body = JSON.parse(raw || 'null');
     tool.received.push({ method: req.method, url: req.url, key: req.headers['x-walnut-key'], authorization: req.headers.authorization, cookie: req.headers.cookie, body });
     // The status lookup knows one request; everything else is the intake.
+    // The stand-in LMS: one certificate is on record.
+    if (req.url.endsWith('/certificates/verify')) {
+      tool.lms.push({ authorization: req.headers.authorization, body });
+      const known = body?.certificateId === 'WDT-2026-000123';
+      res.writeHead(known ? 200 : 404, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(known ? { valid: true, certificate: { holder: 'Asha Rao', course: 'Online Programme Course', issuedOn: '2026-09-30', status: 'Active', internalId: 'secret' } } : { valid: false, status: 'not found' }));
+    }
     const lookup = req.url.endsWith('/status');
     const known = lookup && body.reference === 'UR-000042' && body.email === 'asha@example.com';
     const status = lookup ? (known ? 200 : 404) : tool.status;
@@ -76,7 +83,7 @@ before(async () => {
   });
   await new Promise((resolve) => toolServer.listen(TOOL_PORT, resolve));
   tmp = mkdtempSync(join(tmpdir(), 'walnut-test-'));
-  writeFileSync(join(tmp, 'env'), `ONBOARDING_API_URL=http://localhost:${TOOL_PORT}/\nONBOARDING_API_KEY=${TOOL_KEY}\n`);
+  writeFileSync(join(tmp, 'env'), `ONBOARDING_API_URL=http://localhost:${TOOL_PORT}/\nONBOARDING_API_KEY=${TOOL_KEY}\nCERT_VERIFY_URL=http://localhost:${TOOL_PORT}/certificates/verify\nCERT_VERIFY_KEY=${TOOL_KEY}\n`);
   linkedServer = spawn(process.execPath, ['scripts/dev-server.mjs', String(LINKED_PORT)], { cwd: projectRoot, env: { ...process.env, WALNUT_ENV_FILE: join(tmp, 'env') } });
   await started(linkedServer);
 });
@@ -708,7 +715,7 @@ test('the site speaks of partners, names its clients and carries the company det
   const home = page('');
   assert.ok(home.includes('support@walnutdatatech.com') && home.includes('Sector 62, Noida') && home.includes('GSTIN 09AADCW6322K1Z1'), 'the footer carries the address, email and GSTIN');
   assert.ok(page('contact').includes('mailto:support@walnutdatatech.com') && page('privacy').includes('Walnut DataTech Private Limited'));
-  assert.ok(home.includes('class="hero-hl"'), 'the headline carries its highlight');
+  assert.ok(home.includes('class="hero-hl gradient-text"'), 'the headline carries its highlight');
 });
 
 test('login asks existing or new once, and a profile can hold a mobile number either way', () => {
@@ -1122,4 +1129,121 @@ test('form choices: the country is a searchable list, short lists stay in view, 
   // An option University switches off says why, and how to get it back.
   const roles = readFileSync(join(dist, 'assets/js/roles.js'), 'utf8');
   assert.ok(roles.includes('Untick University to choose this.') && roles.includes("className: 'why-off'"));
+});
+
+/* ---------- certificates, the LMS link and phone numbers ---------- */
+
+test('a certificate is verified against the LMS only; without an endpoint the page says so', async () => {
+  // No endpoint configured: a clear answer, no pretend result.
+  const off = await api('verify-certificate.php', { certificateId: 'WDT-2026-000123' });
+  assert.equal(off.status, 503);
+  assert.match((await off.json()).error, /not available yet/);
+  // Malformed IDs never reach the LMS.
+  for (const certificateId of ['', 'x', '<script>', 'A'.repeat(41)]) {
+    assert.equal((await linked({ certificateId }, 'verify-certificate.php')).status, 422, certificateId);
+  }
+  assert.equal(tool.lms.length, 0);
+  const ok = await (await linked({ certificateId: 'wdt-2026-000123' }, 'verify-certificate.php')).json();
+  assert.deepEqual(ok, { ok: true, valid: true, certificate: { holder: 'Asha Rao', course: 'Online Programme Course', issuedOn: '2026-09-30', status: 'Active' } }, 'the ID is upper-cased and only the public fields come back');
+  assert.equal(tool.lms.at(-1).authorization, `Bearer ${TOOL_KEY}`, 'the key goes to the LMS, never to the browser');
+  const no = await (await linked({ certificateId: 'WDT-2026-999999' }, 'verify-certificate.php')).json();
+  assert.deepEqual(no, { ok: true, valid: false, certificate: { status: 'not found' } });
+  const page = readFileSync(join(dist, 'verify-certificate/index.html'), 'utf8');
+  assert.ok(page.includes('data-verify-form') && page.includes('assets/js/verify.js'), 'the page is built');
+  assert.ok(readFileSync(join(dist, 'index.html'), 'utf8').includes('href="verify-certificate/"'), 'and linked from the footer');
+  assert.ok(readFileSync(join(dist, 'sitemap.xml'), 'utf8').includes('/verify-certificate/'), 'and listed for search engines');
+});
+
+test('certificate checks are rate-limited per visitor', async () => {
+  let last;
+  for (let i = 0; i < 12; i++) last = await linked({ certificateId: 'WDT-2026-000123' }, 'verify-certificate.php');
+  assert.equal(last.status, 429);
+});
+
+test('"LMS Login" is a footer link to Walnut LMS; the header keeps its sign-in links as before', () => {
+  const home = readFileSync(join(dist, 'index.html'), 'utf8');
+  const lms = config.lms.url.replace(/\/+$/, '');
+  assert.ok(home.includes(`<a class="footer-lms" href="${lms}" target="_blank" rel="noopener" data-track="lms_login">LMS Login <svg`), 'footer link');
+  assert.ok(!home.includes('nav-lms') && !/<header[\s\S]*LMS Login[\s\S]*<\/header>/.test(home), 'not in the header');
+  assert.ok(!home.includes('Student Login'), 'the header shows Student Login only when links.studentLogin is set');
+});
+
+test('content pages scroll smoothly with GSAP (pinned, hashed, allowed there only); app-like pages keep native scrolling', () => {
+  const home = readFileSync(join(dist, 'index.html'), 'utf8');
+  for (const file of ['gsap.min.js', 'ScrollTrigger.min.js', 'ScrollSmoother.min.js']) {
+    assert.match(home, new RegExp(`<script src="https://cdn\\.jsdelivr\\.net/npm/gsap@3\\.15\\.0/dist/${file.replace('.', '\\.')}" integrity="sha384-[A-Za-z0-9+/=]{64}" crossorigin="anonymous" defer></script>`), file);
+  }
+  assert.ok(home.indexOf('ScrollSmoother.min.js') < home.indexOf('<script type="module" src="assets/js/main.js'), 'GSAP is on the page before the site\'s own scripts');
+  assert.ok(home.includes('assets/js/smooth.js') && home.includes('<div id="smooth-wrapper"><div id="smooth-content">'), 'wrapper and script');
+  assert.ok(home.indexOf('</header>') < home.indexOf('id="smooth-wrapper"') && home.includes('</footer>\n</div></div>'), 'the header stays outside the smoothed content; the footer moves with it');
+  assert.match(home, /script-src 'self' 'sha256-[^']+' https:\/\/cdn\.jsdelivr\.net[ ;]/, 'the policy allows the CDN on the home page');
+  assert.ok(home.includes('data-speed="0.75"') && !/class="mark hero-mark"[^>]*data-speed/.test(home), 'the hero glow drifts; the mark keeps its CSS spin (no parallax hook on it)');
+  for (const page of ['academy', 'contact', 'about', 'solutions/infrastructure', 'partners', 'verify-certificate']) {
+    const html = readFileSync(join(dist, page, 'index.html'), 'utf8');
+    assert.ok(html.includes('ScrollSmoother.min.js') && html.includes('<div id="smooth-wrapper"><div id="smooth-content">') && html.includes('assets/js/smooth.js'), `${page} is smoothed`);
+    assert.match(html, /script-src 'self' 'sha256-[^']+' https:\/\/cdn\.jsdelivr\.net[ ;]/, `${page}: policy`);
+  }
+  for (const file of ['configure/index.html', '404.html', 'academy/online-programme-course/index.html']) {
+    const html = readFileSync(join(dist, file), 'utf8');
+    assert.ok(!html.includes('jsdelivr') && !html.includes('smooth-wrapper'), `${file} keeps native scrolling and loads no GSAP`);
+  }
+  const smooth = readFileSync(join(projectRoot, 'src/assets/js/smooth.js'), 'utf8');
+  assert.ok(smooth.includes('prefers-reduced-motion') && smooth.includes('smoothTouch: 0') && smooth.includes('smoother.scrollTo('), 'reduced motion, native touch scrolling, in-page links through the smoother');
+  assert.ok(smooth.includes("cs.position === 'sticky'") && smooth.includes('pin: true') && smooth.includes('pinSpacing: false'), 'sticky panels are pinned with their own offsets');
+  assert.ok(readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8').includes('window.walnutScrollTo'), 'main.js scrolls through the smoother when there is one');
+});
+
+test('the hero\'s "online education." is React Bits\' GradientText: the words stay in the heading, the gradient is painted by the script', () => {
+  const home = readFileSync(join(projectRoot, 'dist/index.html'), 'utf8');
+  assert.match(home, /<h1 class="display">[\s\S]*<span class="hero-hl gradient-text" data-gradient-text style="--i:4"><span class="gradient-text__inner"><span class="gradient-text__content">online education\.<\/span><span class="gradient-text__glow" aria-hidden="true">online education\.<\/span><\/span><\/span><\/h1>/);
+  assert.ok(home.includes('assets/js/gradient-text.js') && !home.includes('tech-text.js'));
+  const gt = readFileSync(join(projectRoot, 'src/assets/js/gradient-text.js'), 'utf8');
+  for (const needle of ['React Bits', 'export function mountGradientText', "variant: 'flow'", 'animationSpeed: 8', 'glow: 0.4', 'radial-gradient(ellipse', 'repeating-conic-gradient', 'prefers-reduced-motion', 'IntersectionObserver', "'#5b3fe6'", "'#7d62ff'"]) {
+    assert.ok(gt.includes(needle), `gradient-text.js keeps ${needle}`);
+  }
+  const css = readFileSync(join(projectRoot, 'src/assets/css/sections.css'), 'utf8');
+  assert.ok(css.includes('.gradient-text__content {') && css.includes('background-clip: text') && css.includes('.gradient-text__glow {'), 'the component CSS is present');
+});
+
+test('course pictures: one 16:9 frame, inset from the card, rounded; odd ratios are shown whole', () => {
+  const css = readFileSync(join(dist, 'assets/css/site.css'), 'utf8');
+  assert.match(css, /\.course-media \{[^}]*aspect-ratio: 16 \/ 9;[^}]*margin: var\(--card-inset\) var\(--card-inset\) 0;[^}]*border-radius: calc\(var\(--r-xl\) - var\(--card-inset\)\)/);
+  assert.ok(css.includes('.course-card { --card-inset: 14px; }') && css.includes('.course-card { --card-inset: 12px; }'), '14px on desktop, 12px on small phones');
+  assert.ok(css.includes('.course-media img.is-contain { object-fit: contain; }'));
+  assert.ok(readFileSync(join(projectRoot, 'src/assets/js/main.js'), 'utf8').includes('fitCourseImages(box)'), 'pictures are fitted again when the live catalogue redraws');
+});
+
+test('HoloCard and CodeSlots: the mounts and adapters are in place, and no stand-in effect is applied', () => {
+  const academy = readFileSync(join(dist, 'academy/index.html'), 'utf8');
+  assert.match(academy, /<div class="course-holo" data-holo data-holo-card="[a-z0-9-]+" data-holo-image="[^"]*" data-holo-alt="[^"]+ course cover" data-holo-preset="bursts" data-holo-foil="#e2e6ec" data-holo-intensity="0.85" data-holo-scale="1" data-holo-edge-sparkle="0.8" data-holo-frame="4" data-holo-glare="0.5" data-holo-tilt-max="14" data-holo-hover-scale="1.04" data-holo-radius="14" data-holo-idle data-holo-shadow><div class="course-media">/);
+  assert.equal((academy.match(/class="course-holo"/g) || []).length, (academy.match(/<article class="course-card/g) || []).length, 'every card has a mount');
+  const holo = readFileSync(join(projectRoot, 'src/assets/js/holo-card.js'), 'utf8');
+  assert.ok(holo.includes('window.HoloCard') && holo.includes("holoState = 'pending'") && holo.includes('reduced: reduceMotion || coarsePointer'), 'the component is used only when present; touch and reduced motion are flagged');
+  const slots = readFileSync(join(projectRoot, 'src/assets/js/code-slots.js'), 'utf8');
+  for (const needle of ['window.CodeSlots?.create', 'slotSize: 44', 'gap: 8', 'radius: 12', 'bounce: 0.2', 'settle: 0.3', 'rise: 8', 'cascade: 20', "outcome: 'accept'", "setStatus('idle')"]) assert.ok(slots.includes(needle), needle);
+  const otp = readFileSync(join(projectRoot, 'src/assets/js/otp.js'), 'utf8');
+  assert.ok(otp.includes('createCodeSlots(') && otp.includes('await verify(current.challengeId, slots.value())') && otp.includes("slots.setStatus('success')") && otp.includes("slots.setStatus('error')"), 'success and error come from the server only');
+  assert.ok(otp.includes('if (busy || dead || slots.value().length !== length) return;'), 'one verification in flight');
+});
+
+test('phone numbers: one country list with ISO alpha-3 codes and dialling codes, India first by default', async () => {
+  const { COUNTRIES, countryByAlpha3, countryByName } = await import('../src/data/countries.mjs');
+  assert.equal(COUNTRIES.length, 195);
+  assert.equal(new Set(COUNTRIES.map((c) => c.alpha3)).size, 195, 'alpha-3 codes are unique');
+  assert.ok(COUNTRIES.every((c) => /^[A-Z]{3}$/.test(c.alpha3) && /^[A-Z]{2}$/.test(c.alpha2) && /^\+\d{1,4}$/.test(c.dial)));
+  assert.deepEqual([countryByAlpha3('ind').name, countryByAlpha3('IND').dial, countryByName('Ukraine').alpha3, countryByName('united kingdom').dial], ['India', '+91', 'UKR', '+44']);
+  const generated = readFileSync(join(dist, 'assets/js/countries.js'), 'utf8');
+  assert.ok(generated.startsWith('// Generated by build.mjs') && generated.includes('"alpha3":"IND"'), 'the browser gets the same list');
+  const contact = readFileSync(join(dist, 'contact', 'index.html'), 'utf8');
+  assert.ok(contact.includes('type="tel" autocomplete="tel" inputmode="tel"') && contact.includes('data-phone'), 'the enquiry form uses the international field');
+  assert.ok(readFileSync(join(projectRoot, 'src/assets/js/account.js'), 'utf8').includes('initPhones(box)'), 'and so does the profile');
+  const phone = readFileSync(join(projectRoot, 'src/assets/js/phone.js'), 'utf8');
+  assert.ok(phone.includes("DEFAULT_ALPHA2 = 'IN'") && phone.includes('[2-9]') && phone.includes("replace(/^00/, '+')"), 'India default, Indian number rule, pasted 00 / + prefixes');
+  assert.ok(readFileSync(join(projectRoot, 'src/assets/js/login.js'), 'utf8').includes('mountPhone('), 'the sign-in page uses it for the mobile OTP');
+  // The server accepts the E.164 form (7–15 digits after the +) and rejects nonsense. Checked on the PHP and
+  // its Node twin rather than live, because the enquiry rate limit is spent by the tests above.
+  for (const file of ['src/api/enquiry.php', 'scripts/dev-server.mjs']) {
+    const source = readFileSync(join(projectRoot, file), 'utf8');
+    assert.match(source, /digits.{0,12}< 7 \|\| .{0,25}> 15/, `${file} keeps the 7–15 digit rule`);
+  }
 });

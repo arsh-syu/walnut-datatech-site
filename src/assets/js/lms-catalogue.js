@@ -131,6 +131,30 @@ const tone = (category) => [...category].reduce((h, ch) => (h * 31 + ch.codePoin
 
 // The picture at the top of a card and of its details: the course's image from Walnut LMS, or a cover
 // drawn here naming the category. Decorative either way (the title says what the course is).
+// The HoloCard mount around a card's picture (assets/js/holo-card.js): the requester's settings travel as
+// data attributes, the component reads them when it is integrated; until then the mount is inert.
+function holoMount(course, title) {
+  const attrs = {
+    'data-holo': '',
+    'data-holo-card': course.slug,
+    'data-holo-image': course.image || '',
+    'data-holo-alt': `${title} course cover`,
+    'data-holo-preset': 'bursts',
+    'data-holo-foil': '#e2e6ec',
+    'data-holo-intensity': '0.85',
+    'data-holo-scale': '1',
+    'data-holo-edge-sparkle': '0.8',
+    'data-holo-frame': '4',
+    'data-holo-glare': '0.5',
+    'data-holo-tilt-max': '14',
+    'data-holo-hover-scale': '1.04',
+    'data-holo-radius': '14',
+    'data-holo-idle': '',
+    'data-holo-shadow': '',
+  };
+  return `<div class="course-holo" ${Object.entries(attrs).map(([k, v]) => (v === '' ? k : `${k}="${esc(v)}"`)).join(' ')}>`;
+}
+
 function media(course, { icon, video }) {
   const picture = course.image
     ? `<img src="${esc(course.image)}" alt="" width="1600" height="900" loading="lazy" decoding="async">`
@@ -143,9 +167,16 @@ function media(course, { icon, video }) {
 // What the "i" on a card opens: everything known about the course, its preview video when it has one,
 // and the way in. Kept in a <template> on the card, so it costs nothing until it is opened; main.js makes
 // its title the dialog's <h2> then (a heading in every card's template would break the page's outline).
+// Sample certificates kept on this site (certificates/<course>/ holds the template and the renders), shown in
+// the details of the course they belong to. Keyed by the LMS slug; the path is relative to the site root.
+export const CERTIFICATE_SPECIMENS = {
+  'online-counselling-course': { src: 'assets/img/certificate-online-counselling-specimen.webp', width: 1200, height: 848 },
+};
+
 export function renderCourseDetails(course, { icon, lmsUrl, root = '', sso = false }) {
   const { page, enrol } = courseLinks(course, { lmsUrl, root, sso });
   const title = esc(course.title);
+  const specimen = CERTIFICATE_SPECIMENS[course.slug] || null;
   // The short facts share a row; the certificate's name is long, so it gets a row of its own.
   const facts = [
     ['Level', sentence(course.level)],
@@ -164,6 +195,7 @@ export function renderCourseDetails(course, { icon, lmsUrl, root = '', sso = fal
       ${course.subtitle ? `<p class="course-detail-lede">${esc(course.subtitle)}</p>` : ''}
       <dl class="course-facts">${facts.map(([k, v, wide]) => `<div${wide ? ` class="${wide}"` : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
       ${course.highlights.length ? `<p class="course-learn-head">What you will learn</p><ul class="course-learn">${course.highlights.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
+      ${specimen ? `<figure class="course-cert"><p class="course-learn-head">Your certificate</p><img src="${esc(root + specimen.src)}" alt="Specimen of the ${title} certificate" width="${specimen.width}" height="${specimen.height}" loading="lazy" decoding="async"><figcaption>A specimen. Yours carries your name, the date and a certificate number you can verify on this site, once you have completed the course and passed its assessment.</figcaption></figure>` : ''}
       <div class="course-detail-actions">
         ${course.preview ? `<button class="btn btn-ghost" type="button" data-video="${esc(course.preview)}" data-video-title="${title} — preview" data-track="course_preview" data-track-item="${esc(course.slug)}">${icon('play')}<span>Watch the preview</span></button>` : ''}
         ${course.upcoming
@@ -189,9 +221,9 @@ export function renderCard(course, { icon, lmsUrl, root = '', sso = false, level
     course.certificateTitle ? 'Certificate' : null,
   ].filter(Boolean);
   return `<article class="course-card spot${course.upcoming ? ' is-upcoming' : ''}"${reveal ? ` data-reveal style="--d:${(i * 0.08).toFixed(2)}s"` : ''}>
-    <div class="course-media">
+    ${holoMount(course, title)}<div class="course-media">
       ${media(course, { icon, video: true })}
-    </div>
+    </div></div>
     <div class="course-body">
       <p class="eyebrow">${esc(course.category)} · ${sentence(course.level)}</p>
       <h${level} class="course-card-title"><a href="${esc(page)}" rel="noopener" data-track="course_select" data-track-item="${esc(course.slug)}">${title}<span class="sr-only"> (on Walnut LMS)</span></a></h${level}>

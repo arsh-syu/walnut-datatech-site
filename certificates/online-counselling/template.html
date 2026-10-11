@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Certificate — {{holder}} — Online Counselling Course — Walnut DataTech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lexend:wght@400;500;600&display=swap">
+<style>
+  /* Walnut DataTech certificate — A4 landscape (297 × 210 mm). Brand tokens from the website (base.css). */
+  :root {
+    --ink: #0d0c14; --muted: #5f5b73; --line: #e6e3f2; --mist: #f6f5fb;
+    --violet: #7d62ff; --violet-600: #6a4df5; --violet-700: #5b3fe6; --violet-soft: #efebff; --ok: #17b26a;
+    --font-display: "Lexend", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #fff; }
+  body { font: 400 13pt/1.5 var(--font-body); color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sheet { position: relative; width: 297mm; height: 210mm; overflow: hidden; background: #fff; }
+
+  /* frame: a violet hairline inset from the edge, a soft inner panel */
+  .frame { position: absolute; inset: 9mm; border: 1.2pt solid var(--violet); border-radius: 6mm; }
+  .frame::after { content: ''; position: absolute; inset: 2.2mm; border: .5pt solid var(--line); border-radius: 4.6mm; }
+  .panel { position: absolute; inset: 14mm; display: grid; grid-template-rows: auto 1fr auto; padding: 10mm 16mm 9mm; }
+
+  /* the Walnut mark pattern in the top-right and bottom-left corners */
+  .corner { position: absolute; width: 58mm; height: 58mm; color: var(--violet); opacity: .07; }
+  .corner.tr { top: 9mm; right: 9mm; transform: translate(22%, -22%) rotate(12deg); }
+  .corner.bl { bottom: 9mm; left: 9mm; transform: translate(-22%, 22%) rotate(12deg); }
+  .mark { fill: currentColor; width: 100%; height: 100%; }
+
+  /* header */
+  .head { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 4mm; }
+  .brand .mark { width: 13mm; height: 13mm; color: var(--violet); }
+  .brand-name { font: 600 15pt/1.05 var(--font-display); letter-spacing: -.02em; }
+  .brand-sub { margin-top: 1mm; font: 500 8.5pt/1.2 var(--font-body); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .cert-no { text-align: right; font: 500 8.5pt/1.5 var(--font-body); color: var(--muted); }
+  .cert-no strong { display: block; font: 600 10.5pt/1.3 var(--font-body); color: var(--ink); letter-spacing: .04em; }
+
+  /* body */
+  .body { display: grid; align-content: center; justify-items: center; text-align: center; gap: 0; }
+  .eyebrow { font: 600 10pt/1.4 var(--font-body); color: var(--violet-700); letter-spacing: .18em; text-transform: uppercase; }
+  .title { margin: 2mm 0 6mm; font: 500 34pt/1.05 var(--font-display); letter-spacing: -.035em; }
+  .lead { font: 400 12.5pt/1.5 var(--font-body); color: var(--muted); }
+  .holder { margin: 3mm 0 1.5mm; font: 500 32pt/1.1 var(--font-display); letter-spacing: -.03em; color: var(--ink); }
+  .holder-rule { width: 70mm; height: 1pt; margin: 0 auto 5mm; background: linear-gradient(90deg, transparent, var(--violet), transparent); }
+  .course { margin: 1.5mm 0 0; font: 500 19pt/1.2 var(--font-display); letter-spacing: -.02em; color: var(--violet-700); }
+  .credential { margin: 2mm 0 0; font: 600 11pt/1.4 var(--font-body); letter-spacing: .02em; }
+  .facts { display: flex; justify-content: center; gap: 4mm 9mm; margin-top: 5mm; font: 400 10.5pt/1.4 var(--font-body); color: var(--muted); }
+  .facts span::before { content: '·'; margin-right: 9mm; color: var(--violet); }
+  .facts span:first-child::before { content: none; margin: 0; }
+
+  /* foot: date, seal, signature */
+  .foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 10mm; }
+  .sig { display: grid; gap: 1.5mm; justify-items: start; }
+  .sig.right { justify-items: end; text-align: right; }
+  .sig-line { width: 58mm; height: .7pt; background: var(--ink); opacity: .55; }
+  .sig-label { font: 600 9.5pt/1.3 var(--font-body); }
+  .sig-sub { font: 400 8.5pt/1.3 var(--font-body); color: var(--muted); }
+  .sig-value { font: 500 12pt/1.3 var(--font-display); letter-spacing: -.01em; margin-bottom: 1mm; }
+  .seal { display: grid; place-items: center; width: 30mm; height: 30mm; border-radius: 50%; border: 1pt solid var(--violet); background: var(--violet-soft); color: var(--violet-700); }
+  .seal .mark { width: 15mm; height: 15mm; }
+  .seal-text { position: absolute; width: 30mm; height: 30mm; }
+  .seal-text text { font: 600 5.6pt var(--font-body); letter-spacing: .22em; fill: var(--violet-700); text-transform: uppercase; }
+  .seal-wrap { position: relative; display: grid; place-items: center; }
+  .verify { margin-top: 2mm; text-align: center; font: 400 8.5pt/1.5 var(--font-body); color: var(--muted); }
+  .verify b { color: var(--ink); font-weight: 600; letter-spacing: .03em; }
+
+  /* specimen: a repeating diagonal watermark and a notice; nothing else changes */
+  .watermark { display: none; }
+  .specimen .watermark {
+    display: block; position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='420' height='220'><text x='0' y='140' transform='rotate(-24 210 110)' font-family='Lexend, Arial, sans-serif' font-size='54' font-weight='600' letter-spacing='6' fill='%237d62ff' fill-opacity='0.13'>SPECIMEN</text></svg>");
+    background-size: 420px 220px;
+  }
+  .specimen .notice {
+    position: absolute; left: 50%; bottom: 3.6mm; z-index: 6; transform: translateX(-50%); padding: 1.2mm 4mm;
+    border-radius: 99px; background: var(--violet-700); color: #fff; font: 600 7.5pt/1.3 var(--font-body); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .notice { display: none; }
+  .specimen .notice { display: block; }
+</style>
+</head>
+<body>
+<div class="sheet {{mode}}">
+  <div class="frame"></div>
+  <svg class="corner tr" viewBox="60 60 180 180" aria-hidden="true"><g class="mark"><path d="M180 119.962L239.912 109L239.912 125.918L192.335 133.168L192.511 130.406L240 141.973L240 158.027L192.511 169.68L192.335 166.832L239.912 174.082L239.912 191L180 180.038L180 160.531L227.048 148.187L227.048 151.899L180 139.469L180 119.962Z"/><path d="M180.038 120L191 60.0881L174.082 60.0881L166.832 107.665L169.594 107.489L158.027 60L141.973 60L130.32 107.489L133.168 107.665L125.918 60.0881L109 60.0881L119.962 120L139.469 120L151.813 72.9515L148.101 72.9515L160.531 120L180.038 120Z"/><path d="M180.038 180L191 239.912L174.082 239.912L166.832 192.335L169.594 192.511L158.027 240L141.973 240L130.32 192.511L133.168 192.335L125.918 239.912L109 239.912L119.962 180L139.469 180L151.813 227.048L148.101 227.048L160.531 180L180.038 180Z"/><path d="M120 119.962L60.0881 109L60.0881 125.918L107.665 133.168L107.489 130.406L60 141.973L60 158.027L107.489 169.68L107.665 166.832L60.0881 174.082L60.0881 191L120 180.038L120 160.531L72.9515 148.187L72.9515 151.899L120 139.469L120 119.962Z"/></g></svg>
+  <svg class="corner bl" viewBox="60 60 180 180" aria-hidden="true"><g class="mark"><path d="M180 119.962L239.912 109L239.912 125.918L192.335 133.168L192.511 130.406L240 141.973L240 158.027L192.511 169.68L192.335 166.832L239.912 174.082L239.912 191L180 180.038L180 160.531L227.048 148.187L227.048 151.899L180 139.469L180 119.962Z"/><path d="M180.038 120L191 60.0881L174.082 60.0881L166.832 107.665L169.594 107.489L158.027 60L141.973 60L130.32 107.489L133.168 107.665L125.918 60.0881L109 60.0881L119.962 120L139.469 120L151.813 72.9515L148.101 72.9515L160.531 120L180.038 120Z"/><path d="M180.038 180L191 239.912L174.082 239.912L166.832 192.335L169.594 192.511L158.027 240L141.973 240L130.32 192.511L133.168 192.335L125.918 239.912L109 239.912L119.962 180L139.469 180L151.813 227.048L148.101 227.048L160.531 180L180.038 180Z"/><path d="M120 119.962L60.0881 109L60.0881 125.918L107.665 133.168L107.489 130.406L60 141.973L60 158.027L107.489 169.68L107.665 166.832L60.0881 174.082L60.0881 191L120 180.038L120 160.531L72.9515 148.187L72.9515 151.899L120 139.469L120 119.962Z"/></g></svg>
+
+  <div class="panel">
+    <header class="head">
+      <div class="brand">
+        <svg class="mark" viewBox="60 60 180 180" aria-hidden="true"><path d="M180 119.962L239.912 109L239.912 125.918L192.335 133.168L192.511 130.406L240 141.973L240 158.027L192.511 169.68L192.335 166.832L239.912 174.082L239.912 191L180 180.038L180 160.531L227.048 148.187L227.048 151.899L180 139.469L180 119.962Z"/><path d="M180.038 120L191 60.0881L174.082 60.0881L166.832 107.665L169.594 107.489L158.027 60L141.973 60L130.32 107.489L133.168 107.665L125.918 60.0881L109 60.0881L119.962 120L139.469 120L151.813 72.9515L148.101 72.9515L160.531 120L180.038 120Z"/><path d="M180.038 180L191 239.912L174.082 239.912L166.832 192.335L169.594 192.511L158.027 240L141.973 240L130.32 192.511L133.168 192.335L125.918 239.912L109 239.912L119.962 180L139.469 180L151.813 227.048L148.101 227.048L160.531 180L180.038 180Z"/><path d="M120 119.962L60.0881 109L60.0881 125.918L107.665 133.168L107.489 130.406L60 141.973L60 158.027L107.489 169.68L107.665 166.832L60.0881 174.082L60.0881 191L120 180.038L120 160.531L72.9515 148.187L72.9515 151.899L120 139.469L120 119.962Z"/></svg>
+        <div><div class="brand-name">Walnut DataTech</div><div class="brand-sub">Private Limited</div></div>
+      </div>
+      <div class="cert-no">Certificate No.<strong>{{certificateId}}</strong></div>
+    </header>
+
+    <main class="body">
+      <p class="eyebrow">Certificate of Completion</p>
+      <h1 class="title">Online Counselling Course</h1>
+      <p class="lead">This is to certify that</p>
+      <p class="holder">{{holder}}</p>
+      <div class="holder-rule"></div>
+      <p class="lead">has successfully completed the course and passed its assessment, and is recognised as a</p>
+      <p class="course">Certified Online Programme Counsellor</p>
+      <p class="credential">FOUNDATION LEVEL</p>
+      <p class="facts"><span>23 modules</span><span>111 lessons</span><span>29 hours of learning</span><span>Online, on Walnut LMS</span></p>
+    </main>
+
+    <footer class="foot">
+      <div class="sig">
+        <div class="sig-value">{{issuedOn}}</div>
+        <div class="sig-line"></div>
+        <div class="sig-label">Date of issue</div>
+        <div class="sig-sub">{{place}}</div>
+      </div>
+      <div class="seal-wrap">
+        <div class="seal"><svg class="mark" viewBox="60 60 180 180" aria-hidden="true"><path d="M180 119.962L239.912 109L239.912 125.918L192.335 133.168L192.511 130.406L240 141.973L240 158.027L192.511 169.68L192.335 166.832L239.912 174.082L239.912 191L180 180.038L180 160.531L227.048 148.187L227.048 151.899L180 139.469L180 119.962Z"/><path d="M180.038 120L191 60.0881L174.082 60.0881L166.832 107.665L169.594 107.489L158.027 60L141.973 60L130.32 107.489L133.168 107.665L125.918 60.0881L109 60.0881L119.962 120L139.469 120L151.813 72.9515L148.101 72.9515L160.531 120L180.038 120Z"/><path d="M180.038 180L191 239.912L174.082 239.912L166.832 192.335L169.594 192.511L158.027 240L141.973 240L130.32 192.511L133.168 192.335L125.918 239.912L109 239.912L119.962 180L139.469 180L151.813 227.048L148.101 227.048L160.531 180L180.038 180Z"/><path d="M120 119.962L60.0881 109L60.0881 125.918L107.665 133.168L107.489 130.406L60 141.973L60 158.027L107.489 169.68L107.665 166.832L60.0881 174.082L60.0881 191L120 180.038L120 160.531L72.9515 148.187L72.9515 151.899L120 139.469L120 119.962Z"/></svg></div>
+        <svg class="seal-text" viewBox="0 0 100 100" aria-hidden="true"><defs><path id="ring" d="M50 50 m-42 0 a42 42 0 1 1 84 0 a42 42 0 1 1 -84 0"/></defs><text><textPath href="#ring" startOffset="1%">WALNUT DATATECH · CERTIFIED · WALNUT LMS ·</textPath></text></svg>
+      </div>
+      <div class="sig right">
+        <div class="sig-value">{{signatoryName}}</div>
+        <div class="sig-line"></div>
+        <div class="sig-label">{{signatoryTitle}}</div>
+        <div class="sig-sub">Walnut DataTech Private Limited</div>
+      </div>
+    </footer>
+    <p class="verify">Verify this certificate at <b>walnutdatatech.com/verify-certificate</b> with certificate number <b>{{certificateId}}</b>. Issued on Walnut LMS.</p>
+  </div>
+
+  <div class="watermark"></div>
+  <div class="notice">Specimen — not a valid certificate</div>
+</div>
+</body>
+</html>
