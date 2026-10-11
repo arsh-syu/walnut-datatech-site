@@ -56,7 +56,9 @@ let toolServer, linkedServer, tmp;
 
 let server;
 before(async () => {
-  const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8' });
+  // The production shape, whatever the environment sets (the preview workflow builds with NOINDEX, which leaves
+  // out the sitemap the tests read).
+  const build = spawnSync(process.execPath, ['build.mjs'], { cwd: projectRoot, encoding: 'utf8', env: { ...process.env, NOINDEX: '', SITE_URL: 'https://walnutdatatech.com' } });
   assert.equal(build.status, 0, build.stderr);
   // No keys: the API must validate everything and then refuse to create an order.
   server = spawn(process.execPath, ['scripts/dev-server.mjs', String(PORT)], { cwd: projectRoot, env: { ...process.env, WALNUT_ENV_FILE: '/dev/null' } });

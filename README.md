@@ -1,8 +1,18 @@
 # Walnut Data Tech — website
 
-Website for Walnut Data Tech: technology and services for universities, short courses for learners, and applications for education agents.
+Website for Walnut Data Tech: technology and services for universities, short courses for learners, and applications for education partners.
 
 A zero-dependency static site plus a small PHP API. Data files describe every service and application, a snapshot of the Walnut LMS catalogue describes the courses, and a Node script turns them into HTML.
+
+## What is on the site
+
+- **Universities** — solutions, service pages and the seven-step configurator (`/configure/`) that files a university request in the Onboarding Tool and returns a Request ID; `/request-status/` looks one up.
+- **Learners** — the Walnut LMS catalogue on `/academy/` (a build-time snapshot refreshed live in the browser), course details with a preview video and the specimen certificate, Enrol on Walnut LMS (signed in through the site when SSO is configured), certificate verification on `/verify-certificate/`.
+- **Partners** — the partnership page and the application launcher.
+- **Accounts** — one Walnut account for all three (`/login/`, `/dashboard/`): OTP by email or mobile, the account type chosen on a toggle bar at sign-up, course purchases and progress from the LMS on the dashboard, and the payment gateway (`/pay/`) that Walnut products use.
+- **Motion** — smooth scrolling (GSAP ScrollSmoother) on the content pages, React Bits' GradientText on the hero words, animated OTP slots and a verified moment built on React Bits' StatusMark and ClickSpark, HoloCard mounts on course pictures.
+
+Operations notes: [docs/GO-LIVE.md](docs/GO-LIVE.md) (deploy settings and what changes on live), [docs/LAUNCH-CHECKLIST.md](docs/LAUNCH-CHECKLIST.md) (pre-launch audit), [certificates/online-counselling/](certificates/online-counselling/README.md) (the course certificate template and specimen).
 
 ## Commands
 
@@ -36,6 +46,8 @@ Requires Node 20+. There is nothing to install — no dependencies.
 | Enquiry and account API (runs on the web host) | `src/api/` |
 | Deploy script, local dev server | `scripts/` |
 | Tests | `tests/` |
+| Course certificates (template, renderer, specimen) | `certificates/` |
+| Go-live notes, launch checklist, QA screenshots | `docs/` |
 | Brand kit for re-theming other tools (tokens, component styles, logos, icons, guidelines) | `brand/` — start with `brand/brand-book.html` |
 | Secrets (FTP login, Razorpay keys, Twilio API key, account database login, Onboarding Tool key) — never committed | `.env` (see `.env.example`) |
 
@@ -148,7 +160,7 @@ browser → walnutdatatech.com/login, /dashboard
 ```
 
 - **Switching it on.** Set `ONBOARDING_API_URL` and `ONBOARDING_API_KEY` in `.env` and deploy: the deploy script then publishes `login/` and `dashboard/`, adds **Sign in** to the header (it becomes the person's first name once signed in) and the **Create your Walnut account** links. Without those two settings none of it is published. (`accounts: true` in `site.config.mjs`, or `ACCOUNTS=1 node build.mjs`, does the same for a local build.)
-- **Login** (`assets/js/login.js`): Email OTP or Mobile OTP into the same account, password as a fallback. A new person is asked "How can we help you?" (University / Learn / Agent) and their name. `?type=university|student|agent` pre-selects the answer.
+- **Login** (`assets/js/login.js`): Email OTP or Mobile OTP into the same account, password as a fallback. A new person chooses what brings them to Walnut on a toggle bar (University / Learner / Partner, as on the home page) and gives their name. `?type=university|student|agent` pre-selects the answer.
 - **Dashboard** (`assets/js/account.js`): the person's card (name, verified email and mobile) and tabs — *My requests* (empanelment requests and their status), *My courses* (purchases and progress), *Partner application* (the agent form and its status) and *Profile* (name, verify email, add a mobile number, other Walnut services).
 - **The relay** (`api/account.php`) forwards only `/auth/…` and `/account/…` calls, refuses other sites, rate-limits, and authenticates to the service with the shared key. The service's session cookie is handed to the browser as this site's own `HttpOnly` cookie.
 - **What the browser stores.** Only the person's first name, for the header. The session is that cookie (scripts cannot read it) plus a short-lived token kept in memory (`assets/js/session.js`). A one-time code is never stored.
