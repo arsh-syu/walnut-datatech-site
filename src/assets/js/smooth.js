@@ -30,7 +30,7 @@ if (wrapper && content && gsap && ScrollTrigger && ScrollSmoother && !reduceMoti
     smooth: 1.4, // seconds the content takes to catch up with the scrollbar (the demo uses 2)
     effects: true, // honours data-speed and data-lag on elements inside #smooth-content
     smoothTouch: 0, // phones and tablets keep native scrolling; only the parallax applies there
-    normalizeScroll: finePointer, // one unified scroll input on desktop; left alone on touch devices
+    normalizeScroll: finePointer ? { allowNestedScroll: true } : false, // one unified scroll input on desktop (nested scrollers such as the course dialog keep their own); left alone on touch devices
     ignoreMobileResize: true,
   });
   window.walnutSmoother = smoother;

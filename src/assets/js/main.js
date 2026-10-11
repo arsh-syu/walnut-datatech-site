@@ -114,6 +114,14 @@ document.addEventListener('pointermove', (e) => {
 
 /* ---------- dialogs and video ---------- */
 
+// While a dialog is open the page behind it holds still (the smooth scroller is paused) and the dialog starts at
+// its top; the wheel then belongs to the dialog (the scroller lets nested scrollers scroll — smooth.js).
+const holdPage = (dialog) => {
+  dialog.scrollTop = 0;
+  window.walnutSmoother?.paused(true);
+};
+const releasePage = () => window.walnutSmoother?.paused(false);
+
 const videoModal = $('#video-modal');
 const videoFrame = $('[data-video-frame]');
 
@@ -137,8 +145,9 @@ function openVideo(url, title) {
   videoFrame.replaceChildren(iframe);
   videoModal.setAttribute('aria-label', title);
   videoModal.showModal();
+  holdPage(videoModal);
 }
-videoModal.addEventListener('close', () => videoFrame.replaceChildren());
+videoModal.addEventListener('close', () => (videoFrame.replaceChildren(), releasePage()));
 
 // The "i" on a course card: the course's details, from the <template> on the card, in a dialog. Its title
 // becomes the dialog's heading here (a heading in every card's template would break the page's outline).
@@ -158,8 +167,9 @@ function openCourse(card) {
   }
   courseBody.replaceChildren(content);
   courseModal.showModal();
+  holdPage(courseModal);
 }
-courseModal?.addEventListener('close', () => courseBody.replaceChildren());
+courseModal?.addEventListener('close', () => (courseBody.replaceChildren(), releasePage()));
 
 document.addEventListener('click', (e) => {
   const video = e.target.closest('[data-video]');
