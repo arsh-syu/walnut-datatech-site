@@ -46,7 +46,7 @@ export default {
   // goes through api/sso.php so the learner arrives signed in with their Walnut account. Without it,
   // Enrol opens the course on Walnut LMS. WALNUT_LMS_URL in the environment overrides `url`.
   lms: {
-    url: 'https://walnut-lms.vercel.app',
+    url: 'https://lms.walnutdatatech.com',
     sso: false,
   },
 

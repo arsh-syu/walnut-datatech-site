@@ -50,7 +50,7 @@ if (env.CERT_VERIFY_URL && !certVerifyUrl) fail('CERT_VERIFY_URL must be an http
 const hasLogin = hasOnboarding || hasAccounts;
 // Walnut LMS sells the courses. Our server asks it for course progress with a shared secret, and the Enrol
 // buttons sign the person in to it — both only with the account database, which holds the learners.
-const lmsUrl = (env.WALNUT_LMS_URL || 'https://walnut-lms.vercel.app').replace(/\/+$/, '');
+const lmsUrl = (env.WALNUT_LMS_URL || 'https://lms.walnutdatatech.com').replace(/\/+$/, '');
 const hasLms = Boolean(hasAccounts && env.WALNUT_LMS_INTEGRATION_SECRET);
 const hasLmsSso = Boolean(hasAccounts && env.WALNUT_SSO_SECRET_LMS);
 // The payment gateway (api/pay/): every Walnut product's payments, on this site. Its ledger is the account

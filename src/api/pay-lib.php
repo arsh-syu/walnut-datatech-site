@@ -27,7 +27,7 @@ function pay_apps(array $config): array
         'walnut-lms' => [
             'name' => 'Walnut LMS',
             'return_origins' => ['https://walnut-lms.vercel.app', 'https://lms.walnutdatatech.com'],
-            'callback_url' => (string) ($config['pay_callback_walnut_lms'] ?? 'https://walnut-lms.vercel.app/api/payments/walnut/callback'),
+            'callback_url' => (string) ($config['pay_callback_walnut_lms'] ?? 'https://lms.walnutdatatech.com/api/payments/walnut/callback'),
             'secret' => (string) ($config['pay_secret_walnut_lms'] ?? ''),
         ],
     ];

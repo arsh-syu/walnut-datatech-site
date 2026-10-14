@@ -62,7 +62,7 @@ Requires Node 20+. There is nothing to install — no dependencies.
 
 ## Courses (Walnut LMS)
 
-Courses are sold and taken on Walnut LMS (`lms.url` in `site.config.mjs`, https://walnut-lms.vercel.app). This site lists them and sends learners there; it takes no payments itself.
+Courses are sold and taken on Walnut LMS (`lms.url` in `site.config.mjs`, https://lms.walnutdatatech.com; the old https://walnut-lms.vercel.app address redirects there). This site lists them and sends learners there; it takes no payments itself.
 
 - **The catalogue.** `/academy/` lists every published course from the LMS's public feed (`{lms.url}/api/public/courses`), grouped by category, featured courses first. The home page and the footer show up to three featured courses. All counts on the page come from the feed.
 - **Snapshot, then live.** The build renders from `src/data/lms-catalogue.json`, a snapshot taken by `node scripts/fetch-catalogue.mjs`. The script keeps the old snapshot (and still exits 0) when the LMS is down or sends nothing valid, so a deploy never fails because of the LMS. In the browser, `main.js` fetches the live feed and redraws the catalogue only when the courses differ from the snapshot; on any failure the built catalogue stays as it is.

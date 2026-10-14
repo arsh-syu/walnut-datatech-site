@@ -323,7 +323,7 @@ function walnut_apps(array $config): array
         'course-finder' => ['name' => 'Course Finder', 'url' => 'https://syu-course-finder.vercel.app', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_course_finder'] ?? ''],
         'leads' => ['name' => 'Online Leads', 'url' => 'https://syu-leads.vercel.app', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_leads'] ?? ''],
         // Where courses are sold and taken. Its address can be changed (WALNUT_LMS_URL) without a code change.
-        'walnut-lms' => ['name' => 'Walnut LMS', 'url' => lms_origin($config) ?: 'https://walnut-lms.vercel.app', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_lms'] ?? ''],
+        'walnut-lms' => ['name' => 'Walnut LMS', 'url' => lms_origin($config) ?: 'https://lms.walnutdatatech.com', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_lms'] ?? ''],
     ];
 }
 

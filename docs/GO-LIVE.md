@@ -26,7 +26,7 @@ https://walnutdatatech.com/api/health.php: `accounts`, `email`, `sms`, `onboardi
 | `RAZORPAY_WEBHOOK_SECRET` | **new** — `/api/pay/webhook.php` | create the webhook in the Razorpay dashboard for `https://walnutdatatech.com/api/pay/webhook.php` with events payment.authorized, payment.captured, payment.failed, order.paid, refund.processed, refund.failed; paste its secret |
 | `WALNUT_PAY_SECRET_WALNUT_LMS` | **new** — lets Walnut LMS take payments through this site | generate (`openssl rand -hex 32`), give the same value to the LMS team |
 | `WALNUT_SSO_SECRET_LMS` | **new** — "Enrol"/"Continue" sign the learner in to Walnut LMS | same value as the LMS's `WALNUT_SSO_SECRET`; empty = Enrol opens the LMS and the learner signs in there |
-| `WALNUT_LMS_URL` | **new** — the LMS address used by links, the catalogue snapshot and redirects | default `https://walnut-lms.vercel.app`; https origin, no path |
+| `WALNUT_LMS_URL` | **new** — the LMS address used by links, the catalogue snapshot and redirects | default `https://lms.walnutdatatech.com`; https origin, no path |
 | `WALNUT_LMS_INTEGRATION_SECRET` | **new** — course progress on the dashboard | same value as `WALNUT_INTEGRATION_SECRET` in the LMS's Vercel settings; empty = dashboard shows purchases only |
 | `WALNUT_LMS_BACKFILL` | **new** — hands past website purchases to the LMS once | leave empty until the LMS team confirms they receive them |
 | `CERT_VERIFY_URL`, `CERT_VERIFY_KEY` | **new** — `/verify-certificate/` asks the LMS | leave empty until the LMS provides the endpoint and key; the page then says verification is not available yet |

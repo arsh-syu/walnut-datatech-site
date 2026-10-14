@@ -31,7 +31,7 @@ const request = { ...enquiry, topic: 'University empanelment request', flow: 'un
 const outbox = async () => (await (await fetch(`http://localhost:${PORT}/api/_outbox`)).json());
 
 // Walnut LMS, as the build sees it: the default address and the catalogue snapshot the pages are built from.
-const LMS = 'https://walnut-lms.vercel.app';
+const LMS = 'https://lms.walnutdatatech.com';
 const snapshot = parseFeed(JSON.parse(readFileSync(join(projectRoot, 'src/data/lms-catalogue.json'), 'utf8')));
 // The courses with an Enrol button on their card, as /academy/ shows them: open for enrolment, in catalogue
 // order (an upcoming course has none).
@@ -151,7 +151,7 @@ test('old course addresses forward: to the same course on Walnut LMS, or to /aca
   if (existsSync(join(dist, 'sitemap.xml'))) assert.ok(!readFileSync(join(dist, 'sitemap.xml'), 'utf8').includes('/academy/agentic-ai') && !readFileSync(join(dist, 'sitemap.xml'), 'utf8').includes('/academy/online-programme-course'));
   // The server answers them with a 301 first.
   const htaccess = readFileSync(join(dist, '.htaccess'), 'utf8');
-  assert.match(htaccess, /<IfModule mod_alias\.c>\s+RedirectMatch 301 \^\S*\/academy\/online-programme-course\/\?\$ https:\/\/walnut-lms\.vercel\.app\/courses\/online-counselling-course\n\s+RedirectMatch 301 \^\S*\/academy\/agentic-ai\/\?\$ \S*\/academy\/\n<\/IfModule>/);
+  assert.match(htaccess, /<IfModule mod_alias\.c>\s+RedirectMatch 301 \^\S*\/academy\/online-programme-course\/\?\$ https:\/\/lms\.walnutdatatech\.com\/courses\/online-counselling-course\n\s+RedirectMatch 301 \^\S*\/academy\/agentic-ai\/\?\$ \S*\/academy\/\n<\/IfModule>/);
   // The stubs promise nothing a reader never sees; the note for past buyers is where the redirects land.
   for (const html of [programme, agentic]) assert.ok(!html.includes('If you bought this course'), 'no note on a page that forwards at once');
   const academy = readFileSync(join(dist, 'academy/index.html'), 'utf8');
@@ -239,7 +239,7 @@ test('prices stay the same as on Walnut LMS wherever courses are shown', () => {
   const picks = featured(courses, 3);
   const home = readFileSync(join(dist, 'index.html'), 'utf8');
   const grid = home.match(/<div class="course-grid" data-lms-featured[^>]*>/)[0];
-  assert.ok(grid.includes('data-count="3"') && grid.includes(`data-lms-key="${catalogueKey(picks)}"`) && grid.includes('data-lms-url="https://walnut-lms.vercel.app"'));
+  assert.ok(grid.includes('data-count="3"') && grid.includes(`data-lms-key="${catalogueKey(picks)}"`) && grid.includes(`data-lms-url="${LMS}"`));
   assert.ok(/<script type="application\/json" id="lms-icons">\{/.test(home), 'the home page has the icons to redraw its cards');
   // At its LMS price — or, while it is upcoming (not for sale on the LMS either), with no price at all.
   for (const c of picks) {
@@ -455,7 +455,7 @@ test('login and the dashboard are part of this site, and built only when account
   assert.ok(made('dashboard/index.html').includes('<meta name="robots" content="noindex">') && !made('sitemap.xml').includes('/dashboard/'), 'the dashboard is not listed for search engines');
   // Everything stays on this domain: the pages call the site's own API and nothing else.
   assert.ok(made('login/index.html').includes('"account":"../api/account.php?p="'));
-  assert.match(made('login/index.html'), /connect-src 'self' https:\/\/walnut-lms\.vercel\.app;/, 'beyond itself, only the LMS course feed');
+  assert.match(made('login/index.html'), /connect-src 'self' https:\/\/lms\.walnutdatatech\.com;/, 'beyond itself, only the LMS course feed');
   // Accounts alone do not send Enrol through the sign-in: that waits for the LMS sign-in secret (LMS_SSO).
   for (const [slug, href] of enrolLinks(made('academy/index.html'))) assert.equal(href, `${LMS}/courses/${slug}`, slug);
   rmSync(out, { recursive: true, force: true });
@@ -493,7 +493,7 @@ test('with accounts and the LMS sign-in on, Enrol signs the person in to Walnut 
   noAccounts.done();
 
   // The LMS address is reduced to its https origin before it reaches a link or .htaccess, and plain http stops the build.
-  const pathed = build({ WALNUT_LMS_URL: 'https://walnut-lms.vercel.app/lms/' });
+  const pathed = build({ WALNUT_LMS_URL: `${LMS}/lms/` });
   assert.ok(catalogueOf(pathed.read('academy/index.html')).includes(`data-lms-url="${LMS}"`) && pathed.read('.htaccess').includes(` ${LMS}/courses/online-counselling-course\n`));
   pathed.done();
   for (const bad of ['http://walnut-lms.vercel.app', 'walnut-lms.vercel.app']) {
@@ -512,7 +512,7 @@ test('the security policy allows the LMS feed, and Razorpay on the pay page only
     const csp = readFileSync(file, 'utf8').match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)?.[1];
     assert.ok(csp, `${file} has a policy`);
     assert.ok(!/razorpay/i.test(csp), `${file}: Razorpay is still allowed`);
-    assert.match(csp, /connect-src 'self' https:\/\/walnut-lms\.vercel\.app[ ;]/, file);
+    assert.match(csp, /connect-src 'self' https:\/\/lms\.walnutdatatech\.com[ ;]/, file);
   }
   // Asked for, the policy lets Razorpay's checkout load, show its frame and call home; nothing else changes.
   const plain = contentSecurityPolicy(config);
@@ -879,7 +879,7 @@ test('deploy wires Walnut LMS: catalogue first, secrets only to the server, the 
   assert.ok(deploy.includes("['ONBOARDING', 'COURSE_FINDER', 'LEADS', 'LMS'].filter((k) => env[`WALNUT_SSO_SECRET_${k}`])"));
   assert.ok(deploy.includes('const hasLmsSso = Boolean(hasAccounts && env.WALNUT_SSO_SECRET_LMS);') && deploy.includes("LMS_SSO: hasLmsSso ? '1' : ''"));
   // The integration secret and address, with the address checked before anything is built.
-  assert.ok(deploy.includes("const lmsUrl = (env.WALNUT_LMS_URL || 'https://walnut-lms.vercel.app')") && deploy.includes('WALNUT_LMS_URL: lmsUrl'));
+  assert.ok(deploy.includes("const lmsUrl = (env.WALNUT_LMS_URL || 'https://lms.walnutdatatech.com')") && deploy.includes('WALNUT_LMS_URL: lmsUrl'));
   // Checked on every deploy (sign-in tokens go there even without the integration secret): a public https origin.
   const urlRule = deploy.match(/\nif \(!(\/\^https:[^\n]+\/i)\.test\(lmsUrl\)\) fail\(/);
   assert.ok(urlRule, 'the address is checked whatever else is set');
@@ -904,7 +904,7 @@ test('deploy wires Walnut LMS: catalogue first, secrets only to the server, the 
 
 test('the server registers Walnut LMS, makes learners of those who open it, and signs every call to it', () => {
   const lib = readFileSync(join(projectRoot, 'src/api/account-lib.php'), 'utf8');
-  assert.ok(lib.includes("'walnut-lms' => ['name' => 'Walnut LMS', 'url' => lms_origin($config) ?: 'https://walnut-lms.vercel.app', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_lms'] ?? '']"));
+  assert.ok(lib.includes("'walnut-lms' => ['name' => 'Walnut LMS', 'url' => lms_origin($config) ?: 'https://lms.walnutdatatech.com', 'receiver' => '/api/sso/walnut', 'secret' => $config['sso_lms'] ?? '']"));
   // Only an https origin is ever used: for the sign-in redirect, and for the signed calls (whose signature covers the path).
   // It ends in \z, not $, so an address with a trailing newline is refused; a lost backslash ('?z~i') would refuse every
   // address and quietly switch the LMS off.
