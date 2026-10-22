@@ -39,8 +39,8 @@ node ~/code/walnut-datatech-site/certificates/online-counselling/render.mjs --ho
 
 "Certificate of Completion · Online Counselling Course · This is to certify that *name* has successfully
 completed the course and passed its assessment, and is recognised as a Certified Online Programme Counsellor,
-Foundation level" — the credential title the LMS carries for this course — with the course facts (23 modules,
-111 lessons, 29 hours, on Walnut LMS), the date and place of issue, the Walnut seal, the signatory and the
+Foundation level" — the credential title the LMS carries for this course — with the course facts (21 modules,
+120 minutes of learning, on Walnut LMS; the syllabus's figures, 22 October 2026), the date and place of issue, the Walnut seal, the signatory and the
 verification line.
 
 Still to decide by the business: the signatory's name and title, and whether to add a QR code to the
